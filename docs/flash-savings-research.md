@@ -77,7 +77,7 @@ Flash を減らす手段は (a) 定数データを減らす/圧縮する, (b) �
 
 | # | 案 | 節約 (算出) | 備考 |
 | --- | --- | ---: | --- |
-| B1 | **PERC の生成ドラム 11 音を削除し、GM ノートは DRUM エンジンで鳴らす** | **−46,276** | `eng_drum.c` は既に GM 35..81 を DRUM 音で再生する (`DRUM_GM`)。SAMPLE PERC は CC0 手打楽器のみ残し、生成ドラムの GM 番号は DRUM 合成へ転送 (`eng_sample.c` note_on で分岐)。音は変わる → golden 更新 |
+| B1 | **PERC を削除し、パーカッションは DRUM エンジンの合成のみにする** (決定済: `flash-savings-plan.md` フェーズ 1) | **−67,812** (生成 46,276 + CC0 21,536) | `eng_drum.c` は既に GM 35..81 を DRUM 音で再生する (`DRUM_GM`)。SAMPLE PERC は CC0 手打楽器のみ残し、生成ドラムの GM 番号は DRUM 合成へ転送 (`eng_sample.c` note_on で分岐)。音は変わる → golden 更新 |
 | B2 | **FLUTE/SAX のループ区間を短縮** (0.55 s → ~0.15 s, クロスフェードループ) | −約 25,000 | `gen_samples.py cc0_entries` でループ長を切り詰め、`sampleio` でクロスフェード。ゾーン形式は変更なし |
 | B3 | **PIANO/FLUTE/SAX を 16 kHz で格納** (ゾーン毎 `rate` は既にフォーマットにある) | −約 28,500 (104 KB × 27 %) | `gen_samples.py` のセット別 `TR`。`eng_sample.c` は `z->rate` を使うので変更不要。高域が落ちる |
 | B4 | PIANO を 5→3 ゾーン | −16,540 | ピッチシフト幅 ±4→±6 半音 |
@@ -118,7 +118,7 @@ B1+B2+B3 で約 −100 KB (スロットの空きが倍になる)。
 | C7 | `param_desc_t` の `min/max/def` を int8 化・`label/unit` を文字列表インデックス化 | −約 1,500 | `TP` 1,820 / `ENG_*` 3,080 の約半分 |
 | — | `FELUCCA_UAC=0` / `FELUCCA_UART=0` | −1,820 / −456 | 機能に対して小さい。非推奨 |
 | — | `FELUCCA_OTA=0` | −14,924 | エディタも消えるので不可 |
-| — | `FELUCCA_SLICE=0` | −10,068 | BREAK 22 KB は `SMP_DATA` に残る (gen_samples.py が無条件に書く)。SLICE=0 ビルドなら BREAK も外すべき (−22,050 追加) |
+| — | `FELUCCA_SLICE=0` | −10,068 (+BREAK −22,050) | 実測はヘッダ再生成なし。`gen_samples.py slice_on()` は SLICE=0 で BREAK を書かないので、通常ビルドでは合計約 −32 KB |
 
 ### D. Flash 配置 (1 MiB)
 
