@@ -54,6 +54,7 @@ static int16_t cv_cy0, cv_cy1;   /* text clip: canvas rows cv_cy0 .. cv_cy1 - 1 
 static struct {
     uint16_t bg, surf, text, theme, accent;
     uint16_t mid, dim, line, sel, tint, ink, rec, raise, key, lane, grid;
+    uint16_t stone, edge;        /* GHOULBOX: the stone's specks, a window's outer line */
     uint8_t light, mono;
     uint32_t gen;                /* bumped by palette_set (the text ramps follow) */
 } ux;
@@ -72,6 +73,8 @@ static struct {
 #define T_RAISE ux.raise         /* a raised area on a surface: stubs, guides, slots, chips, button wells */
 #define T_KEY ux.key             /* a keycap's fill (its label: T_INK; unavailable: a T_DIM fill) */
 #define T_LANE ux.lane           /* the piano roll: an in-scale row (SURF -> THEME 10 %) */
+#define T_STONE ux.stone         /* GHOULBOX: the darker specks of a window's stone (SURF -> BG 45 %) */
+#define T_EDGE ux.edge           /* GHOULBOX: a window's outer line (BG -> THEME 45 %) */
 #define T_GRID ux.grid           /* the piano roll: a step line (SURF -> TEXT 6 %; beats and C rows: RAISE) */
 #define NPALETTES UI_NPALETTES
 
@@ -111,6 +114,8 @@ static void palette_set(uint32_t i)
     ux.key = ux_mix(p->bg, p->text, UI_KEY_PCT);
     ux.lane = ux_mix(p->surf, p->theme, 10);
     ux.grid = ux_mix(p->surf, p->text, 6);
+    ux.stone = ux_mix(p->surf, p->bg, 45);
+    ux.edge = ux_mix(p->bg, p->theme, 45);
     ux.light = ux_luma(p->bg) > 128u;
     ux.rec = ux.mono ? p->accent : ux.light ? UI_REC_LIGHT : UI_REC_DARK;
     ux.gen++;                                    /* the text ramps change with the coverage curve */
@@ -192,6 +197,62 @@ static void cv_frame(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c)
     cv_rect(x, y + h - 1, w, 1, c);
     cv_rect(x, y, 1, h, c);
     cv_rect(x + w - 1, y, 1, h, c);
+}
+
+/* GHOULBOX: stone, SURF with STONE specks (about 1 in 8). The pattern is a pure function of the position in the
+ * caller's coordinates plus (ox, oy), so a redraw matches and a window drawn as two canvases has no seam */
+static void cv_stone(int32_t x, int32_t y, int32_t w, int32_t h, int32_t ox, int32_t oy)
+{
+    int32_t i, j;
+    uint16_t s = swap16(T_SURF), k = swap16(T_STONE);
+    for (j = 0; j < h; j++) {
+        int32_t py = y + j + cv_oy;
+        uint32_t ry = (uint32_t)(y + j + oy) * 0x7F4Au;
+        uint16_t *row;
+        if (py < 0 || py >= (int32_t)cv_h)
+            continue;
+        row = cv_px + (uint32_t)py * cv_w;
+        for (i = 0; i < w; i++) {
+            int32_t px = x + i;
+            uint32_t r = ((uint32_t)(x + i + ox) * 0x9E37u) ^ ry;
+            if ((uint32_t)px < cv_w)
+                row[px] = ((r >> 7) & 7u) ? s : k;
+        }
+    }
+    GFX_HOOK_PIXELS((uint32_t)(w * h));
+}
+
+/* GHOULBOX: an RPG window. border 3: the EDGE line, a STONE line, a THEME line, then stone; border 1: one THEME
+ * line, then stone. ACCENT studs (border x border) on the corners. Its inner area is a lint cell */
+static void cv_window(int32_t x, int32_t y, int32_t w, int32_t h, int32_t border)
+{
+    int32_t b = border == 1 ? 1 : 3;
+    cv_stone(x + b, y + b, w - 2 * b, h - 2 * b, 0, 0);
+    if (b == 3) {
+        cv_frame(x, y, w, h, T_EDGE);
+        cv_frame(x + 1, y + 1, w - 2, h - 2, T_STONE);
+        cv_frame(x + 2, y + 2, w - 4, h - 4, T_THEME);
+    } else {
+        cv_frame(x, y, w, h, T_THEME);
+    }
+    cv_rect(x, y, b, b, T_ACCENT);
+    cv_rect(x + w - b, y, b, b, T_ACCENT);
+    cv_rect(x, y + h - b, b, b, T_ACCENT);
+    cv_rect(x + w - b, y + h - b, b, b, T_ACCENT);
+    GFX_HOOK_CELL(x + b, y + b + cv_oy, x + w - b, y + h - b + cv_oy);   /* (the lint: text inside stays off the border) */
+}
+
+/* GHOULBOX: a small picture from rows of characters: '.' leaves the canvas, '0'..'9' are pal[0..9] */
+static void cv_sprite(int32_t x, int32_t y, const char *const *rows, uint32_t h, const uint16_t *pal)
+{
+    uint32_t j;
+    for (j = 0; j < h; j++) {
+        const char *r = rows[j];
+        int32_t i;
+        for (i = 0; r[i]; i++)
+            if (r[i] >= '0' && r[i] <= '9')
+                cv_rect(x + i, y + (int32_t)j, 1, 1, pal[r[i] - '0']);
+    }
 }
 
 static void cv_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint16_t c)

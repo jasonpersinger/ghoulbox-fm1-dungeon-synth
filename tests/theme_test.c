@@ -48,6 +48,9 @@ int main(int argc, char **argv)
         palette_set(p);
         if (p == UI_MONO_INDEX)
             for (unsigned i = 0; i < 14; i++) assert(gray(tok[i]));      /* every token, derived ones too (RAISE, KEY the last) */
+        if (p == UI_MONO_INDEX)
+            assert(gray(T_STONE) && gray(T_EDGE));                     /* GHOULBOX's tokens too */
+        assert(contrast(T_TEXT, T_STONE) >= 7.0 && contrast(T_THEME, T_STONE) >= 3.5);   /* text on the stone */
         /* text and the things read on the screen; the generator checks the same (tools/gen_ui_palettes.py) */
         struct { uint16_t fg, bg; double min; } c[] = {
             {T_TEXT, T_BG, 12.0}, {T_TEXT, T_SURF, 9.0}, {T_MID, T_BG, 5.0}, {T_MID, T_SURF, 4.0},
@@ -133,6 +136,48 @@ int main(int argc, char **argv)
             fputc(channel(sheet[i], 2) * 255 / 31, f);
         }
         fclose(f);
+    }
+    {   /* GHOULBOX primitives */
+        static uint16_t a[60 * 40], b[60 * 40];
+        palette_set(UI_CRYPT_INDEX);
+        cv_begin(60, 40, T_BG);
+        cv_window(0, 0, 60, 40, 3);
+        memcpy(a, cv_px, sizeof a);
+        cv_begin(60, 40, T_BG);
+        cv_window(0, 0, 60, 40, 3);
+        assert(!memcmp(a, cv_px, sizeof a));                           /* the same every time: no flicker */
+        assert(swap16(cv_px[0]) == T_ACCENT && swap16(cv_px[59]) == T_ACCENT);   /* corner studs */
+        assert(swap16(cv_px[20 * 60 + 0]) == T_EDGE);                  /* the outer line */
+        assert(swap16(cv_px[20 * 60 + 2]) == T_THEME);                 /* the border */
+        {
+            unsigned specks = 0, other = 0;
+            for (unsigned y = 3; y < 37; y++)
+                for (unsigned x = 3; x < 57; x++) {
+                    uint16_t c = swap16(cv_px[y * 60 + x]);
+                    specks += c == T_STONE;
+                    other += c != T_STONE && c != T_SURF;
+                }
+            assert(specks > 50 && specks < 600 && !other);             /* stone: SURF with specks, nothing else */
+        }
+        /* drawn as two canvases (the menu's passes), the texture continues across the seam */
+        cv_begin(60, 40, T_BG);
+        cv_stone(0, 0, 60, 40, 0, 0);
+        memcpy(a, cv_px, sizeof a);
+        cv_begin(60, 20, T_BG);
+        cv_stone(0, 0, 60, 20, 0, 0);
+        memcpy(b, cv_px, 60 * 20 * 2);
+        cv_begin(60, 20, T_BG);
+        cv_stone(0, 0, 60, 20, 0, 20);
+        memcpy(b + 60 * 20, cv_px, 60 * 20 * 2);
+        assert(!memcmp(a, b, sizeof a));
+        {   /* a sprite: '.' leaves the canvas, digits pick colours */
+            static const char *const R[2] = {"0.", ".1"};
+            const uint16_t pal[2] = {T_THEME, T_ACCENT};
+            cv_begin(2, 2, T_BG);
+            cv_sprite(0, 0, R, 2u, pal);
+            assert(swap16(cv_px[0]) == T_THEME && swap16(cv_px[1]) == T_BG && swap16(cv_px[3]) == T_ACCENT);
+        }
+        printf("primitives: window, stone (seamless), sprite ok\n");
     }
     {   /* GHOULBOX: the UI faces are crisp (VT323 drawn without smoothing): S's alpha is only 0 or 15 */
         unsigned bad_alpha = 0;
