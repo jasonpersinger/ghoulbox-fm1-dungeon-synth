@@ -133,8 +133,9 @@ static void fm1_main(void)
     settings_init();
     lcd_init();
     lcd_fill(0, 0, 240, 240, T_BG);
-    draw_text_box(0, 94, 240, &AF_L, "GHOULBOX", T_THEME, 1);
-    draw_text_box(0, 134, 240, &AF_S, "MULTI-ENGINE SYNTH", T_MID, 1);
+    draw_art_box(34, GB_SKULL_W, GB_SKULL_H, GB_SKULL, T_TEXT);    /* GHOULBOX: bone */
+    draw_art_box(100, GB_LOGO_W, GB_LOGO_H, GB_LOGO, T_THEME);
+    draw_text_box(0, 166, 240, &AF_S, "DUNGEON SYNTH", T_MID, 1);
     if (felucca_dbg.magic != DBG_MAGIC) {
         memset(&felucca_dbg, 0, sizeof felucca_dbg);
         felucca_dbg.magic = DBG_MAGIC;

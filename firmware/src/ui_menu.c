@@ -109,7 +109,7 @@ static int32_t menu_document(int32_t y, int draw)
 {
     uint32_t i;
     if (draw) {
-        cv_text(6, y + 2, &AF_L, "GHOULBOX", T_THEME);
+        cv_alpha(6, y + 2, GB_LOGO_S_W, GB_LOGO_S_H, GB_LOGO_S, ramp(T_THEME, T_BG));   /* GHOULBOX's wordmark */
         cv_text(6, y + 38, &AF_S, "Dungeon synth firmware", T_TEXT);
         cv_text(6, y + 58, &AF_M, GHOULBOX_VERSION, T_THEME);
         cv_text_r(232, y + 61, &AF_S, __DATE__, T_MID, T_BG);

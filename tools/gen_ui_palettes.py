@@ -38,6 +38,7 @@ PALETTES = [
     ("ROSE",   (24, 10, 18),    (52, 22, 40),    (252, 232, 242), (244, 114, 182), (255, 214, 110)),
     ("PAPER",  (244, 239, 228), (226, 218, 202), (34, 30, 24),    (10, 84, 70),    (172, 56, 8)),
     ("HI-CON", (0, 0, 0),       (40, 40, 40),    (255, 255, 255), (255, 232, 0),   (0, 230, 255)),
+    ("CRYPT",  (14, 11, 8),     (36, 28, 20),    (232, 220, 196), (232, 154, 44),  (232, 76, 64)),   # GHOULBOX: stone, bone, torch, blood
 ]
 # the 20 palettes of the earlier firmware (index order) -> the new palette
 OLD = ["GREEN", "AMBER", "CYAN", "RED", "MONO", "VIOLET", "PINK", "ICE", "WARM", "OCEAN", "DUSK", "HI-CON",
@@ -164,7 +165,9 @@ def main():
         for p in PALETTES:
             v = [to565(c) for c in p[1:]]
             out.append(f'    {{"{p[0]}", ' + ", ".join(f"0x{x:04x}" for x in v) + "},")
+        crypt = [p[0] for p in PALETTES].index("CRYPT")
         out += ["};", f"#define UI_NPALETTES {len(PALETTES)}u", "#define UI_MONO_INDEX 0u",
+                f"#define UI_CRYPT_INDEX {crypt}u   /* GHOULBOX: a fresh device's palette */",
                 f"#define UI_PAL_TAG {PAL_TAG}u          /* stored id = UI_PAL_TAG + index; below 20: an old id */"]
         out += [f"#define UI_{k}_PCT {v}" for k, v in PCT.items()] + [f"#define UI_RAISE_PCT {RAISE_PCT}   /* SURF -> TEXT */"]
         out += [f"#define UI_REC_DARK 0x{to565(REC_DARK):04x}u", f"#define UI_REC_LIGHT 0x{to565(REC_LIGHT):04x}u",

@@ -41,7 +41,8 @@ int main(int argc, char **argv)
     static const uint8_t pd[] = {0x08, 0xf0};
     const aafont_t probe = {1, 1, 'A', 'A', 0, 0, pg, pd, 0, 0, 0};
     double worst = 100;
-    assert(NPALETTES == 8u && !strcmp(UI_PALETTES[0].name, "MONO") && !strcmp(UI_PALETTES[7].name, "HI-CON"));
+    assert(NPALETTES == 9u && !strcmp(UI_PALETTES[0].name, "MONO") && !strcmp(UI_PALETTES[7].name, "HI-CON") &&
+           !strcmp(UI_PALETTES[8].name, "CRYPT") && UI_CRYPT_INDEX == 8u);   /* (GHOULBOX's, appended) */
     for (unsigned p = 0; p < NPALETTES; p++) {
         uint16_t *tok = &ux.bg;
         palette_set(p);

@@ -5,13 +5,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Felucca</title>
+<title>GHOULBOX</title>
 <style>
-  :root { --bg: #fff; --fg: #000; --dim: #777; }
+  :root { --bg: #F2EAD8; --fg: #1E140C; --dim: #6E604C; --theme: #9A5A0C; }   /* GHOULBOX: parchment / CRYPT */
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) { --bg: #000; --fg: #fff; --dim: #888; }
+    :root:not([data-theme="light"]) { --bg: #0E0B08; --fg: #E8DCC4; --dim: #A0927C; --theme: #E89A2C; }
   }
-  :root[data-theme="dark"] { --bg: #000; --fg: #fff; --dim: #888; }
+  :root[data-theme="dark"] { --bg: #0E0B08; --fg: #E8DCC4; --dim: #A0927C; --theme: #E89A2C; }
+  h1 { color: var(--theme); }
   body { margin: 0; background: var(--bg); color: var(--fg);
          font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; }
   main { max-width: 520px; margin: 0 auto; padding: 48px 16px; }
@@ -29,7 +30,7 @@
 <body>
 <main>
   <button class="lang" id="lang"></button>
-  <h1>Felucca</h1>
+  <h1>GHOULBOX <span class="small" style="color:var(--dim)">on Felucca</span></h1>
   <p data-t="intro"></p>
   <p data-t="warn"></p>
   <p class="small" data-t="direct"></p>
@@ -152,7 +153,7 @@ window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault
     const pkg = new Uint8Array(await r.arrayBuffer());
     if (productOf(pkg) !== meta.product) { sayK("badpkg"); return; }
     image = logicalImage(pkg);
-    say(`Felucca ${meta.version}`);
+    say(`GHOULBOX ${meta.version}`);
     $("go").disabled = false;
   } catch (e) { sayK("loadfail", e.message); }
 })();
@@ -202,7 +203,7 @@ $("stock-file").addEventListener("change", async () => {
 });
 function saveArchive(archive) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(archive)], {type:"application/json"}));
-  const a = document.createElement("a"); a.href = url; a.download = `Felucca-backup-${new Date().toISOString().slice(0,10)}.json`;
+  const a = document.createElement("a"); a.href = url; a.download = `GHOULBOX-backup-${new Date().toISOString().slice(0,10)}.json`;
   document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function archiveInfo(a) {

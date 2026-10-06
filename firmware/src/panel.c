@@ -103,7 +103,7 @@ static void settings_init(void)
     }
     if (settings.magic != SETTINGS_MAGIC || settings.palette >= NPALETTES) {
         settings.magic = SETTINGS_MAGIC;
-        settings.palette = UI_MONO_INDEX;      /* MONO (default) */
+        settings.palette = UI_CRYPT_INDEX;     /* GHOULBOX: CRYPT (Felucca's default: MONO) */
         settings.lowcut = 0;
         settings.zoom = 0;                     /* (retired: the LEDS setting, settings_persist.c) */
     }

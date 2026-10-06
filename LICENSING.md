@@ -43,6 +43,7 @@ All by Hügelton Instruments (Leo Kuroshita), in this tree:
 | What | Licence | Where |
 | --- | --- | --- |
 | Inter Tight font by The Inter Project Authors: the UI text, rasterised into the firmware at build time (`tools/gen_aa_font.py`; the generated tables are not offered as a font, and the font declares no Reserved Font Name) | SIL OFL 1.1 | `assets/fonts/InterTight[wght].ttf`, `LICENSES/OFL-InterTight.txt` (also `assets/fonts/OFL.txt`) |
+| Pirata One font by Rodrigo Fuenzalida and Nicolas Massi (GHOULBOX): the boot / ABOUT wordmark, rasterised into the firmware at build time (`tools/gen_ghoulbox_art.py`; the generated bitmaps are pictures of one word, not offered as a font; the font itself is unmodified) | SIL OFL 1.1 (Reserved Font Name "Pirata") | `assets/fonts/PirataOne-Regular.ttf`, `LICENSES/OFL-PirataOne.txt` |
 | Instrument samples (Versilian Studios VSCO-2 Community Edition, VCSL) | CC0 1.0 | `assets/samples-cc0/`, provenance in `ATTRIBUTION.txt` there |
 | DaisySP by Electrosmith, Corp and Emilie Gillet (<https://github.com/electro-smith/DaisySP>): the PHYS engine's modal and string models and the resonator, ported to fixed point | MIT | `firmware/src/phys_dsp.c`, `LICENSES/MIT-DaisySP.txt` |
 | Rings by Emilie Gillet (<https://github.com/pichenettes/eurorack>): the PHYS engine's sympathetic strings, ported to fixed point | MIT | `firmware/src/phys_symp.c`, `LICENSES/MIT-Rings.txt` |

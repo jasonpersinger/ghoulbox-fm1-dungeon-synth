@@ -1173,8 +1173,9 @@ static int test_display_preferences(void)
                  settings.palette == 6 && T_BG == UI_PALETTES[6].bg && ux.light && ui.menu == 1 && !song.octave &&
                  memcmp(before, host_screen, sizeof before) && !memcmp(sounds, trk, sizeof sounds));
     turn(EN_K1, 1);
-    bad += check("COLOR KNOB 1 steps on to HI-CON, then wraps to MONO",
-                 settings.palette == 7 && (turn(EN_K1, 1), settings.palette == UI_MONO_INDEX));
+    bad += check("COLOR KNOB 1 steps on to HI-CON, CRYPT (GHOULBOX), then wraps to MONO",
+                 settings.palette == 7 && (turn(EN_K1, 1), settings.palette == UI_CRYPT_INDEX) &&
+                 (turn(EN_K1, 1), settings.palette == UI_MONO_INDEX));
     settings.lowcut = 2;
     ui.menu_sel = MI_LOWCUT;
     press(B_OCTUP);
