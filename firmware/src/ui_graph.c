@@ -7,8 +7,9 @@
  * graph_signature() changes. The look:
  * curves THEME (2 px), guides and empty marks RAISE, captions MID / DIM, the active thing ACCENT,
  * bars rounded; a list's selected row has the sword and ACCENT text (GHOULBOX). */
-#define PANEL_X0 10                                  /* the graphs' inner area: x 10..230 */
-#define PANEL_W 220
+static int32_t panel_x0 = 10, panel_w = 220;         /* GHOULBOX: the graphs' inner area (narrower beside torches) */
+#define PANEL_X0 panel_x0                            /* the graphs' inner area: x 10..230, or 24..216 */
+#define PANEL_W panel_w
 #define GOY 11                                       /* graphs drawn on a 100 px scale sit at y 11..111 */
 
 /* Matches voice.c: attack is linear, decay and release are exponential
@@ -1212,6 +1213,65 @@ static void graph_song(void)
         }
     }
 }
+/* GHOULBOX: a wall torch, 12 x 30: the flame (rows 0..11, frame f 0..3: its tip sways and the core rises), the
+ * cup (12..17), the handle (18..29). Colours: ACCENT outer flame, THEME middle, TEXT core, EDGE wood */
+#define TORCH_LX 8
+#define TORCH_RX 220
+#define TORCH_Y 10
+static void torch_draw(int32_t x, int32_t y, uint32_t f)
+{
+    static const uint8_t OUTER[12] = {2, 2, 4, 4, 6, 6, 8, 8, 10, 10, 8, 6};
+    static const uint8_t MIDW[12] = {0, 0, 0, 2, 2, 4, 4, 6, 6, 6, 6, 4};
+    static const uint8_t CORE[12] = {0, 0, 0, 0, 0, 2, 2, 2, 4, 4, 2, 2};
+    static const int8_t SWAY[4] = {-1, 0, 1, 0};
+    int32_t j;
+    for (j = (int32_t)(f & 1u); j < 12; j++) {        /* (odd frames: one row shorter) */
+        int32_t dx = j < 5 ? SWAY[f & 3u] : 0, cx = x + 6 + dx;
+        cv_rect(cx - OUTER[j] / 2, y + j, OUTER[j], 1, T_ACCENT);
+        if (MIDW[j]) cv_rect(cx - MIDW[j] / 2, y + j, MIDW[j], 1, T_THEME);
+        if (CORE[j] && j + (int32_t)(f & 2u) / 2 < 12) cv_rect(cx - CORE[j] / 2, y + j, CORE[j], 1, T_TEXT);
+    }
+    for (j = 0; j < 6; j++)                            /* the cup: narrowing */
+        cv_rect(x + j / 2, y + 12 + j, 12 - (j / 2) * 2, 1, j == 0 ? T_THEME : T_EDGE);
+    cv_rect(x + 4, y + 18, 4, 12, T_EDGE);             /* the handle */
+    cv_rect(x + 5, y + 18, 1, 12, T_STONE);
+    GFX_HOOK_TEXT(x, y + cv_oy, x + 12, y + cv_oy + 30, "torch", 4u);   /* the lint: nothing may overlap it */
+}
+/* the pages whose stage has room for the torches: HOME's scope, the envelope, the LFO, FX, and an engine page
+ * that shows the scope (draw_graph's default: not WHEEL's drawbars, a sample, FM6's or DIGITAL's charts) */
+static int torch_page(void)
+{
+    const page_t *pg = cur_page();
+    uint32_t e = TSEL->eng_req % NENGINES;
+    if (ui.home)
+        return 1;
+    switch (pg->graph) {
+    case GR_ADSR: case GR_LFO: case GR_FX:              /* (not SLICER: its 16 columns span the stage) */
+        return 1;
+    case GR_NONE:
+        return !(pg->scope == SC_ENGINE && (ENGINES[e] == &ENG_WHEEL || (ENGINES[e] == &ENG_SAMPLE && sample_wave.ready) ||
+                                            e == ENGI_FM6 || (FELUCCA_FM4 && e == ENGI_DIGITAL))) &&
+               !(FELUCCA_FM4 && pg->id[0] == P_FM1_LEVEL && e == ENGI_DIGITAL);
+    default:
+        return 0;
+    }
+}
+static void torch_tick(void)                          /* only the two torch rectangles, every 8 UI frames */
+{
+    uint32_t f = (ui.frame >> 3) & 3u;
+    if (!ui.torches || f == ui.torch_f)
+        return;
+    ui.torch_f = (uint8_t)f;
+    cv_begin(12, 30, T_SURF);
+    cv_stone(0, 0, 12, 30, TORCH_LX, TORCH_Y);
+    torch_draw(0, 0, f);
+    cv_blit(TORCH_LX, Y_GRAPH + TORCH_Y);
+    cv_begin(12, 30, T_SURF);
+    cv_stone(0, 0, 12, 30, TORCH_RX, TORCH_Y);
+    torch_draw(0, 0, f ^ 2u);                          /* (the other one out of step) */
+    cv_blit(TORCH_RX, Y_GRAPH + TORCH_Y);
+}
+
 static void draw_graph(void)
 {
     const page_t *pg = cur_page();
@@ -1219,6 +1279,7 @@ static void draw_graph(void)
     uint16_t c = ACC;
     uint32_t sig;
     if (!ui.home && pg->graph == GR_TRK) {
+        ui.torches = 0;
         draw_tracks();
         return;
     }
@@ -1230,6 +1291,14 @@ static void draw_graph(void)
     cv_begin(240, H_GRAPH, T_BG);
     cv_window(3, 0, 234, H_GRAPH, 3);                /* the panel: GHOULBOX's stone window */
     cv_bg = T_SURF;                                  /* (text drawn with cv_text lands on it) */
+    ui.torches = (uint8_t)torch_page();              /* GHOULBOX: the torches, and the graphs' area beside them */
+    panel_x0 = ui.torches ? 24 : 10;
+    panel_w = ui.torches ? 192 : 220;
+    if (ui.torches) {
+        ui.torch_f = (uint8_t)((ui.frame >> 3) & 3u);
+        torch_draw(TORCH_LX, TORCH_Y, ui.torch_f);
+        torch_draw(TORCH_RX, TORCH_Y, ui.torch_f ^ 2u);
+    }
     cv_oy = GOY;                                     /* graphs on a 100 px scale */
     if (ui.home) {
         cv_oy = 0;

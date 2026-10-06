@@ -241,6 +241,7 @@ static int same_sound(const track_t *a, const track_t *b)
 }
 
 /* sounds never touch the steps; the arp, the scale, the SLICER and the pattern parameters are the track's */
+static void go_title(const char *title);              /* (below; GHOULBOX's torch check uses it) */
 static int test_sound_loads(void)
 {
     int bad = 0;
@@ -406,6 +407,27 @@ static int test_sound_loads(void)
         for (i = 6; i < 20u; i++)
             blade += swap16(cv_px[(2u + 8u) * 240u + i]) == T_TEXT;   /* the blade's row */
         bad += check("a selected list row: the sword, accent text, no THEME bar", theme < 40u && accent > 40u && blade >= 6u);
+    }
+    {   /* GHOULBOX: torches on HOME's stage; their flame moves; a list page has none */
+        static uint16_t f0[12 * 30], f2[12 * 30];
+        uint32_t i, diff = 0, ink = 0;
+        cv_begin(12, 30, T_SURF);
+        torch_draw(0, 0, 0);
+        memcpy(f0, cv_px, sizeof f0);
+        cv_begin(12, 30, T_SURF);
+        torch_draw(0, 0, 2);
+        memcpy(f2, cv_px, sizeof f2);
+        for (i = 0; i < 12u * 30u; i++) {
+            diff += f0[i] != f2[i];
+            ink += swap16(f0[i]) == T_ACCENT;
+        }
+        ui_power_on();
+        ui.force = 1; ui_draw();
+        bad += check("torches: the flame flickers (frames differ), it burns (accent), HOME shows them",
+                     diff > 4u && ink > 10u && ui.torches == 1u && PANEL_X0 >= 24);
+        go_title("PRESETS");
+        ui.force = 1; ui_draw();
+        bad += check("  a list page: no torches, the full width", ui.torches == 0u && PANEL_X0 == 10);
     }
     printf("ui: undo copy %u bytes\n", (unsigned)sizeof undo);
     return bad;
@@ -1335,7 +1357,9 @@ static uint32_t roll_diff(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int in
     for (y = 0; y < 240; y++)
         for (x = 0; x < 240; x++) {
             int inside = x >= x0 && x < x1 && y >= y0 && y < y1;
-            if (inside == in && host_screen[y * 240 + x] != roll_shot[y * 240 + x]) n++;
+            int torch = y >= Y_GRAPH + TORCH_Y && y < Y_GRAPH + TORCH_Y + 30 &&     /* (GHOULBOX: the torches flicker */
+                        ((x >= TORCH_LX && x < TORCH_LX + 12) || (x >= TORCH_RX && x < TORCH_RX + 12));   /* on their own) */
+            if (!torch && inside == in && host_screen[y * 240 + x] != roll_shot[y * 240 + x]) n++;
         }
     return n;
 }
