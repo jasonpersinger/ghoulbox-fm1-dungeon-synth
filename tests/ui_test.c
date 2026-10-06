@@ -394,6 +394,19 @@ static int test_sound_loads(void)
                  !memcmp(trk[3].step, before.step, sizeof trk[3].step));
     bad += check("  its old drum channel (10, in id 24) loads as REVERB TYPE ROOM", song.g[G_RTYPE] == 0);
     bad += check("  its old drum level / send (ids 25, 26) load as TAPE / CRSH off", song.g[G_TAPE] == 0 && song.g[G_CRSH] == 0);
+    {   /* GHOULBOX: a list's selected row: the sword and accent text, no THEME bar */
+        uint32_t theme = 0, accent = 0, blade = 0, i;
+        cv_begin(240, 20, T_SURF);
+        list_row(2, 1, "ANLG", T_MID, "CRYPT PAD", T_TEXT, 230);
+        for (i = 0; i < 240u * 20u; i++) {
+            uint16_t c = swap16(cv_px[i]);
+            theme += c == T_THEME;
+            accent += c == T_ACCENT;
+        }
+        for (i = 6; i < 20u; i++)
+            blade += swap16(cv_px[(2u + 8u) * 240u + i]) == T_TEXT;   /* the blade's row */
+        bad += check("a selected list row: the sword, accent text, no THEME bar", theme < 40u && accent > 40u && blade >= 6u);
+    }
     printf("ui: undo copy %u bytes\n", (unsigned)sizeof undo);
     return bad;
 }

@@ -212,8 +212,10 @@ static void draw_menu(void)
             uint16_t bg = T_SURF, fg = sel ? T_ACCENT : T_TEXT, val = T_THEME;   /* (GHOULBOX: on the stone; sel in the accent) */
             if (y + 24 <= top || y >= top + (int32_t)cv_h)
                 continue;
-            cv_icon_on(12, y + 4, 16, ICO[i], sel ? T_ACCENT : T_MID, bg);
-            cv_text_on(36, y + 5, &AF_S, MI_NAME[i], fg, bg);
+            if (sel)
+                cv_sword(8, y + 9);                     /* GHOULBOX: the sword */
+            cv_icon_on(26, y + 4, 16, ICO[i], sel ? T_ACCENT : T_MID, bg);
+            cv_text_on(46, y + 5, &AF_S, MI_NAME[i], fg, bg);
             if (i == MI_LOWCUT)
                 cv_text_r(228, y + 3, &AF_M, (const char *const[]){"OFF", "LOWCUT", "BASS+"}[settings.lowcut % 3u], val, bg);
             if (i == MI_HOLD) {                         /* "0.4" and its unit */

@@ -6,7 +6,7 @@
  * instrument diagrams; the MIXER page draws four SURF columns instead. Each graph is redrawn only when
  * graph_signature() changes. The look:
  * curves THEME (2 px), guides and empty marks RAISE, captions MID / DIM, the active thing ACCENT,
- * bars rounded; a list's selected row is a THEME bar with INK text. */
+ * bars rounded; a list's selected row has the sword and ACCENT text (GHOULBOX). */
 #define PANEL_X0 10                                  /* the graphs' inner area: x 10..230 */
 #define PANEL_W 220
 #define GOY 11                                       /* graphs drawn on a 100 px scale sit at y 11..111 */
@@ -382,21 +382,21 @@ static void graph_mod(const track_t *t, uint16_t c)
     for (k = 0; k < NMSLOT; k++) {
         const int16_t *p = &t->p[P_M1SRC + 3u * k];
         int32_t y = 14 + (int32_t)k * 24, on = p[0] && p[1] && p[2], sel = k == mod_ui_slot;
-        uint16_t bg = sel ? T_THEME : T_SURF, col = sel ? T_INK : on ? c : T_DIM;
+        uint16_t bg = T_SURF, col = sel ? T_ACCENT : on ? c : T_DIM;
         char b[8];
         const char *unit;
         if (sel)
-            cv_rrect(6, y, 228, 17, 4, T_THEME, T_SURF);
+            cv_sword(6, y + 5);                          /* GHOULBOX: the sword */
         b[0] = (char)('1' + k);
         b[1] = 0;
-        cv_text_on(14, y + 1, &AF_S, b, sel ? T_INK : T_MID, bg);
+        cv_text_on(22, y + 1, &AF_S, b, sel ? T_ACCENT : T_MID, bg);
         cv_text_on(34, y + 1, &AF_S, N_MSRC[clamp(p[0], 0, MS_N - 1)], col, bg);
         cv_line(78, y + 8, 92, y + 8, col);              /* an arrow */
         cv_line(88, y + 4, 92, y + 8, col);
         cv_line(88, y + 12, 92, y + 8, col);
         cv_text_on(102, y + 1, &AF_S, mod_dst_name(t, p[1]), col, bg);
         param_format(&TP[P_M1AMT], p[2], b, &unit);
-        cv_text_on(cv_text_on(170, y + 1, &AF_S, b, col, bg) + 2, y + 1, &AF_S, unit, sel ? T_INK : T_DIM, bg);
+        cv_text_on(cv_text_on(170, y + 1, &AF_S, b, col, bg) + 2, y + 1, &AF_S, unit, sel ? T_ACCENT : T_DIM, bg);
     }
 }
 
@@ -867,15 +867,15 @@ static const char *eng_abbr(const char *name)
     return name;
 }
 
-/* a list row (17 px): the selected one a THEME bar with INK text; tag at x 14, free text from x 54 to x1 */
+/* a list row (16 px): the selected one marked by the sword (GHOULBOX), its text in the accent; tag at x 22, free text
+ * from x 54 to x1 */
 #define LIST_Y(k) (4 + 16 * (int32_t)(k))            /* (GHOULBOX: 16 px rows: 7 fit inside the window's border) */
 static void list_row(int32_t y, int sel, const char *tag, uint16_t tc, const char *name, uint16_t nc, int32_t x1)
 {
-    uint16_t bg = sel ? T_THEME : T_SURF;
     if (sel)
-        cv_rrect(6, y, 228, 16, 4, T_THEME, T_SURF);
-    cv_text_on(14, y, &AF_S, tag, sel ? T_INK : tc, bg);           /* (GHOULBOX: at y, VT323's Q tail fits row 7) */
-    cv_free_text(54, y, &AF_S, name, sel ? T_INK : nc, bg, x1 - 54);
+        cv_sword(6, y + 5);                              /* GHOULBOX: the sword, the row in the accent */
+    cv_text_on(22, y, &AF_S, tag, sel ? T_ACCENT : tc, T_SURF);    /* (at y: VT323's Q tail fits row 7) */
+    cv_free_text(54, y, &AF_S, name, sel ? T_ACCENT : nc, T_SURF, x1 - 54);
 }
 /* an empty list: a title and a hint, centred */
 static void note_line(int32_t y, const char *s, uint16_t fg)   /* centred S; "[K2] ADD PATTERN": a key hint */
@@ -932,7 +932,7 @@ static void graph_browse(void)
         if (hint >= 0)
             cv_text_r(206, y + 1, &AF_S, pt, T_INK, T_THEME);
         if (favorite_has(e, k))
-            cv_icon_on(214, y + 2, 12, ICON_X_STAR, sel ? T_INK : T_ACCENT, sel ? T_THEME : T_SURF);
+            cv_icon_on(214, y + 2, 12, ICON_X_STAR, T_ACCENT, T_SURF);   /* (GHOULBOX: no bar under it) */
     }
 }
 /* the EDIT layer (ui_layer.c): the sound loaded, as the browser's selected row: "03" (its place in KNOB 2's list,
@@ -1192,11 +1192,11 @@ static void graph_song(void)
         char b[16];
         int32_t y = LIST_Y(i - first);
         int sel = i == ui.song_row;
-        uint16_t bg = sel ? T_THEME : T_SURF, col = sel ? T_INK : T_TEXT, dim = sel ? T_INK : T_DIM;
+        uint16_t bg = T_SURF, col = sel ? T_ACCENT : T_TEXT, dim = T_DIM;
         if (i > chain_config.count) break;
-        if (sel) cv_rrect(6, y, 228, 16, 4, T_THEME, T_SURF);
-        if (chain.running && i == chain.row) cv_icon_on(9, y + 2, 12, ICON_X_RIGHT, sel ? T_INK : T_ACCENT, bg);
-        fmt_int(b, (int32_t)i + 1); cv_text_on(24, y + 1, &AF_S, b, sel ? T_INK : T_MID, bg);
+        if (sel) cv_sword(6, y + 5);                    /* GHOULBOX: the sword marks it */
+        else if (chain.running && i == chain.row) cv_icon_on(9, y + 2, 12, ICON_X_RIGHT, T_ACCENT, bg);
+        fmt_int(b, (int32_t)i + 1); cv_text_on(24, y + 1, &AF_S, b, sel ? T_ACCENT : T_MID, bg);
         if (i == chain_config.count) { cv_text_on(54, y + 1, &AF_S, "+ ADD PATTERN", dim, bg); break; }
         b[0] = (char)('A' + chain_config.row[i].slot); b[1] = 0;
         cv_text_on(54, y + 1, &AF_S, b, col, bg);
@@ -1206,9 +1206,9 @@ static void graph_song(void)
         if (!graph_project_used(chain_config.row[i].slot)) cv_text_on(142, y + 1, &AF_S, "NOT SAVED", dim, bg);
         else if (chain.running && i == chain.row) {
             fmt_int(b, chain.remaining); str_cpy(b + str_len(b), " LEFT", 8);
-            cv_text_on(142, y + 1, &AF_S, b, sel ? T_INK : T_THEME, bg);
+            cv_text_on(142, y + 1, &AF_S, b, sel ? T_ACCENT : T_THEME, bg);
         } else if (graph_project_name(chain_config.row[i].slot)[0]) {   /* the project's name, cut to fit */
-            cv_free_text(142, y + 1, &AF_S, graph_project_name(chain_config.row[i].slot), sel ? T_INK : T_MID, bg, 232 - 142);
+            cv_free_text(142, y + 1, &AF_S, graph_project_name(chain_config.row[i].slot), sel ? T_ACCENT : T_MID, bg, 232 - 142);
         }
     }
 }

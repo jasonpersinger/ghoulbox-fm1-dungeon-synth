@@ -299,7 +299,10 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
         cv_window(0, 0, COL_W, COL_H, 3);               /* GHOULBOX: a stone window */
     }
     if (label[0] || val[0]) {
-        if (!strip && FELUCCA_ICONS && icon != ICON_NONE && label[0] && text_w(&AF_S, label) <= COL_W - 2 - 19)
+        if (!strip && hot && label[0] && text_w(&AF_S, label) <= COL_W - 2 - 20)
+            lx = 4 + cv_sword(4, 7) + 2;                 /* GHOULBOX: the knob just turned: the sword (a long label:
+                                                         * none, as an icon; the label is in the accent anyway) */
+        else if (!strip && FELUCCA_ICONS && icon != ICON_NONE && label[0] && text_w(&AF_S, label) <= COL_W - 2 - 19)
             lx = 5 + cv_icon_on(5, 5, 12, icon, lc, T_SURF) + 2;      /* icon rows 5..16, the label from x 19 */
         if (!strip && label[0])
             cv_text_fit(lx, 3, &AF_S, label, lc, T_SURF, COL_W - 2 - lx);

@@ -258,6 +258,21 @@ static void cv_sprite(int32_t x, int32_t y, const char *const *rows, uint32_t h,
     }
 }
 
+/* GHOULBOX: the sword cursor, 14 x 7, pointing right: pommel and grip (EDGE), guard (THEME), blade (TEXT) */
+static int32_t cv_sword(int32_t x, int32_t y)
+{
+    static const char *const R[7] = {"....2.........",
+                                     "....2.........",
+                                     "....2.0000000.",
+                                     "11112000000000",
+                                     "....2.0000000.",
+                                     "....2.........",
+                                     "....2........."};
+    const uint16_t pal[3] = {T_TEXT, T_EDGE, T_THEME};
+    cv_sprite(x, y, R, 7u, pal);
+    return 14;
+}
+
 static void cv_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint16_t c)
 {
     int32_t dx = x1 > x0 ? x1 - x0 : x0 - x1, sx = x0 < x1 ? 1 : -1;
