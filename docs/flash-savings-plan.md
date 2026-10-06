@@ -7,10 +7,13 @@
 
 | フェーズ | 内容 | 見込み | 累計空き |
 | --- | --- | ---: | ---: |
-| 1 | SAMPLE PERC を廃止、パーカッションは DRUM 合成のみ | −68.0 KB | 172 KB |
-| 2 | 無損失データ圧縮と表の縮小、ビルド設定 | −17.6 KB | 190 KB |
-| 3 | 見た目を確認して採る (フォント、キーキャップ) | −21.3 KB | 211 KB |
-| 4 | 音の判断つき (任意): ループ短縮、16 kHz | −50〜60 KB | 260〜270 KB |
+| 1A | SAMPLE PERC を廃止、パーカッションは DRUM 合成のみ | −67.8 KB | 172 KB |
+| 1B | FLUTE / SAX を内蔵から外し、Web エディタの「サンプルパック」でユーザースロットへ (PIANO と BREAK は内蔵のまま) | −62.8 KB | 235 KB |
+| 2 | 無損失データ圧縮と表の縮小、ビルド設定 | −17.6 KB | 253 KB |
+| 3 | 見た目を確認して採る (フォント、キーキャップ) | −21.3 KB | 274 KB |
+| 4 | 音の判断つき (任意): PIANO と BREAK の 16 kHz 化 | −17 KB | 291 KB |
+
+内蔵サンプルは PIANO 41 KB + BREAK 22 KB = 63 KB になる (今 194 KB)。
 
 進め方の原則:
 - 1 ステップ = 1 PR。各 PR で `./build.sh` の `image ... B` 行と `tests/run_tests.sh` を通し、`tests/target_budget.py` の
@@ -21,7 +24,7 @@
 
 ---
 
-## フェーズ 1: SAMPLE PERC の廃止 (−67,812 B + コード数百 B)
+## フェーズ 1A: SAMPLE PERC の廃止 (−67,812 B + コード数百 B)
 
 ### 1.1 方針
 
@@ -81,6 +84,46 @@
 
 ---
 
+## フェーズ 1B: FLUTE / SAX をサンプルパックへ (−62,844 B)
+
+### 方針
+
+- 内蔵に残すのは PIANO (41,350 B、SET 0、別名の SET 1) と SLICE の BREAK (22,050 B、生成物)。FLUTE (SET 2) と SAX (SET 3) は
+  `SMP_DATA` から外し、PERC と同じ「名前だけのゾーン 0 個のセット」として番号を残す。USR1–3 (5, 6, 7) は動かない。
+- 素材は **サンプルパック**として Web エディタから入れる: ビルド時に `sampleio.user_slot` でスロット像 (`flute.fsmp`, `sax.fsmp`:
+  ヘッダ 512 B + ゾーン表 + ADPCM、`web/EDITOR_PROTOCOL.md` の「User sample slot」そのもの) を作り、サイトに置く。エディタは
+  既存の `SMP_BEGIN / SMP_WRITE / SMP_END` でスロットへ書く。CC0 の帰属表記 (`ATTRIBUTION.txt`) はパックに同梱。
+- **退役セット → 同名スロット**: SAMPLE / GRAIN が SET 2 (FLUTE) を鳴らすとき、名前が "FLUTE" のユーザースロットがあれば
+  それを鳴らす (スロットヘッダの名前で解決、`eng_sample.c` のゾーン解決に 1 段)。無ければ無音。これで旧プロジェクト・
+  旧プリセット・FLUTE/SAX を SRC にした GRAIN のプリセットは、パックを入れれば今と同じ音で鳴る。保存値は書き換えない。
+- SAMPLE の工場プリセットは PIANO のみ。FLUTE / SAX のプリセット行は残すが、同名スロットが無い間は PERC と同じ規則
+  (ゾーン 0 個) でブラウズから隠す。GRAIN の工場プリセットで SRC が FLUTE / SAX のものは PIANO に差し替えるか、同名スロットがある
+  ときだけ出す。
+
+### 手順
+
+1. `tools/gen_samples.py`: `CC0_SETS` の FLUTE / SAX を `"pack"` 種別にし、`SMP_DATA` には書かず `{"FLUTE", z0, 0}` の空セットを出す。
+   同じ `cc0_entries()` の結果から `sampleio.user_slot()` で `build/pack/flute.fsmp`, `sax.fsmp` を書く (`tools/gen_pack.py` に分けてもよい)。
+2. `eng_sample.c`: ゾーン解決に「組み込みセット n == 0 なら、同名の USR スロット (usr_nz > 0、ヘッダの名前一致) を使う」を足す。
+   `eng_grain.c` の `gr_find` / `gr_stamp` も同じ解決を通す (スロットのアップロードで索引が追従する仕組みは既にある)。
+3. `web/editor.html`: サンプルのパネルに「Factory pack: FLUTE → USR2, SAX → USR3」(スロットは選択可、上書き確認つき) を追加。
+   `web/make_site.py` が `build/pack/*.fsmp` と `ATTRIBUTION.txt` をサイトへコピー。インストーラの最後に「サンプルパックも入れる」
+   の 1 ステップ (任意) を置く。
+4. UI: パック未導入で FLUTE / SAX 参照の音を選んだときの表示 (`NO PACK`、ui_draw.c のプリセット名の横)。
+5. テスト: golden から `preset/SAMPLE/02_FLUTE`, `03_SAX` と GRAIN の該当行が消える (PIANO の行は不変)。新規: スロット像を
+   RAM 像に載せて (`SMP_USER_XIP` のホスト経路) 名前解決で FLUTE が鳴ること、スロットが無いときに無音で落ちないこと。
+   `tests/install_test.py` 相当でパックの SysEx 書き込みを一巡。
+6. 文書: README (SAMPLE: PIANO built in, FLUTE / SAX and your own sounds from the editor)、`EDITOR_PROTOCOL.md`、`LICENSING.md`
+   (CC0 はパック側)、`BUILDING.md` の Samples 節。
+
+### 確認
+
+- `./build.sh`: `samples: 5 sets, 6 zones, ~63,400 B ADPCM`、イメージ約 346 KB、空き約 235 KB。
+- 実機: パック導入前は PIANO と BREAK が鳴り、FLUTE/SAX は無音で表示が出る。導入後は 0.9/1.0 のプロジェクトの FLUTE/SAX が同じ音で鳴る。
+- 自分のサンプルで USR2 を上書きしたら FLUTE は再び無音になり、パック再導入で戻る。
+
+---
+
 ## フェーズ 2: 無損失の縮小 (−17.6 KB、音も見た目も不変)
 
 | # | 変更 | 節約 | ファイル |
@@ -112,13 +155,15 @@
 
 ---
 
-## フェーズ 4 (任意、音の判断): サンプルの縮小
+## フェーズ 4 (任意、音の判断): 内蔵サンプルの縮小
 
 | # | 変更 | 節約 (算出) | 備考 |
 | --- | --- | ---: | --- |
-| 4.1 | FLUTE/SAX のループ区間 0.55 s → 0.15 s 程度、クロスフェードループ | −約 25,000 | `gen_samples.py cc0_entries`。ゾーン形式不変 |
-| 4.2 | PIANO/FLUTE/SAX を 16 kHz で格納 (ゾーンの `rate` は既存。`eng_sample.c` 無変更) | −約 28,500 | 高域 8 kHz 以上が落ちる。CC0 の原音を聞いて判断 |
-| 4.3 | BREAK を 16 kHz | −約 6,000 | ハイハットが鈍る。優先度低 |
+| 4.1 | PIANO を 16 kHz で格納 (ゾーンの `rate` は既存。`eng_sample.c` 無変更) | −約 11,000 | 高域 8 kHz 以上が落ちる |
+| 4.2 | BREAK を 16 kHz | −約 6,000 | ハイハットが鈍る。優先度低 |
+| 4.3 | PIANO を 5 → 3 ゾーン | −16,540 | ピッチシフト幅 ±4 → ±6 半音 |
+
+FLUTE / SAX はパック側なので、ループ短縮や 16 kHz 化はパックの作り方の問題になり、本体の Flash には関係しない。
 
 ADPCM のビット数削減 (3 bit) は SAX で SNR 15 dB まで落ちるため **採らない**。zlib/LZMA 系はボイス毎のランダムアクセスと
 RAM (空き 9 KB) の都合で実機では使えない (research 2.B 参照)。
@@ -137,6 +182,7 @@ RAM (空き 9 KB) の都合で実機では使えない (research 2.B 参照)。
 | フェーズ | PR | イメージ | 空き | 備考 |
 | --- | --- | ---: | ---: | --- |
 | 0 (基準) | — | 476,996 | 104,568 | 1.0.1 |
-| 1 | | | | |
+| 1A | | | | |
+| 1B | | | | |
 | 2 | | | | |
 | 3 | | | | |

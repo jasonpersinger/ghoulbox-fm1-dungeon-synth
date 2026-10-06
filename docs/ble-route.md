@@ -12,11 +12,11 @@ Flash 280,576 B、静的 RAM 39 KB + ヒープ)。要望は Issue #17 (open、+1
 | USB シリアルコンソール | Flash −5.5 KB (デバッグ機能) | 開発者向け |
 | ディレイの最大時間 | RAM: `dly_buf` 128 KB → 64 KB で +64 KB | 2.97 s → 1.49 s |
 | GRAIN か SLICER のどちらか | RAM: `gr_p` 28 KB / `sl_buf` 32 KB。ディレイ半減で足りなければ | エンジン or インサート 1 つ |
-| 工場サンプルの音質 | Flash: フェーズ 4 (16 kHz、ループ短縮) まで実施が前提 | PIANO/FLUTE/SAX |
+| (サンプル) | FLUTE / SAX はフェーズ 1B で既にパック化、PIANO と BREAK のみ内蔵 | なし |
 | 音切れゼロの保証 | BLE の IRQ が音声 ISR の上で動く。接続中はレンダ時間が削られる | 実機で測るまで不明 |
 | ベアメタルの純度 | FreeRTOS と SDK ランタイム (bitcode) を同梱。hal/ 限定のレジスタ検査もホストテストも届かない部分ができる | 設計 |
 
-Flash の収支: フェーズ 1–4 後 260〜270 KB + SLICE/CDC 外し 37 KB ≈ 300 KB の空きに対し、BLE が 240〜260 KB。余裕 40〜60 KB。
+Flash の収支: フェーズ 1–3 後 274 KB (+ フェーズ 4 で 291 KB) + SLICE/CDC 外し 37 KB ≈ 310〜330 KB の空きに対し、BLE が 240〜260 KB。余裕 50〜90 KB。
 RAM の収支: 現状の空き 23 KB + ディレイ半減 64 KB = 87 KB に対し、BLE が 60〜80 KB。GRAIN/SLICER を削れば +28〜32 KB。
 
 ## 2. ライセンス
