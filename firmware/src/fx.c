@@ -24,7 +24,43 @@ static struct {
     int32_t sp_lp, sp_hp, sp_he, sp_size;   /* .. its loop low-pass, low cut (and its remainder), the loop
                                              * length (Q8, glides) */
     uint32_t sp_ph;                      /* .. the output tap's wobble */
+    uint16_t hl_p;                       /* HALL: the ring's pointer (counts down: hl_at) */
+    int32_t hl_lpl, hl_lpr;              /* .. the two halves' damping low-passes */
+    uint32_t hl_ph;                      /* .. the tank allpasses' slow modulation */
 } fx;
+
+/* HALL (G_RTYPE 2, GHOULBOX): J. Dattorro's figure-eight tank ("Effect Design, Part 1", JAES 1997): a pre-delay
+ * (longer with SIZE: a bigger room answers later), four input allpasses (diffusion), then two halves that feed
+ * each other: a modulated allpass (the slow wobble keeps a long tail from ringing metallic), a delay, the
+ * damping low-pass (DAMP), the decay gain (SIZE), a second allpass and delay. Lines 1.33 x Dattorro's (his
+ * 29.8 kHz lengths x 1.48 at 44.1 kHz would not fit). Seven taps, his left output: the bus is mono.
+ * No RAM of its own: the back half of the delay line, dly_buf[DLY_LEN / 2 ..]; while HALL runs, the delay
+ * keeps the front half (1/4 at 80 BPM fits, 0.74 s). Every multiply in the loop rounds towards 0 (hl_mul):
+ * floors would feed the tank an offset for ever.
+ * All thirteen lines share one ring of 32768 and one pointer that counts down a sample at a time (as the
+ * Lexicon and FV-1 reverbs do): line k writes at hl_p + HL_B[k] and reads d samples back at hl_p + HL_B[k] + d,
+ * both masked: no index per line, no wrap test. A line's region is its longest delay + 1 (its write slot). */
+enum { H_PRE, H_I1, H_I2, H_I3, H_I4, H_AL, H_D1L, H_APL, H_D2L, H_AR, H_D1R, H_APR, H_D2R, H_N };
+static const uint16_t HL_D[H_N] = {2792, 189, 142, 504, 368, 917, 5922, 2394, 4948, 1231, 5609, 3532, 4207};
+#define HL_B_PRE 0u                      /* the lines' bases in the ring (the sums of the regions before) */
+#define HL_B_I1 2793u
+#define HL_B_I2 2983u
+#define HL_B_I3 3126u
+#define HL_B_I4 3631u
+#define HL_B_AL 4000u
+#define HL_B_D1L 4918u
+#define HL_B_APL 10841u
+#define HL_B_D2L 13236u
+#define HL_B_AR 18185u
+#define HL_B_D1R 19417u
+#define HL_B_APR 25027u
+#define HL_B_D2R 28560u
+#define HL_MASK (DLY_LEN / 2u - 1u)
+#define HL_AL 894u                       /* the modulated allpasses' centre delays, +-HL_EXC (their lines: +23) */
+#define HL_AR 1208u
+#define HL_EXC 21
+#define hl_buf (dly_buf + DLY_LEN / 2u)
+_Static_assert(HL_B_D2R + 4207u + 1u == DLY_LEN / 2u, "HALL's lines fill the back half of dly_buf");
 
 /* SPRING (G_RTYPE 1): one spring of a spring tank, mono like the other buses, in the ROOM's own buffers (no
  * RAM of its own): the input and the loop's return -> a low cut (~110 Hz: a spring carries little bass) ->
@@ -163,11 +199,12 @@ static uint32_t div_samples(uint32_t div)
 }
 
 #include "perform.c"                                 /* the FX hold layer's effects (the master) */
+#include "tape.c"                                    /* GHOULBOX: TAPE / CRSH on the mix, before MASTER */
 
 static uint32_t delay_samples(void)
 {
-    uint32_t s = div_samples((uint32_t)song.g[G_DTIME]);
-    return s < 16u ? 16u : s >= DLY_LEN ? DLY_LEN - 1u : s;
+    uint32_t s = div_samples((uint32_t)song.g[G_DTIME]), len = fx.rtype == 2u ? DLY_LEN / 2u : DLY_LEN;
+    return s < 16u ? 16u : s >= len ? len - 1u : s;
 }
 
 /* ROOM (G_RTYPE 0): 4 damped combs + 2 allpasses (Freeverb-like, mono), added to out */
@@ -246,17 +283,109 @@ static __attribute__((noinline)) void rev_spring(const int32_t *rev_in, int32_t 
     }
 }
 
+/* HALL (see the top) */
+static inline int32_t hl_mul(int32_t a, int32_t g)      /* a * g / 32768 towards 0 (|a| <= 32768) */
+{
+    int32_t v = a * g;
+    return (v + ((v >> 31) & 32767)) >> 15;
+}
+#define hl_at(base, d) hl_buf[(p + (base) + (d)) & HL_MASK]        /* d samples back (1 .. HL_D) */
+#define hl_put(base, v) (hl_buf[(p + (base)) & HL_MASK] = (int16_t)clamp((v), -32768, 32767))
+static inline int32_t hl_ap(uint32_t p, uint32_t base, uint32_t len, int32_t x, int32_t g)   /* allpass, g Q15 */
+{
+    int32_t o = hl_at(base, len), w = clamp(x - hl_mul(o, g), -32768, 32767);
+    hl_buf[(p + base) & HL_MASK] = (int16_t)w;
+    return o + hl_mul(w, g);
+}
+static inline int32_t hl_apmod(uint32_t p, uint32_t base, int32_t x, int32_t g, int32_t dq8)   /* .. at a moving delay (Q8) */
+{
+    uint32_t d = (uint32_t)dq8 >> 8;
+    int32_t o0 = hl_at(base, d), o1 = hl_at(base, d + 1u), o = o0 + (((o1 - o0) * (dq8 & 255)) >> 8);
+    int32_t w = clamp(x - hl_mul(o, g), -32768, 32767);
+    hl_buf[(p + base) & HL_MASK] = (int16_t)w;
+    return o + hl_mul(w, g);
+}
+
+/* HALL's decay gain (Q15) for SIZE 0..127, applied twice in each half of the tank (a half's loop: ~0.32 s), so
+ * the low notes' RT60 (where the damping does not reach) = 0.48 s / -log10(g). SIZE sets that RT60 on an
+ * exponential curve, 1.5 s at 0 to 12 s at 127 (x 2 every 42 steps: even to the ear); DAMP shortens the highs.
+ * HL_G: g at SIZE 0, 8 .. 120, 127 (g = 10^(-0.4815 / RT60)), linear between. */
+static const uint16_t HL_G[17] = {15648, 17134, 18554, 19896, 21153, 22320, 23398, 24385, 25286, 26104, 26843,
+                                  27508, 28106, 28640, 29118, 29543, 29876};
+static int32_t hall_decay(int32_t size)
+{
+    uint32_t k = (uint32_t)size >> 3, f = (uint32_t)size & 7u;
+    return HL_G[k] + (((int32_t)HL_G[k + 1u] - (int32_t)HL_G[k]) * (int32_t)f >> 3);
+}
+
+static __attribute__((noinline)) void rev_hall(const int32_t *rev_in, int32_t *out, uint32_t n)
+{
+    uint32_t i, s = (uint32_t)song.g[G_RSIZE], p = fx.hl_p;
+    uint32_t pd = 1u + ((s * (HL_D[H_PRE] - 1u)) >> 7);   /* pre-delay: 0 .. 63 ms */
+    int32_t g = hall_decay((int32_t)s), kd = 32767 - song.g[G_RDAMP] * 220;   /* damping: open .. ~1 kHz */
+    int32_t m = (osc_sine(fx.hl_ph) * HL_EXC) >> 7, m2 = (osc_sine(fx.hl_ph + 0x40000000u) * HL_EXC) >> 7;
+    int32_t dl = (int32_t)(HL_AL << 8) + m, dr = (int32_t)(HL_AR << 8) + m2, lpl = fx.hl_lpl, lpr = fx.hl_lpr;
+    fx.hl_ph += LFO_INC[20];                            /* ~0.5 Hz, stepped per block */
+    for (i = 0; i < n; i++, p--) {
+        int32_t x = clamp(mulq15(rev_in[i], 2580), -32768, 32767), el, er, a, o;
+        a = hl_at(HL_B_PRE, pd);
+        hl_put(HL_B_PRE, x);
+        a = hl_ap(p, HL_B_I1, 189u, a, 24576);          /* input diffusion 0.75, 0.75, 0.625, 0.625 */
+        a = hl_ap(p, HL_B_I2, 142u, a, 24576);
+        a = hl_ap(p, HL_B_I3, 504u, a, 20480);
+        a = hl_ap(p, HL_B_I4, 368u, a, 20480);
+        el = hl_at(HL_B_D2L, 4948u);                    /* the halves' ends, before either writes */
+        er = hl_at(HL_B_D2R, 4207u);
+        /* left half, fed by the right: decay diffusion 1 (-0.7, moving), delay, damping, decay, diffusion 2 (0.5) */
+        o = hl_at(HL_B_D1L, 5922u);
+        hl_put(HL_B_D1L, hl_apmod(p, HL_B_AL, clamp(a + hl_mul(er, g), -32768, 32767), -22938, dl));
+        lpl = hl_mul(o, kd) + hl_mul(lpl, 32768 - kd);   /* (each term towards 0: no dead band to stick in) */
+        hl_put(HL_B_D2L, hl_ap(p, HL_B_APL, 2394u, hl_mul(lpl, g), 16384));
+        /* right half, fed by the left */
+        o = hl_at(HL_B_D1R, 5609u);
+        hl_put(HL_B_D1R, hl_apmod(p, HL_B_AR, clamp(a + hl_mul(el, g), -32768, 32767), -22938, dr));
+        lpr = hl_mul(o, kd) + hl_mul(lpr, 32768 - kd);   /* (each term towards 0: no dead band to stick in) */
+        hl_put(HL_B_D2R, hl_ap(p, HL_B_APR, 3532u, hl_mul(lpr, g), 16384));
+        /* Dattorro's left output taps (x 1.33): the bus is mono; x 4: ROOM's level */
+        o = hl_at(HL_B_D1R, 354u) + hl_at(HL_B_D1R, 3955u) - hl_at(HL_B_APR, 2544u) + hl_at(HL_B_D2R, 2655u)
+          - hl_at(HL_B_D1L, 2647u) - hl_at(HL_B_APL, 249u) - hl_at(HL_B_D2L, 1418u);
+        out[i] += o << 2;
+    }
+    fx.hl_p = (uint16_t)p;
+    fx.hl_lpl = lpl;
+    fx.hl_lpr = lpr;
+}
+
+/* HALL's half of the delay line and its states to silence */
+static void hall_clear(void)
+{
+    uint32_t i, *p = (uint32_t *)(void *)hl_buf;
+    for (i = 0; i < DLY_LEN / 4u; i++)
+        p[i] = 0;
+    fx.hl_lpl = fx.hl_lpr = 0;
+}
+
 /* the reverb's buffers and states to silence (the model changed) */
 static void rev_clear(void)
 {
     uint32_t i;
     for (i = 0; i < sizeof rev_comb / 2u; i++)
         rev_comb[i] = 0;
-    for (i = 0; i < sizeof rev_u.sp / 4u; i++)
-        rev_u.sp[i] = 0;
+    for (i = 0; i < sizeof rev_u.ap / 2u; i++)          /* (int16: 997 of them, an odd count the int32 view misses one of) */
+        rev_u.ap[i] = 0;
     for (i = 0; i < 4u; i++)
         fx.comb_lp[i] = 0;
     fx.sp_lp = fx.sp_hp = fx.sp_he = 0;
+}
+
+static void rev_run(uint32_t model, const int32_t *rev_in, int32_t *out, uint32_t n)   /* G_RTYPE's model */
+{
+    if (model == 2u)
+        rev_hall(rev_in, out, n);
+    else if (model)
+        rev_spring(rev_in, out, n);
+    else
+        rev_room(rev_in, out, n);
 }
 
 static int32_t part_buf[CTL];                            /* a part's block (mix_part); the fade of a model change */
@@ -265,7 +394,7 @@ static int32_t part_buf[CTL];                            /* a part's block (mix_
 static void fx_buses(const int32_t *cho_in, const int32_t *dly_in, const int32_t *rev_in, int32_t *wet,
                      uint32_t n)
 {
-    uint32_t i, dl = delay_samples();
+    uint32_t i, dl = delay_samples(), dm = fx.rtype == 2u ? DLY_LEN / 2u - 1u : DLY_LEN - 1u;   /* HALL: front half */
     int32_t fb = song.g[G_DFDBK] * 230, col = 2000 + song.g[G_DCOLOR] * 240;
     int32_t dmix = song.g[G_DMIX] * 258;
     int32_t cdepth = song.g[G_CDEPTH] * 6, rt;
@@ -284,33 +413,29 @@ static void fx_buses(const int32_t *cho_in, const int32_t *dly_in, const int32_t
         }
         fx.cho_w++;
         /* delay with a low-passed feedback */
-        x = dly_buf[(fx.dly_w - dl) & (DLY_LEN - 1u)];
+        x = dly_buf[(fx.dly_w - dl) & dm];
         fx.dly_lp += mulq15(x - fx.dly_lp, col);
-        dly_buf[fx.dly_w & (DLY_LEN - 1u)] =
+        dly_buf[fx.dly_w & dm] =
             (int16_t)clamp((dly_in[i] >> 1) + mulq15(fx.dly_lp, fb), -32768, 32767);
         fx.dly_w++;
         y += mulq15(x << 1, dmix);
         wet[i] = y;
     }
-    rt = song.g[G_RTYPE] == 1;
+    rt = song.g[G_RTYPE] >= 0 && song.g[G_RTYPE] <= 2 ? song.g[G_RTYPE] : 0;
     if (rt != fx.rtype) {                               /* the model changed: the old one's block fades out, */
         int32_t *t = part_buf, g = 65536, d = 65536 / (int32_t)n;   /* its buffers are cleared, the new */
         for (i = 0; i < n; i++)                                     /* one starts from silence */
             t[i] = 0;
-        if (fx.rtype)
-            rev_spring(rev_in, t, n);
-        else
-            rev_room(rev_in, t, n);
+        rev_run(fx.rtype, rev_in, t, n);
         for (i = 0; i < n; i++, g -= d)
             wet[i] += mulq16(t[i], (uint32_t)g);
         rev_clear();
+        if (fx.rtype == 2u || rt == 2)                  /* HALL's half: the delay's own again, or HALL's from */
+            hall_clear();                               /* silence (no old tail or old echoes replayed) */
         fx.rtype = (uint8_t)rt;
         return;
     }
-    if (rt)
-        rev_spring(rev_in, wet, n);
-    else
-        rev_room(rev_in, wet, n);
+    rev_run((uint32_t)rt, rev_in, wet, n);
 }
 
 /* one block of the whole mix (shared with hostsim.c): events -> each part (with its modulation matrix)
@@ -368,8 +493,13 @@ static __attribute__((noinline)) void perf_master(int32_t *out, uint32_t n)
 {
     uint32_t i;
     for (i = 0; i < n; i++) {
-        mix_l[i] = (((mix_l[i] + wet[i]) >> 2) * (int32_t)song.master_q12) >> 10;
-        mix_r[i] = (((mix_r[i] + wet[i]) >> 2) * (int32_t)song.master_q12) >> 10;
+        mix_l[i] += wet[i];
+        mix_r[i] += wet[i];
+    }
+    tape_block(mix_l, mix_r, n);
+    for (i = 0; i < n; i++) {
+        mix_l[i] = ((mix_l[i] >> 2) * (int32_t)song.master_q12) >> 10;
+        mix_r[i] = ((mix_r[i] >> 2) * (int32_t)song.master_q12) >> 10;
     }
     perf_block(mix_l, mix_r, n);
     for (i = 0; i < n; i++) {
@@ -398,8 +528,13 @@ static void mix_block(int32_t *out, uint32_t n)
         return;
     }
     for (i = 0; i < n; i++) {
-        int32_t l = (((mix_l[i] + wet[i]) >> 2) * (int32_t)song.master_q12) >> 10;
-        int32_t r = (((mix_r[i] + wet[i]) >> 2) * (int32_t)song.master_q12) >> 10;
+        mix_l[i] += wet[i];
+        mix_r[i] += wet[i];
+    }
+    tape_block(mix_l, mix_r, n);
+    for (i = 0; i < n; i++) {
+        int32_t l = ((mix_l[i] >> 2) * (int32_t)song.master_q12) >> 10;
+        int32_t r = ((mix_r[i] >> 2) * (int32_t)song.master_q12) >> 10;
         master_out(&l, &r);
         out[2u * i] = l;
         out[2u * i + 1u] = r;

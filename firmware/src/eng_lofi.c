@@ -211,6 +211,11 @@ static const preset_t LOFI_PRESETS[] = {
     {"WAVE LEAD", {0, 4, 92, 0, 0, 18, 0, 110}, {0, 70, 90, 30}, 0, 1, FX(0, 0, 40, 25), PAT(3)},
     /* STEP: 25 % pulse, DCY 34 = D7 (a 15-step decay over 0.5 s), REL ~54 ms of staircase after note-off */
     {"STEP LEAD", {4, 0, 40, 34, 0, 16, 0, 127}, {0, 64, 127, 55}, 0, 1, FX(0, 0, 40, 20), PAT(4)},
+    /* GHOULBOX presets (tools/ghoulbox_presets.py) */
+    {"TOWER LEAD", {0, 1, 64, 0, 0, 30, 0, 70}, {5, 70, 110, 60}, 0, 1, FX(0, 20, 35, 90), PAT(4)},
+    {"CASIO CHOIR", {0, 4, 92, 0, 0, 20, 0, 80}, {60, 90, 115, 90}, 0, 0, FX(0, 70, 20, 100), PAT(5)},
+    {"RECORDER", {2, 1, 64, 0, 0, 24, 0, 60}, {12, 70, 115, 50}, 0, 1, FX(0, 20, 25, 90), PAT(4)},
+    /* GHOULBOX end */
 };
 
 static const engine_t ENG_LOFI = {

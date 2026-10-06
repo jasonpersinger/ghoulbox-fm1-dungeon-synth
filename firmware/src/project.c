@@ -23,7 +23,7 @@
  * added since (SLICE 8, ..) were appended, no index moved.
  *
  * Track 4 was the GM drum part until 1.0 (no engine: its byte 0; its level and reverb send in the
- * globals G_DRLVL / G_DRREV, which are inert now). A project says which it has in `parts`: NPART
+ * globals of ids 25 / 26, TAPE / CRSH now). A project says which it has in `parts`: NPART
  * when written since, 0 before (a reserved byte, always written 0: the format and its size did not
  * change). proj_drums_to_part turns such a track 4 into the legacy SAMPLE PERC part
  * (the GM kit, so its drum steps still play drums), keeping its steps, its pattern and mix parameters
@@ -226,8 +226,9 @@ static void proj_drums_to_part(project_t *q)
         return;
     d->engine = 4;                              /* SAMPLE: independent of today's power-on drum sound */
     d->preset = PROJ_DEF_KEEP;
-    d->p[P_LEVEL] = (int16_t)clamp(q->g[G_DRLVL], 0, 127);   /* the drum part's level and reverb send */
-    d->p[P_REV] = (int16_t)clamp(q->g[G_DRREV], 0, 127);
+    d->p[P_LEVEL] = (int16_t)clamp(q->g[G_TAPE], 0, 127);    /* the drum part's level and reverb send (their */
+    d->p[P_REV] = (int16_t)clamp(q->g[G_CRSH], 0, 127);      /* ids are TAPE / CRSH now: those start off) */
+    q->g[G_TAPE] = q->g[G_CRSH] = 0;
     q->parts = NPART;
     q->sum = proj_sum(q);
 }
@@ -422,6 +423,13 @@ static int proj_import_any(project_t *q, const void *b, int n)
     proj_fm6_init(q);
     return 1;
 }
+/* GHOULBOX: ids 25, 26 (TAPE / CRSH now) of a format before FUN7 are the old drum part's level and send, or
+ * stale: off (after proj_drums_to_part took them) */
+static void proj_tape_off(project_t *q)
+{
+    q->g[G_TAPE] = q->g[G_CRSH] = 0;
+    q->sum = proj_sum(q);
+}
 static int proj_import_old(project_t *q, const void *b, int n)
 {
     if (n == (int)sizeof(project_v5_t) || n == (int)sizeof(project_v6_t)) {
@@ -444,7 +452,7 @@ static int proj_import_old(project_t *q, const void *b, int n)
                 for (k = 0; k < NSTEP; k++) memcpy(&q->t[i].step[k], &v->t[i].step[k], sizeof(step10_t));
             }
             if (bytes == sizeof *v6) q->chain = v6->chain; else chain_defaults(&q->chain);
-            q->sum = proj_sum(q); proj_drums_to_part(q); proj_phys(q);
+            q->sum = proj_sum(q); proj_drums_to_part(q); proj_phys(q); proj_tape_off(q);
             return 1;
         }
     }
@@ -452,6 +460,7 @@ static int proj_import_old(project_t *q, const void *b, int n)
         proj_from_v2(q, (const project_v2_t *)b, n) || proj_from_v1(q, (const project_v1_t *)b, n)) {
         proj_phys(q);                          /* (formats 1..3 had no PHYS track: only the byte) */
         proj_grid(q);                          /* (after it: a PHYS DRUM track is DRUM now) */
+        proj_tape_off(q);
         return 1;
     }
     return 0;

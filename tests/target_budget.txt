@@ -46,6 +46,8 @@ perf_begin 28
 perf_mute 21
 perf_pre 27
 perf_block 814
-perf_master 31
+perf_master 36
 rev_room 218
 rev_spring 126
+rev_hall 345
+tape_block 436

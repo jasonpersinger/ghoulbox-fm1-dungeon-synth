@@ -350,6 +350,11 @@ static const preset_t TRIO_PRESETS[] = {
     {"SYNC LEAD", {9, 9, 0, 0, 0, 82, 30, 64}, {2, 70, 100, 40}, 18, 1, FX(0, 10, 40, 25), PAT(4)},
     {"RING BELL", {13, 0, 18, 6, 1, 96, 30, 64}, {0, 92, 0, 80}, 0, 0, FX(0, 20, 35, 55), PAT(7)},
     {"CHIP CHOIR", {1, 0, 12, 7, 1, 62, 95, 40}, {70, 90, 110, 85}, 30, 0, FX(0, 50, 20, 65), PAT(5)},
+    /* GHOULBOX presets (tools/ghoulbox_presets.py) */
+    {"FANTASY PAD", {0, 12, 7, 14, 0, 55, 20, 64}, {90, 90, 115, 100}, 10, 0, FX(0, 90, 25, 110), PAT(5)},
+    {"MOURN HORN", {1, 0, -12, 5, 0, 40, 25, 50}, {40, 85, 105, 70}, 35, 0, FX(5, 20, 10, 90), PAT(4)},
+    {"STRING MACH", {0, 12, 0, 18, 0, 70, 5, 64}, {60, 90, 120, 95}, 0, 0, FX(0, 110, 0, 100), PAT(5)},
+    /* GHOULBOX end */
 };
 
 static const engine_t ENG_TRIO = {

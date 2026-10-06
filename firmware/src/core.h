@@ -77,12 +77,13 @@ enum {                          /* global parameters */
     G_ENGSEL, G_ENGGO,          /* no page: the editor switches the engine with a SET of G_ENGSEL; G_ENGGO is
                                  * unused (ids are fixed by the formats and the protocol) */
     G_CLRSEQ, G_INITSND,
-    G_RTYPE,                    /* REVERB TYPE: 0 ROOM, 1 SPRING (fx.c). Was G_DRCH, the GM drum part's MIDI
+    G_RTYPE,                    /* REVERB TYPE: 0 ROOM, 1 SPRING, 2 HALL (fx.c). Was G_DRCH, the GM drum part's MIDI
                                  * channel (inert since 1.0, never read); projects of formats before FUN7 load it
                                  * as ROOM (project.c proj_rtype_room) */
-    G_DRLVL, G_DRREV,           /* inert (label "-", on no page): the GM drum part they set is gone; kept
-                                 * because the ids and G_COUNT are fixed by the formats and the protocol (only
-                                 * the import of an old project reads them: proj_drums_to_part) */
+    G_TAPE, G_CRSH,             /* GHOULBOX: TAPE / CRSH (tape.c). Were G_DRLVL / G_DRREV, the GM drum part's level
+                                 * and reverb send (inert since 1.0, clamped to 0 on every load since): the import
+                                 * of a project of firmware before 1.0 reads them as the drum part's, then sets
+                                 * them 0 (project.c proj_drums_to_part) */
     G_COUNT
 };
 

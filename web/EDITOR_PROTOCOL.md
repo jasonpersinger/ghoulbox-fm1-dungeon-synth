@@ -315,10 +315,11 @@ grid lives in the steps themselves, so every engine has it:
   NENGINES, no presets (`UP_LOAD` / `UP_STORE` rc 1), its level the global `G_DRLVL`. Drums are now the
   SAMPLE engine's PERC set and the DRUM engine on any part: the first C key is the kick (C2 = 36), notes are GM numbers.
 - The globals `G_DRCH`, `G_DRLVL`, `G_DRREV` (ids 24..26: the old drum track's MIDI channel, level and
-  reverb send) keep their ids, and `G_COUNT` stays 27. `G_DRLVL` and `G_DRREV` are inert: `DESC` gives
-  label "-", range 0..0, and no page shows them. Id 24 (`G_DRCH`, never read since 1.0) is `G_RTYPE`
-  since 1.0: the reverb's model, `DESC` label "TYPE", enum ROOM (0) / SPRING (1), on the REVERB
-  page (FX); projects of formats before FUN7 load it as ROOM. MIDI channel 10 is no longer special (channels 1..4 play
+  reverb send) keep their ids, and `G_COUNT` stays 27. Id 24 (`G_DRCH`, never read since 1.0) is `G_RTYPE`
+  since 1.0: the reverb's model, `DESC` label "TYPE", enum ROOM (0) / SPRING (1) / HALL (2, GHOULBOX), on
+  the REVERB page (FX); projects of formats before FUN7 load it as ROOM. GHOULBOX: ids 25, 26 (inert in
+  Felucca 1.0) are `G_TAPE` / `G_CRSH`, `DESC` labels "TAPE" / "CRSH", 0..127, default 0, on the TAPE page
+  (FX); a project of firmware before 1.0 loads them 0 (after its drum part took its level and send from them). MIDI channel 10 is no longer special (channels 1..4 play
   tracks 1..4, every other channel the selected track; with ROUT SEL every channel the selected track).
 - Selecting a track with `TRACK` does not push `RELOAD` (the editor re-reads `DUMP`, the steps and the
   engine `DESC` itself); selecting one on the device does (`RELOAD` with the new track).

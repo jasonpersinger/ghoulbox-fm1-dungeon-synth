@@ -226,6 +226,12 @@ static const preset_t PHYS_PRESETS[] = {
     /* SYMP: {MODEL, CHRD, BRIT, DAMP, SYMP, ACC, BUZZ, EXC} */
     {"DRONE STRING", {PM_SYMP, 127, 80, 88, 64, 100, 92, 0}, {0, 100, 127, 90}, 0, 0, FX(0, 10, 20, 50), PAT(3)},
     {"HARP", {PM_SYMP, 8, 62, 74, 60, 90, 0, 0}, {0, 100, 127, 80}, 0, 0, FX(0, 20, 20, 60), PAT(3)},
+    /* GHOULBOX presets (tools/ghoulbox_presets.py) */
+    {"LUTE", {1, 48, 55, 70, 30, 127, 0, 0}, {0, 100, 127, 70}, 0, 0, FX(0, 15, 20, 80), PAT(3)},
+    {"HARPSICHORD", {1, 80, 110, 78, 12, 127, 0, 0}, {0, 100, 127, 50}, 0, 0, FX(0, 10, 10, 75), PAT(3)},
+    {"DUNGEON HARP", {3, 4, 50, 80, 70, 127, 0, 0}, {0, 100, 127, 90}, 0, 0, FX(0, 20, 20, 95), PAT(3)},
+    {"GURDY DRONE", {3, 1, 70, 95, 80, 127, 110, 0}, {30, 100, 127, 90}, 0, 0, FX(5, 10, 0, 90), PAT(5)},
+    /* GHOULBOX end */
 };
 
 static const engine_t ENG_PHYS = {

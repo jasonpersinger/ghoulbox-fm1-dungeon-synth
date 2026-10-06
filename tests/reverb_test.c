@@ -18,13 +18,23 @@
  * 6. a model change while the bus rings: no click (the old one's block fades out), the new one starts silent.
  * 7. cost: host instructions per sample of the reverb alone (rev_room, rev_spring): SPRING at most ROOM + 30 %;
  *    and of the whole bus stage (fx_buses), with the device estimate (1.7 % per 100, drum_test's ratio).
- * Demos (WAV) into DEMODIR: a drum pattern and a pluck through SPRING, the drums through ROOM to compare. */
+ * 8. HALL (GHOULBOX, G_RTYPE 2): the RT60 of a low tone (150 Hz: what music rings with; a click's highs die
+ *    sooner under DAMP and would hide a tail that drones on) rises with SIZE: at most 3 s at SIZE 0, 8 .. 20 s at 127;
+ *    stable at the corners and silent after the tail; its level within 6 dB of ROOM's; the delay keeps its
+ *    own half of dly_buf (bit-identical to ROOM's buses with no reverb send, never reads HALL's half); a
+ *    model change into and out of HALL: no click, no old tail replayed by the delay; cost.
+ * Demos (WAV) into DEMODIR: a drum pattern and a pluck through SPRING and HALL, the drums through ROOM to compare. */
 #define main hostsim_main
 #include "hostsim.c"
 #undef main
 #ifdef __APPLE__
 #include <libproc.h>
 #include <sys/resource.h>
+#endif
+#ifdef __linux__
+#include <linux/perf_event.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 #endif
 
 static int bad;
@@ -39,6 +49,21 @@ static uint64_t instr_now(void)
     struct rusage_info_v4 ri;
     if (!proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ri))
         return ri.ri_instructions;
+#endif
+#ifdef __linux__
+    static int fd = -2;                                 /* user-space instructions (perf_event_paranoid <= 2) */
+    uint64_t v;
+    if (fd == -2) {
+        struct perf_event_attr a;
+        memset(&a, 0, sizeof a);
+        a.type = PERF_TYPE_HARDWARE;
+        a.size = sizeof a;
+        a.config = PERF_COUNT_HW_INSTRUCTIONS;
+        a.exclude_kernel = a.exclude_hv = 1;
+        fd = (int)syscall(SYS_perf_event_open, &a, 0, -1, -1, 0);
+    }
+    if (fd >= 0 && read(fd, &v, sizeof v) == (ssize_t)sizeof v)
+        return v;
 #endif
     return 0;
 }
@@ -142,6 +167,7 @@ static void test_room_identical(void)
 
 /* ------------------------------------------------------------- SPRING --- */
 #define IRN (12u * FS / CTL * CTL)
+#define HIRN (60u * FS / CTL * CTL)                     /* HALL: a cathedral's tail needs more than IRN */
 static int32_t ir[IRN];
 static void spring_reset(int32_t size, int32_t damp)
 {
@@ -169,7 +195,7 @@ static void spring_run(const int32_t *x, uint32_t len, uint32_t n)
 }
 static double rt60(const int32_t *h, uint32_t n)       /* Schroeder: -5 .. -35 dB, x2 */
 {
-    static double e[IRN];
+    static double e[HIRN];
     double s = 0, t5 = -1, t35 = -1;
     uint32_t i;
     for (i = n; i-- > 0;) {
@@ -320,16 +346,209 @@ static void test_switch(void)
     check("  and back to ROOM", fx.rtype == 0);
 }
 
+
+/* --------------------------------------------------------------- HALL --- */
+static int32_t hir[HIRN];
+static void hall_reset(int32_t size, int32_t damp)
+{
+    song.g[G_RTYPE] = 2;
+    song.g[G_RSIZE] = (int16_t)size;
+    song.g[G_RDAMP] = (int16_t)damp;
+    hall_clear();
+    fx.rtype = 2;
+}
+static void hall_run(const int32_t *x, uint32_t len, uint32_t n)       /* x (len samples, then silence) -> hir */
+{
+    static int32_t in[CTL];
+    uint32_t t, i;
+    for (t = 0; t < n; t += CTL) {
+        for (i = 0; i < CTL; i++) {
+            in[i] = t + i < len ? x[t + i] : 0;
+            hir[t + i] = 0;
+        }
+        rev_hall(in, hir + t, CTL);
+    }
+}
+static int half_clean(void)                             /* HALL's half of dly_buf all zero */
+{
+    uint32_t i;
+    for (i = DLY_LEN / 2u; i < DLY_LEN; i++)
+        if (dly_buf[i])
+            return 0;
+    return 1;
+}
+
+static void test_hall(void)
+{
+    static int32_t tone[FS], burst[2u * FS];
+    static const int32_t SZ[3] = {0, 64, 127};
+    double r[3];
+    char what[200];
+    uint32_t k, i;
+    host_tracks_init();
+    for (i = 0; i < FS; i++)                            /* 1 s of 150 Hz, then silence: the tail from its end */
+        tone[i] = (int32_t)(150000 * sin(2 * M_PI * 150 * i / FS));
+    for (k = 0; k < 3u; k++) {
+        hall_reset(SZ[k], 60);
+        hall_run(tone, FS, HIRN);
+        r[k] = rt60(hir + FS, HIRN - FS);
+    }
+    snprintf(what, sizeof what, "HALL decay of a 150 Hz tone rises with SIZE: RT60 %.2f s (SIZE 0), %.2f (64), %.2f (127)", r[0], r[1], r[2]);
+    check(what, r[0] < r[1] && r[1] < r[2] && r[0] <= 3.0 && r[2] >= 8.0 && r[2] <= 20.0);
+    for (k = 0; k < 4u; k++) {   /* the corners: full-scale noise or square waves, then a long silence */
+        int32_t pk = 0, tail = 0;
+        for (i = 0; i < 2u * FS; i++)
+            burst[i] = k < 2u ? noise(1 << 19) : (i / (k == 2u ? 7u : 53u)) & 1u ? 1 << 19 : -(1 << 19);
+        hall_reset(127, k & 1u ? 127 : 0);
+        hall_run(burst, 2u * FS, HIRN);
+        for (i = 0; i < HIRN; i++) {
+            int32_t v = abs(hir[i]);
+            pk = v > pk ? v : pk;
+            if (i >= HIRN - FS)
+                tail = v > tail ? v : tail;
+        }
+        snprintf(what, sizeof what, "HALL at SIZE 127 DAMP %d: 2 s of %s: peak %d, the 60th second %d",
+                 k & 1u ? 127 : 0, k < 2u ? "full-scale noise" : k == 2u ? "a full-scale 3.2 kHz square" : "a 416 Hz square",
+                 pk, tail);
+        check(what, pk <= 28 * 32768 && tail <= 4);     /* (7 taps of saturated int16 lines x 4 at most: under half of
+                                                         * the ~2^21 where the master's (mix + wet) >> 2 * MASTER overflows) */
+    }
+    {   /* the level against ROOM: the same noise burst, defaults */
+        static int32_t in[CTL], o[CTL];
+        double er = 0, eh = 0;
+        uint32_t t, m;
+        for (m = 0; m < 2u; m++) {
+            host_tracks_init();
+            rev_clear();
+            hall_clear();
+            xs = 99;
+            for (t = 0; t < 2u * FS; t += CTL) {
+                for (i = 0; i < CTL; i++) {
+                    in[i] = t < FS / 4u ? noise(20000) : 0;
+                    o[i] = 0;
+                }
+                if (m)
+                    rev_hall(in, o, CTL);
+                else
+                    rev_room(in, o, CTL);
+                for (i = 0; i < CTL; i++)
+                    *(m ? &eh : &er) += (double)o[i] * o[i];
+            }
+        }
+        snprintf(what, sizeof what, "level: HALL's tail %.1f dB from ROOM's (the same burst, defaults)", 10 * log10(eh / er));
+        check(what, fabs(10 * log10(eh / er)) <= 6.0);
+    }
+}
+
+/* the delay beside HALL: its own half of dly_buf only */
+static void test_hall_delay(void)
+{
+    static int32_t c[CTL], d[CTL], r[CTL], w0[10u * FS / CTL * CTL], w1[CTL];
+    uint32_t b, i, m, diff = 0, nb = 10u * FS / CTL, dl_ok = 1, front = 0;
+    char what[200];
+    for (m = 0; m < 2u; m++) {                          /* ROOM, then HALL: no reverb send, a short delay */
+        host_tracks_init();
+        rev_clear();
+        memset(dly_buf, 0, sizeof dly_buf);
+        memset(cho_buf, 0, sizeof cho_buf);
+        memset(&fx, 0, sizeof fx);
+        song.g[G_RTYPE] = (int16_t)(m * 2u);
+        fx.rtype = (uint8_t)(m * 2u);
+        song.g[G_DTIME] = 3;                            /* 1/8 */
+        song.g[G_DFDBK] = 100;
+        xs = 7;
+        for (b = 0; b < nb; b++) {
+            for (i = 0; i < CTL; i++) {
+                c[i] = noise(60000);
+                d[i] = b % 300u < 100u ? noise(60000) : 0;
+                r[i] = 0;
+            }
+            fx_buses(c, d, r, m ? w1 : w0 + b * CTL, CTL);
+            for (i = 0; m && i < CTL; i++)
+                diff += w1[i] != w0[b * CTL + i];
+        }
+    }
+    check("HALL: the delay and chorus bit for bit as with ROOM (no reverb send, 1/8 delay, 10 s)", !diff);
+    for (i = 0; i < 10u; i++) {                         /* every division at the slowest tempo */
+        song.g[G_DTIME] = (int16_t)i;
+        song.g[G_BPM] = 40;
+        dl_ok &= delay_samples() < DLY_LEN / 2u;
+    }
+    hall_reset(127, 0);
+    memset(dly_buf, 0, DLY_LEN);                        /* (the front half: the delay's) */
+    fx.dly_lp = 0;                                      /* (no old echo left in its feedback) */
+    song.g[G_DTIME] = 9;
+    song.g[G_DFDBK] = 120;
+    song.g[G_DMIX] = 127;
+    for (b = 0; b < 5u * FS / CTL; b++) {               /* a loud reverb send, none to the delay */
+        for (i = 0; i < CTL; i++) {
+            c[i] = d[i] = 0;
+            r[i] = noise(1 << 19);
+        }
+        fx_buses(c, d, r, w1, CTL);
+    }
+    for (i = 0; i < DLY_LEN / 2u; i++)
+        front |= (uint32_t)(dly_buf[i] != 0);
+    snprintf(what, sizeof what, "HALL: the delay at most %u samples at every division (40 BPM); never reads HALL's half",
+             DLY_LEN / 2u - 1u);
+    check(what, dl_ok && !front);
+    song.g[G_BPM] = 120;
+    song.g[G_DTIME] = 3;
+}
+
+/* into HALL and out of it while the tails ring */
+static void test_hall_switch(void)
+{
+    static int32_t c[CTL], d[CTL], r[CTL], w[CTL];
+    static const uint8_t FROM[2] = {0, 2}, TO[2] = {2, 0};
+    uint32_t b, i, k;
+    char what[200];
+    for (k = 0; k < 2u; k++) {
+        int32_t prev = 0, step = 0, own = 0, after = 0;
+        host_tracks_init();
+        rev_clear();
+        hall_clear();
+        memset(dly_buf, 0, sizeof dly_buf);
+        memset(cho_buf, 0, sizeof cho_buf);
+        song.g[G_RTYPE] = FROM[k];
+        fx.rtype = FROM[k];
+        for (b = 0; b < 4u * FS / CTL; b++) {
+            if (b == 2u * FS / CTL)
+                song.g[G_RTYPE] = TO[k];
+            for (i = 0; i < CTL; i++) {
+                c[i] = d[i] = 0;
+                r[i] = b < FS / CTL ? (int32_t)(30000 * sin(2 * M_PI * 220 * (b * CTL + i) / FS)) : 0;
+            }
+            fx_buses(c, d, r, w, CTL);
+            for (i = 0; i < CTL; i++) {
+                int32_t s = abs(w[i] - prev);
+                if (b >= 2u * FS / CTL - 4u && b <= 2u * FS / CTL + 4u)
+                    step = s > step ? s : step;
+                else if (b > FS / CTL + 100u && b < 2u * FS / CTL - 4u)
+                    own = s > own ? s : own;
+                if (b > 2u * FS / CTL)
+                    after = abs(w[i]) > after ? abs(w[i]) : after;
+                prev = w[i];
+            }
+        }
+        snprintf(what, sizeof what, "%s -> %s while the tail rings: largest step %d (the tail's own %d), silent after: %d",
+                 k ? "HALL" : "ROOM", k ? "ROOM" : "HALL", step, own, after);
+        check(what, step <= 2 * own + 64 && after == 0 && fx.rtype == TO[k] && (k == 0 || half_clean()));
+    }
+    song.g[G_RTYPE] = 0;
+}
+
 /* ---------------------------------------------------------------- cost --- */
-static double cost_of(int what)              /* 0 rev_room, 1 rev_spring, 2 fx_buses ROOM, 3 fx_buses SPRING */
+static double cost_of(int what)   /* 0 rev_room, 1 rev_spring, 2 fx_buses ROOM, 3 fx_buses SPRING, 4 rev_hall, 5 fx_buses HALL */
 {
     static int32_t c[CTL], d[CTL], r[CTL], w[CTL];
     uint32_t b, i, nb = 4u * FS / CTL;
     uint64_t i0;
     host_tracks_init();
     rev_clear();
-    song.g[G_RTYPE] = (int16_t)(what & 1);
-    fx.rtype = (uint8_t)(what & 1);
+    hall_clear();
+    song.g[G_RTYPE] = (int16_t)(what >= 4 ? 2 : what & 1);
+    fx.rtype = (uint8_t)song.g[G_RTYPE];
     for (i = 0; i < CTL; i++) {
         c[i] = noise(30000);
         d[i] = noise(30000);
@@ -337,7 +556,9 @@ static double cost_of(int what)              /* 0 rev_room, 1 rev_spring, 2 fx_b
     }
     i0 = instr_now();
     for (b = 0; b < nb; b++) {
-        if (what >= 2)
+        if (what == 4)
+            rev_hall(r, w, CTL);
+        else if (what >= 2)
             fx_buses(c, d, r, w, CTL);
         else if (what)
             rev_spring(r, w, CTL);
@@ -360,6 +581,12 @@ static void test_cost(void)
     snprintf(what, sizeof what, "  the bus stage (chorus, delay, reverb) ROOM %.0f (~%.1f %%), SPRING %.0f (~%.1f %%): +%.0f (~%.2f %% CPU)",
              broom, broom * 0.017, bspr, bspr * 0.017, bspr - broom, (bspr - broom) * 0.017);
     check(what, (bspr - broom) * 0.017 <= 2.0);
+    {
+        double hall = cost_of(4), bhall = cost_of(5);
+        snprintf(what, sizeof what, "  HALL alone %.0f instructions / sample (%.1f x ROOM, limit 2.5; once per mix, not per voice); bus stage %.0f",
+                 hall, hall / room, bhall);
+        check(what, hall <= room * 2.5);
+    }
 }
 
 /* ------------------------------------------------------------- demos --- */
@@ -374,6 +601,7 @@ static void demo(const char *dir, const char *name, int rtype, int pluck)
     memset(trk, 0, sizeof trk);
     host_tracks_init();
     rev_clear();
+    hall_clear();
     fx.rtype = (uint8_t)rtype;
     song.g[G_RTYPE] = (int16_t)rtype;
     song.g[G_BPM] = 100;
@@ -414,11 +642,16 @@ int main(int argc, char **argv)
     test_room_identical();
     test_spring();
     test_switch();
+    test_hall();
+    test_hall_delay();
+    test_hall_switch();
     test_cost();
     if (argc > 1) {
         demo(argv[1], "spring_drums", 1, 0);
         demo(argv[1], "spring_pluck", 1, 1);
         demo(argv[1], "room_drums", 0, 0);
+        demo(argv[1], "hall_drums", 2, 0);
+        demo(argv[1], "hall_pluck", 2, 1);
     }
     printf("%s\n", bad ? "REVERB TEST FAILED" : "reverb test passed");
     return bad != 0;

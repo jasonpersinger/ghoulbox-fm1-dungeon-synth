@@ -8,8 +8,8 @@
  * every matrix slot OFF), steps, globals, selection, the engine bytes (0..7 kept: the engines added since
  * were appended); damaged ones are refused. Track 4 of a project written before 1.0 (formats 2 and 3,
  * `parts` 0) was the GM drum part: it becomes the legacy SAMPLE part 4 (PROJ_DEF_KEEP: project_load
- * gives it the PERC preset), its steps and parameters kept, the drum level / reverb send (G_DRLVL /
- * G_DRREV) as its LEVEL / REV; global id 24 (the drum part's MIDI channel then, REVERB TYPE now) loads as ROOM
+ * gives it the PERC preset), its steps and parameters kept, the drum level / reverb send (ids 25 / 26, now
+ * G_TAPE / G_CRSH, then 0) as its LEVEL / REV; global id 24 (the drum part's MIDI channel then, REVERB TYPE now) loads as ROOM
  * from every format before FUN7. A FUN4 written while the drums were PHYS's MODEL DRUM (`phys` 1) loads such
  * a track as the DRUM engine with the same sound (its E values moved), other PHYS tracks as they were; one
  * of before 1.0 (`phys` 0) its DUST as MODAL bowed. The steps of a DRUM track of before FUN5 (DRUM, or
@@ -176,8 +176,8 @@ int main(void)
     bad += check("FUN2 -> FUN6: converted, valid format 5 slot", ok && proj_ok(&q) && q.magic == PROJ_MAGIC);
     ok = q.sel == 2;
     for (i = 0; i < G_COUNT; i++)
-        ok &= q.g[i] == (i == G_RTYPE ? 0 : (int16_t)(500 + i));
-    bad += check("FUN2 -> FUN6: globals (id 24, the old drum channel: ROOM) and selected track", ok);
+        ok &= q.g[i] == (i == G_RTYPE || i == G_TAPE || i == G_CRSH ? 0 : (int16_t)(500 + i));
+    bad += check("FUN2 -> FUN6: globals (id 24, the old drum channel: ROOM; 25, 26: TAPE / CRSH off) and selected track", ok);
     ok = 1;
     for (t = 0; t < NTRK; t++)
         ok &= track_ok(&q.t[t], &v2.t[t], t, t == 3u, 127, 127);   /* (G_DRLVL / G_DRREV 525 / 526: 127) */
@@ -207,7 +207,7 @@ int main(void)
     ok = proj_import(&q, &buf, (int)sizeof v3) && proj_ok(&q) && q.magic == PROJ_MAGIC && q.sel == 3 &&
          q.parts == NPART;
     for (i = 0; i < G_COUNT; i++)
-        ok &= q.g[i] == (i == G_RTYPE ? 0 : (int16_t)(600 + i));
+        ok &= q.g[i] == (i == G_RTYPE || i == G_TAPE || i == G_CRSH ? 0 : (int16_t)(600 + i));   /* (a parts-4 FUN3 too) */
     for (t = 0; t < NTRK; t++)
         ok &= track_v3_ok(&q.t[t], &v3.t[t], t);
     bad += check("FUN3 -> FUN6: every parameter kept, the matrix OFF, steps, globals (24: ROOM)", ok);
@@ -217,16 +217,17 @@ int main(void)
     v3.t[3] = v3.t[0];
     v3.t[3].engine = 0;
     v3.t[3].preset = 0;
-    v3.g[G_DRLVL] = 90;
-    v3.g[G_DRREV] = 20;
+    v3.g[G_TAPE] = 90;                                  /* (ids 25, 26: the drum level / send then, TAPE / CRSH now) */
+    v3.g[G_CRSH] = 20;
     v3.sum = proj_hash(&v3, sizeof v3 - 4u);
     memcpy(&buf, &v3, sizeof v3);
     ok = proj_import(&q2, &buf, (int)sizeof v3) && proj_ok(&q2) && q2.parts == NPART && q2.t[3].engine == 4 &&
          q2.t[3].preset == PROJ_DEF_KEEP && q2.t[3].p[P_LEVEL] == 90 && q2.t[3].p[P_REV] == 20 &&
          q2.t[3].p[P_PAN] == oldv3(0, P_PAN) && q2.t[3].p[P_SLEN] == oldv3(0, P_SLEN) &&
          q2.t[3].p[P_SLCR] == oldv3(0, P_SLCR) && q2.t[3].p[P_M1SRC] == 0 &&
-         steps_same(q2.t[3].step, v3.t[0].step) && !memcmp(&q2.t[0], &q.t[0], sizeof q.t[0]);
-    bad += check("FUN3 before 1.0: the drum track -> part 4 (LEVEL / REV from G_DRLVL / G_DRREV)", ok);
+         steps_same(q2.t[3].step, v3.t[0].step) && !memcmp(&q2.t[0], &q.t[0], sizeof q.t[0]) &&
+         q2.g[G_TAPE] == 0 && q2.g[G_CRSH] == 0;
+    bad += check("FUN3 before 1.0: the drum track -> part 4 (LEVEL / REV from ids 25 / 26); TAPE / CRSH then off", ok);
 
     /* a FUN6 round trip: stored as is (a matrix slot set; an engine added since: SLICE, 8; a DRUM track with
      * notes on its lanes stays so: only an older format is converted) */

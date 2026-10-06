@@ -178,6 +178,9 @@ static const preset_t PHASE_PRESETS[] = {
     {"RESO", {5, 0, 60, 60, 0, 0, 0, 0}, {0, 70, 30, 60}, 0, 0, FX(0, 0, 40, 40), PAT(1)},
     {"BELL", {6, 0, 80, 50, 0, 0, 0, 0}, {0, 95, 0, 90}, 0, 0, FX(0, 0, 30, 70), PAT(7)},
     {"WIRE", {4, 7, 70, 40, 7, 0, 0, 0}, {10, 80, 80, 60}, 0, 0, FX(15, 30, 30, 40), PAT(4)},
+    /* GHOULBOX presets (tools/ghoulbox_presets.py) */
+    {"GRIM BRASS", {0, 0, 25, 70, 6, 0, 30, 0}, {50, 80, 100, 70}, 0, 0, FX(0, 20, 15, 90), PAT(4)},
+    /* GHOULBOX end */
 };
 
 static const engine_t ENG_PHASE = {
