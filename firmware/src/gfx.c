@@ -239,7 +239,10 @@ static void cv_window(int32_t x, int32_t y, int32_t w, int32_t h, int32_t border
     cv_rect(x + w - b, y, b, b, T_ACCENT);
     cv_rect(x, y + h - b, b, b, T_ACCENT);
     cv_rect(x + w - b, y + h - b, b, b, T_ACCENT);
-    GFX_HOOK_CELL(x + b, y + b + cv_oy, x + w - b, y + h - b + cv_oy);   /* (the lint: text inside stays off the border) */
+    if (b == 3)                                         /* (the lint: text inside stays off the border; a thin window's */
+        GFX_HOOK_CELL(x + b, y + b + cv_oy, x + w - b, y + h - b + cv_oy);   /* 1 px lines lie in its icons' empty */
+    else                                                /* margins (24 px icons: ink rows 3..20), so its cell is the */
+        GFX_HOOK_CELL(x, y + cv_oy, x + w, y + h + cv_oy);   /* whole window) */
 }
 
 /* GHOULBOX: a small picture from rows of characters: '.' leaves the canvas, '0'..'9' are pal[0..9] */

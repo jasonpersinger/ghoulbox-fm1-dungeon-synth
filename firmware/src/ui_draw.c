@@ -46,7 +46,7 @@ static uint32_t batt_icon(int32_t lvl)
 static void draw_battery(int32_t bx)
 {
     int32_t lvl = batt_shown();
-    cv_icon_mid(bx, H_HEAD / 2, 24, batt_icon(lvl), lvl == 1 ? T_ACCENT : lvl == 0 ? T_MID : T_THEME, T_BG);   /* 24 px: the glyph is wide and short */
+    cv_icon_mid(bx, H_HEAD / 2, 24, batt_icon(lvl), lvl == 1 ? T_ACCENT : lvl == 0 ? T_MID : T_THEME, T_SURF);   /* 24 px: the glyph is wide and short */
 }
 
 /* ---------------------------------------------------- rolling digits --- */
@@ -108,7 +108,7 @@ static int32_t roll_text(uint32_t k, int32_t x, int32_t y, const char *s, uint16
     uint32_t e = (uint8_t)(ui.frame - ui.roll[k].t0) + 1u, i, p = 0;
     const char *a = ui.roll[k].from;
     int32_t cy = k < ROLL_BPM ? ROLL_Y : 0, h = k < ROLL_BPM ? ROLL_H : H_HEAD;
-    uint16_t bg = k < ROLL_BPM ? T_SURF : T_BG;
+    uint16_t bg = T_SURF;                               /* (GHOULBOX: the header is a window too) */
     char t[8], ch[2] = {0, 0};
     if (e >= ROLL_FRAMES)
         ui.roll[k].from[0] = 0;
@@ -164,28 +164,32 @@ static void draw_head(void)
     fmt_int(b, song.g[G_BPM]);
     if (!ui.force && sig == ui.head_sig) {
         if (ui.roll[ROLL_BPM].from[0]) {                /* rolling: the BPM's strip only */
-            cv_begin(BPM_W, H_HEAD, T_BG);
+            cv_begin(BPM_W, H_HEAD, T_SURF);
+            cv_stone(0, 1, BPM_W, H_HEAD - 2, BPM_X, 0);   /* GHOULBOX: the header window's stone and lines */
+            cv_rect(0, 0, BPM_W, 1, T_THEME);
+            cv_rect(0, H_HEAD - 1, BPM_W, 1, T_THEME);
             roll_text(ROLL_BPM, 0, 3, b, ui.bpm_t ? T_ACCENT : T_THEME);
             cv_blit(BPM_X, Y_HEAD);
         }
         return;
     }
     ui.head_sig = sig;
-    cv_begin(240, H_HEAD, T_BG);
+    cv_begin(240, H_HEAD, T_SURF);
+    cv_window(0, 0, 240, H_HEAD, 1);                 /* GHOULBOX: the header is a thin window */
     /* zones: transport 8..24, REC 28..44, tempo 56..100, a message 106..236, or: the song row / octave 116..166,
      * track 170..186, USB 189..213, battery 214..238 (icons: ink centred on row 12; USB and battery 24 px) */
     if (song.playing)                                /* a song playing: its disc instead of the triangle */
-        cv_icon_mid(8, H_HEAD / 2, 16, chain.running ? ICON_X_SONG : ICON_X_PLAY, T_THEME, T_BG);
+        cv_icon_mid(8, H_HEAD / 2, 16, chain.running ? ICON_X_SONG : ICON_X_PLAY, T_THEME, T_SURF);
     else
-        cv_icon_mid(8, H_HEAD / 2, 16, ICON_X_STOP, T_MID, T_BG);
-    draw_rec_mark(28, T_BG);
-    if (FELUCCA_ICONS) cv_icon_mid(54, H_HEAD / 2, 16, ICON_TEMPO, T_MID, T_BG);
+        cv_icon_mid(8, H_HEAD / 2, 16, ICON_X_STOP, T_MID, T_SURF);
+    draw_rec_mark(28, T_SURF);
+    if (FELUCCA_ICONS) cv_icon_mid(54, H_HEAD / 2, 16, ICON_TEMPO, T_MID, T_SURF);
     roll_text(ROLL_BPM, BPM_X, 3, b, ui.bpm_t ? T_ACCENT : T_THEME);
     if (ui.msg_t || ui.layer) {                     /* a message, or the layer's name */
-        cv_free_hint(106, 6, ui.msg_t ? ui.msg : layer_head(), T_TEXT, T_BG, 236 - 106);   /* (may start with a keycap) */
+        cv_free_hint(106, 6, ui.msg_t ? ui.msg : layer_head(), T_TEXT, T_SURF, 236 - 106);   /* (may start with a keycap) */
     } else {
         if (chain.running || song.octave) {         /* the song row playing, else the octave */
-            int32_t x = chain.running ? 116 + cv_icon_mid(116, H_HEAD / 2, 16, ICON_X_SONG, T_MID, T_BG)   /* SONG: the disc */
+            int32_t x = chain.running ? 116 + cv_icon_mid(116, H_HEAD / 2, 16, ICON_X_SONG, T_MID, T_SURF)   /* SONG: the disc */
                                       : cv_text(116, 6, &AF_S, "OCT", T_MID);
             if (chain.running) {
                 fmt_int(b, (int32_t)chain.row + 1);
@@ -195,9 +199,9 @@ static void draw_head(void)
             }
             cv_text(x + 4, 3, &AF_M, b, T_THEME);
         }
-        cv_icon_mid(170, H_HEAD / 2, 16, trk_icon(song.sel, 1), T_ACCENT, T_BG);
+        cv_icon_mid(170, H_HEAD / 2, 16, trk_icon(song.sel, 1), T_ACCENT, T_SURF);
         if (usb.config && !usb.suspended)
-            cv_icon_mid(189, H_HEAD / 2, 24, ICON_X_USB, T_MID, T_BG);
+            cv_icon_mid(189, H_HEAD / 2, 24, ICON_X_USB, T_MID, T_SURF);
         draw_battery(214);
     }
     cv_blit(0, Y_HEAD);
@@ -268,6 +272,13 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
         return;
     if (strip) {                                        /* rolling: the value strip only */
         cv_begin(COL_W, ROLL_H, T_SURF);
+        cv_stone(3, 0, COL_W - 6, ROLL_H, 0, ROLL_Y);   /* GHOULBOX: the window's stone and side borders, as drawn */
+        cv_rect(0, 0, 1, ROLL_H, T_EDGE);
+        cv_rect(1, 0, 1, ROLL_H, T_STONE);
+        cv_rect(2, 0, 1, ROLL_H, T_THEME);
+        cv_rect(COL_W - 3, 0, 1, ROLL_H, T_THEME);
+        cv_rect(COL_W - 2, 0, 1, ROLL_H, T_STONE);
+        cv_rect(COL_W - 1, 0, 1, ROLL_H, T_EDGE);
         cv_oy = -ROLL_Y;
     } else {
         char ov[16];                                    /* the value drawn before (in the cache key) */
@@ -285,7 +296,7 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
             ui.roll[c].from[0] = 0;
         str_cpy(ui.col[c], key, sizeof ui.col[c]);
         cv_begin(COL_W, COL_H, T_BG);
-        cv_rrect(0, 0, COL_W, COL_H, 4, T_SURF, T_BG);
+        cv_window(0, 0, COL_W, COL_H, 3);               /* GHOULBOX: a stone window */
     }
     if (label[0] || val[0]) {
         if (!strip && FELUCCA_ICONS && icon != ICON_NONE && label[0] && text_w(&AF_S, label) <= COL_W - 2 - 19)
@@ -403,7 +414,8 @@ static void draw_foot(void)
     if (!ui.force && sig == ui.foot_sig)
         return;
     ui.foot_sig = sig;
-    cv_begin(240, H_FOOT, T_BG);
+    cv_begin(240, H_FOOT, T_SURF);
+    cv_window(0, 0, 240, H_FOOT, 1);                 /* GHOULBOX: the footer is a thin window */
     if (act_cols()) {                                 /* row 1: the OCT+ / OCT- hint in place of the steps */
         char ha[16], hb[16];
         khint_t kh[3];
@@ -414,9 +426,9 @@ static void draw_foot(void)
         if (rn) {                                     /* USER / PROJECT: "EDIT NAME" between them */
             kh[2] = kh[1];
             kh[1] = (khint_t){KC_EDIT, "NAME"};
-            cv_key_row(8, 232, 2, kh, 3, (act_ready() ? 1u : 0u) | (rn == 2u ? 2u : 0u) | 4u, T_BG);
+            cv_key_row(8, 232, 2, kh, 3, (act_ready() ? 1u : 0u) | (rn == 2u ? 2u : 0u) | 4u, T_SURF);
         } else {
-            cv_key_row(8, 232, 2, kh, 2, act_ready() ? 3u : 2u, T_BG);
+            cv_key_row(8, 232, 2, kh, 2, act_ready() ? 3u : 2u, T_SURF);
         }
     } else if (grid_on()) {                           /* row 1: the page, and what the keys do */
         char b[16];
@@ -427,9 +439,9 @@ static void draw_foot(void)
         fmt_int(b + str_len(b), (int32_t)((len + 15u) / 16u));
         cv_text(8, 2, &AF_S, b, T_THEME);
         if (black_held(GK_ACC))
-            cv_text_r(232, 2, &AF_S, "ACCENT", T_ACCENT, T_BG);
+            cv_text_r(232, 2, &AF_S, "ACCENT", T_ACCENT, T_SURF);
         else
-            cv_key_hint(232 - kh_w(KC_KEYS, "STEPS"), 2, KC_KEYS, "STEPS", 1, T_BG);   /* the keys are the steps */
+            cv_key_hint(232 - kh_w(KC_KEYS, "STEPS"), 2, KC_KEYS, "STEPS", 1, T_SURF);   /* the keys are the steps */
     } else {
         uint32_t i;
         for (i = 0; i < 16u; i++) {                   /* row 1: the cursor's bank, 16 bars in 4 groups */
@@ -439,9 +451,9 @@ static void draw_foot(void)
             if (si >= (uint32_t)t->p[P_SLEN])
                 continue;
             if (step_on(st))                          /* a note: a bar (accented: the accent) */
-                cv_rrect(sx, 1, 9, 11, 2, (st->flags & SF_ACCENT) ? T_ACCENT : T_THEME, T_BG);
+                cv_rrect(sx, 1, 9, 11, 2, (st->flags & SF_ACCENT) ? T_ACCENT : T_THEME, T_SURF);
             else                                      /* empty: a stub (a tie: brighter) */
-                cv_rrect(sx, 9, 9, 3, 1, st->time == ST_TIE ? T_MID : T_RAISE, T_BG);
+                cv_rrect(sx, 9, 9, 3, 1, st->time == ST_TIE ? T_MID : T_RAISE, T_SURF);
             if (song.seq_mode && si == ui.cursor)
                 cv_rect(sx, 14, 9, 2, T_ACCENT);        /* the step edited */
             else if (song.playing && si == t->seq_idx)
@@ -450,14 +462,14 @@ static void draw_foot(void)
     }
     x = 8;
     if (FELUCCA_ICONS)                                /* row 2: engine icon + name, sound, page */
-        x += cv_icon_on(x, 20, 12, engine_icon(ename), T_MID, T_BG) + 5;
-    x = cv_text_fit(x, 19, &AF_S, ename, T_THEME, T_BG, 80);
+        x += cv_icon_on(x, 20, 12, engine_icon(ename), T_MID, T_SURF) + 5;
+    x = cv_text_fit(x, 19, &AF_S, ename, T_THEME, T_SURF, 80);
     {   /* the page title at the right, its icon before it (MIXER, PHRASES, SONG, CHANCE, MOTION) */
         uint32_t pi = ui.home ? ICON_NONE : page_icon(pg);
         int32_t tx = 232 - text_w(&AF_S, ti) - (pi != ICON_NONE ? 16 : 0);
-        cv_free_text(x + 10, 19, &AF_S, pn, T_TEXT, T_BG, tx - 12 - (x + 10));
-        if (pi != ICON_NONE) cv_icon_on(tx, 20, 12, pi, T_MID, T_BG);
-        cv_text_r(232, 19, &AF_S, ti, T_MID, T_BG);
+        cv_free_text(x + 10, 19, &AF_S, pn, T_TEXT, T_SURF, tx - 12 - (x + 10));
+        if (pi != ICON_NONE) cv_icon_on(tx, 20, 12, pi, T_MID, T_SURF);
+        cv_text_r(232, 19, &AF_S, ti, T_MID, T_SURF);
     }
     cv_blit(0, Y_FOOT);
 }
@@ -768,7 +780,7 @@ static void draw_confirm(void)
     lcd_fill(0, H_HEAD, 240, 240 - H_HEAD, T_BG);
     ui.head_sig = ~0u;
     cv_begin(DLG_W, DLG_H, T_BG);                     /* a SURF card: warning, the question, the detail, two buttons */
-    cv_rrect(0, 0, DLG_W, DLG_H, 8, T_SURF, T_BG);
+    cv_window(0, 0, DLG_W, DLG_H, 3);                  /* GHOULBOX: a stone window */
     cv_icon_on(DLG_W / 2 - 8, 12, 16, ui.confirm == CF_CLEAR_MOTION ? ICON_X_MOTION_DEL : ICON_X_WARN, T_ACCENT, T_SURF);
     if (text_w(tf, a) > DLG_W - 16)
         tf = &AF_S;
@@ -778,9 +790,9 @@ static void draw_confirm(void)
         text_fit(f, sizeof f, b, &AF_S, DLG_W - 16);    /* a name: free text */
         cv_text_flags(DLG_W / 2 - text_w(&AF_S, f) / 2, 56, &AF_S, f, T_MID, T_SURF, 8u | (f[str_len(f) - 1u] == ELLIPSIS));
     }
-    cv_rrect(10, 80, 90, 26, 6, T_RAISE, T_SURF);     /* OCT-: NO */
+    cv_rrect(10, 80, 90, 26, 0, T_RAISE, T_SURF);     /* OCT-: NO (GHOULBOX: square plates) */
     cv_key_hint(55 - kh_w(KC_OCTDN, "NO") / 2, 87, KC_OCTDN, "NO", 1, T_RAISE);
-    cv_rrect(108, 80, 90, 26, 6, T_THEME, T_SURF);    /* OCT+: YES (on the THEME fill: an INK keycap, THEME label) */
+    cv_rrect(108, 80, 90, 26, 0, T_THEME, T_SURF);    /* OCT+: YES (on the THEME fill: an INK keycap, THEME label) */
     {
         int32_t x = 153 - kh_w(KC_OCTUP, "YES") / 2;
         x = cv_keycap(x, 87, KC_OCTUP, T_INK, T_THEME, T_THEME);

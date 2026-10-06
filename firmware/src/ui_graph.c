@@ -255,7 +255,7 @@ static void graph_roll(const track_t *t, uint16_t c)
 static void graph_grid(const track_t *t, uint16_t c)
 {
     uint32_t l, i, len = (uint32_t)t->p[P_SLEN], base = ui.bank * 16u;
-    int32_t y0 = 6;
+    int32_t y0 = 3;                                  /* (GHOULBOX: 8 lanes end on the window's inner edge, row 119) */
     for (l = 0; l < NLANE; l++) {
         int32_t y = y0 + 4 + (int32_t)l * 14;
         int sel = l == ui.lane;
@@ -276,7 +276,7 @@ static void graph_grid(const track_t *t, uint16_t c)
         }
     }
     if (song.playing && t->seq_idx < len && t->seq_idx / 16u == ui.bank)
-        cv_rect(44 + (int32_t)(t->seq_idx % 16u) * 12, y0 - 1, 10, 3, T_TEXT);
+        cv_rect(44 + (int32_t)(t->seq_idx % 16u) * 12, y0, 10, 2, T_TEXT);   /* (inside the border) */
 }
 /* SCL: the 12 keys as rounded bars (black keys high, white keys low): in the scale THEME, the root the
  * accent, out of the scale RAISE */
@@ -545,8 +545,8 @@ static void graph_slices(void)
     slice_time(u, j < n ? slice_mark(j + 1u) - slice_mark(j) : len - mb);
     str_cpy(t + 4, u, sizeof t - 4);
     str_cpy(t + str_len(t), " S", sizeof t - str_len(t));
-    cv_text(12, 106, &AF_S, t, T_MID);
-    cv_text_r(228, 106, &AF_S, src ? N_SLC_SRC[src] : "BREAK", src ? T_THEME : T_DIM, T_SURF);
+    cv_text(12, 104, &AF_S, t, T_MID);               /* (GHOULBOX: 2 px up, inside the window) */
+    cv_text_r(228, 104, &AF_S, src ? N_SLC_SRC[src] : "BREAK", src ? T_THEME : T_DIM, T_SURF);
 }
 #endif
 
@@ -868,7 +868,7 @@ static const char *eng_abbr(const char *name)
 }
 
 /* a list row (17 px): the selected one a THEME bar with INK text; tag at x 14, free text from x 54 to x1 */
-#define LIST_Y(k) (3 + 17 * (int32_t)(k))
+#define LIST_Y(k) (4 + 16 * (int32_t)(k))            /* (GHOULBOX: 16 px rows: 7 fit inside the window's border) */
 static void list_row(int32_t y, int sel, const char *tag, uint16_t tc, const char *name, uint16_t nc, int32_t x1)
 {
     uint16_t bg = sel ? T_THEME : T_SURF;
@@ -1110,7 +1110,7 @@ static void draw_tracks(void)
             continue;
         ts.col[c] = sig;
         cv_begin(CARD_W, H_GRAPH, T_BG);
-        cv_rrect(0, 0, CARD_W, H_GRAPH, 5, T_SURF, T_BG);
+        cv_window(0, 0, CARD_W, H_GRAPH, 3);           /* (GHOULBOX: a mixer strip is a window) */
         cv_icon_on(4, 5, 16, trk_icon(c, sel), sel ? T_ACCENT : T_MID, T_SURF);
         if (st == 1u || st == 2u)                    /* REC (recording) / ARM (armed, stopped) */
             cv_keycap(53 - kc_w(st == 1u ? KC_REC : KC_ARM), 6, st == 1u ? KC_REC : KC_ARM, st == 1u ? T_REC : T_ACCENT,
@@ -1228,7 +1228,7 @@ static void draw_graph(void)
         return;
     ui.graph_sig = sig;
     cv_begin(240, H_GRAPH, T_BG);
-    cv_rrect(3, 0, 234, H_GRAPH, 5, T_SURF, T_BG);   /* the panel */
+    cv_window(3, 0, 234, H_GRAPH, 3);                /* the panel: GHOULBOX's stone window */
     cv_bg = T_SURF;                                  /* (text drawn with cv_text lands on it) */
     cv_oy = GOY;                                     /* graphs on a 100 px scale */
     if (ui.home) {

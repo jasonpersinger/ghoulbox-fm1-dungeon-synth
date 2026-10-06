@@ -205,14 +205,14 @@ static void draw_menu(void)
         int32_t top = pass ? MENU_SPLIT : H_HEAD;
         cv_begin(240, (uint32_t)(pass ? 240 - MENU_SPLIT : MENU_SPLIT - H_HEAD), T_BG);
         cv_oy = -top;                                 /* drawn in screen rows */
+        cv_window(2, H_HEAD + 2, 236, 240 - H_HEAD - 4, 3);   /* GHOULBOX: one stone window (the passes join) */
         for (i = 0; i < MI_COUNT; i++) {
             int32_t y = MENU_Y0 + (int32_t)i * MENU_ROW;
             int sel = i == ui.menu_sel;
-            uint16_t bg = sel ? T_THEME : T_SURF, fg = sel ? T_INK : T_TEXT, val = sel ? T_INK : T_THEME;
+            uint16_t bg = T_SURF, fg = sel ? T_ACCENT : T_TEXT, val = T_THEME;   /* (GHOULBOX: on the stone; sel in the accent) */
             if (y + 24 <= top || y >= top + (int32_t)cv_h)
                 continue;
-            cv_rrect(4, y, 232, 24, 6, bg, T_BG);
-            cv_icon_on(12, y + 4, 16, ICO[i], sel ? T_INK : T_MID, bg);
+            cv_icon_on(12, y + 4, 16, ICO[i], sel ? T_ACCENT : T_MID, bg);
             cv_text_on(36, y + 5, &AF_S, MI_NAME[i], fg, bg);
             if (i == MI_LOWCUT)
                 cv_text_r(228, y + 3, &AF_M, (const char *const[]){"OFF", "LOWCUT", "BASS+"}[settings.lowcut % 3u], val, bg);

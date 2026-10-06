@@ -547,7 +547,7 @@ static void draw_layer(void)
     if (ui.force || sig != ui.layer_sig) {
         ui.layer_sig = sig;
         cv_begin(240, H_GRAPH, T_BG);
-        cv_rrect(3, 0, 234, H_GRAPH, 5, T_SURF, T_BG);
+        cv_window(3, 0, 234, H_GRAPH, 3);              /* (GHOULBOX: the stone window) */
         cv_bg = T_SURF;
         if (l == LAYER_FX)
             layer_fx();
