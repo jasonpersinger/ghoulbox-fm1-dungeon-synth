@@ -874,8 +874,8 @@ static void list_row(int32_t y, int sel, const char *tag, uint16_t tc, const cha
     uint16_t bg = sel ? T_THEME : T_SURF;
     if (sel)
         cv_rrect(6, y, 228, 16, 4, T_THEME, T_SURF);
-    cv_text_on(14, y + 1, &AF_S, tag, sel ? T_INK : tc, bg);
-    cv_free_text(54, y + 1, &AF_S, name, sel ? T_INK : nc, bg, x1 - 54);
+    cv_text_on(14, y, &AF_S, tag, sel ? T_INK : tc, bg);           /* (GHOULBOX: at y, VT323's Q tail fits row 7) */
+    cv_free_text(54, y, &AF_S, name, sel ? T_INK : nc, bg, x1 - 54);
 }
 /* an empty list: a title and a hint, centred */
 static void note_line(int32_t y, const char *s, uint16_t fg)   /* centred S; "[K2] ADD PATTERN": a key hint */

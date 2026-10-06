@@ -228,7 +228,7 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
     int hot = c == ui.hot_col && ui.hot_t, named = fmt_named, strip, snap;
     uint8_t sig;
     uint16_t lc = hot ? T_ACCENT : T_MID;
-    int32_t x, lx = 5, uw, room = COL_W - 8;
+    int32_t x, lx = 5, uw, room = COL_W - 8, vx = 5, ug = 3;
     const aafont_t *vf = &AF_M;
     uint32_t n, kn;
     int32_t kid = kc_tag(val, &kn);
@@ -255,6 +255,12 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
     uw = unit[0] ? text_w(&AF_S, unit) + 3 : 0;
     if (text_w(vf, val) + uw > room)
         vf = &AF_S;
+    if (vf == &AF_S && text_w(vf, val) + uw > room) {   /* GHOULBOX: still too wide in S ("-11.6 dB"): 1 px left, the */
+        vx = 4;                                         /* unit 1 px after it (VT323's S is wider than Inter Tight's) */
+        ug = 1;
+        uw -= 2;
+        room += 1;
+    }
     sig = (uint8_t)str_hash(str_hash(song.sel + TSEL->eng_req * 4u + ux.gen * 64u, label), unit);
     snap = ui.force || sig != ui.roll[c].sig;           /* what the value is of: label, unit, track, engine, palette */
     strip = !snap && str_eq(key, ui.col[c]);
@@ -291,9 +297,9 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
         else if (vf == &AF_M)
             x = roll_text(c, 5, 17, val, vc);
         else
-            x = cv_text_fit(5, 20, vf, val, vc, T_SURF, room - uw);
+            x = cv_text_fit(vx, 20, vf, val, vc, T_SURF, room - uw);
         if (unit[0])
-            cv_text_on(x + 3, 20, &AF_S, unit, T_MID, T_SURF);     /* on the value's baseline (S) */
+            cv_text_on(x + ug, 20, &AF_S, unit, T_MID, T_SURF);    /* on the value's baseline (S) */
         if (!strip && ratio >= 0) {
             int32_t gw = COL_W - 10, fx = ratio * gw / 1000;
             cv_rrect(5, 38, gw, 3, 1, T_BG, T_SURF);

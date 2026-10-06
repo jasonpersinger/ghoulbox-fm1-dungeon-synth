@@ -394,13 +394,16 @@ static void lcell(int32_t x, int32_t y, int32_t h, const char *note, uint32_t ic
                   uint32_t st, int tri)
 {
     uint16_t ink, fill = lc_fill(st, &ink);
+    int32_t m = h > 30 && lc_w == LF_W ? 2 : 5;         /* GHOULBOX: FX's narrow effect cells: the note and the name
+                                                         * nearer the edges (VT323's S is wider) */
     cv_rrect(x, y, lc_w, h, 4, fill, T_SURF);
     if (note)
-        cv_text_on(x + 5, y + 3, &AF_S, note, fill == T_RAISE ? T_MID : ink, fill);
+        cv_text_on(x + m, y + 3, &AF_S, note, fill == T_RAISE ? T_MID : ink, fill);
     if (h > 30 && lc_w == LF_W) {
-        cv_icon_on(x + (lc_w - 24) / 2, y + h - 25, 24, icon, ink, fill);   /* (its ink: rows 3 .. 20 of 24) */
+        cv_icon_on(x + (lc_w - 24) / 2, y + h - 24, 24, icon, ink, fill);   /* (its ink: rows 3 .. 20 of 24; GHOULBOX:
+                                                                             * 1 px lower, under VT323's taller name) */
         if (name)
-            cv_text_r(x + lc_w - 5, y + 3, &AF_S, name, ink, fill);
+            cv_text_r(x + lc_w - m, y + 3, &AF_S, name, ink, fill);
     } else if (h > 30) {
         cv_icon_on(x + (lc_w - 16) / 2, y + 4, 16, icon, ink, fill);
         cv_text_c(x + lc_w / 2, y + 23, &AF_S, name, ink, fill);

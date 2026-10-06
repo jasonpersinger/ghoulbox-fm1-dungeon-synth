@@ -34,6 +34,11 @@ UPPER = ["CUTOFF", "RESO", "LEVEL", "DECAY", "RELEASE", "SOUND", "OCOE", "COCO",
          "FELUCCA", "PRESETS", "ANALOG", "DIGITAL", "PITCH", "SWING", "AV AW LT TA YO"]
 RULE = ["gfx"]   # "gfx": src/gfx.c cv_text; "rounded": the earlier rule (each glyph at the rounded pen, 1 phase)
 LIMIT = {"S": 0.25, "M": 0.25, "L": 0.5}
+# GHOULBOX's faces are crisp (tools/aa_raster.py crisp: whole-pixel pens, no phases): a glyph can sit up to a pixel
+# from its fractional place, so their limit is one pixel; the reference is shaped without ligatures (VT323 has "ff",
+# the firmware draws letters one by one)
+CRISP_LIMIT = 1.0
+NOLIGA = ["-liga"]
 
 
 def parse(path):
@@ -131,7 +136,7 @@ def measure(f, font_hi, s):
         if ch == " " or not e[4]:
             d.append(None)
             continue
-        pen = (font_hi.getlength(s[:i + 1]) - font_hi.getlength(s[i])) / SS
+        pen = (font_hi.getlength(s[:i + 1], features=NOLIGA) - font_hi.getlength(s[i])) / SS
         w = int(pen + font_hi.getlength(s[i]) / SS) + 3 * f["h"]
         img = ar.render_cell(font_hi, ch, (w * SS, 3 * f["h"] * SS), round((x0 + pen) * SS), 2 * f["h"] * SS)
         a = img.reduce(SS)                               # box-filtered coverage on the pixel grid
@@ -174,7 +179,7 @@ def main():
     a = ap.parse_args()
     RULE[0] = a.rule
     faces = parse(a.header)
-    spec = {n: (font, px) for n, font, px, *_ in gf.preset("inter-tight")}
+    spec = {n: (font, px) for n, font, px, *_ in gf.preset("ghoulbox")}   # GHOULBOX: the build's faces (tools/build.py)
     bad = 0
     for name, f in faces.items():
         font, px = spec[name]
@@ -186,11 +191,12 @@ def main():
         e = sorted(pairs, key=lambda p: -abs(p[1]))
         mx = abs(e[0][1])
         rms = (sum(v * v for _, v in pairs) / len(pairs)) ** 0.5
-        over = sum(abs(v) > LIMIT[name] for _, v in pairs)
-        ok = mx <= LIMIT[name] + 1e-9
+        lim = CRISP_LIMIT if f["psh"] == 0 else LIMIT[name]   # (one phase: a crisp face)
+        over = sum(abs(v) > lim for _, v in pairs)
+        ok = mx <= lim + 1e-9
         bad += not ok
         print(f"  {name} {px}px x{1 << f['psh']} phases: {len(pairs)} pairs, gap error max {mx:.3f} px, rms {rms:.3f} px, "
-              f"{over} over {LIMIT[name]} px {'ok' if ok else 'FAIL'}")
+              f"{over} over {lim} px {'ok' if ok else 'FAIL'}")
         print("    worst: " + ", ".join(f"{p!r} {v:+.2f}" for p, v in e[:10]))
         if a.png:
             Path(a.png).mkdir(parents=True, exist_ok=True)

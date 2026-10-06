@@ -93,12 +93,21 @@ def _phase(font_hi, ch, w, h, ox16, base, features, gamma):
     return best and best[1]
 
 
+def _mono(font, ch, w, h, x, base):
+    """a glyph drawn by FreeType in monochrome (hinted) on a w x h cell, pen at x on the baseline row: alpha 0 / 15"""
+    im = Image.new("L", (w, h), 0)
+    d = ImageDraw.Draw(im)
+    d.fontmode = "1"
+    d.text((x, base), ch, font=font, fill=15, anchor="ls")
+    return im
+
+
 FIXED = "0123456789."       # one phase, at the rounded pen: src/ui_draw.c roll_text draws a number a character at
                             # a time (a sign leads the number: at pen 0 it is phase 0 either way)
 WHOLE = "0123456789."       # with tabular, their advance in whole pixels too: a number keeps an even pitch
 
 
-def raster_font(spec, px, chars, tracking=0.0, gamma=1.0, tabular=True, kern_min=1, phases=1):
+def raster_font(spec, px, chars, tracking=0.0, gamma=1.0, tabular=True, kern_min=1, phases=1, crisp=False):
     """-> dict(h, asc, phases, glyphs{ch: (adv16, [(bx, by, bw, bh, bytes) per phase, or one])}, kern{(a,b): d16})
 
     Advances, kerning and the outlines come from the instanced weight at 16 x the size (unhinted): advances in
@@ -111,6 +120,8 @@ def raster_font(spec, px, chars, tracking=0.0, gamma=1.0, tabular=True, kern_min
     tracking: extra advance per glyph in em (negative = tighter; the stand-in for "Inter Tight").
     tabular: digits share one advance (the widest, OpenType tnum), each centred in it, so values do not jiggle.
     kern_min: keep kerning pairs of at least this many 1/16 px.
+    crisp: a pixel font: each glyph drawn by FreeType in monochrome (hinted, alpha 0 / 15) at the size itself,
+    advances in whole pixels, no kerning (one phase).
     """
     assert phases in (1, 2, 4, 8)
     font = open_font(spec, px)                 # the line metrics only (ascent / descent rounded to pixels)
@@ -131,7 +142,7 @@ def raster_font(spec, px, chars, tracking=0.0, gamma=1.0, tabular=True, kern_min
             for c in digits:
                 adv[c] = wide
         for c in chars:
-            if c in WHOLE:
+            if c in WHOLE or crisp:
                 adv[c] = float(max(1, round(adv[c])))
     bot_max = 0
     for ch in chars:
@@ -140,7 +151,10 @@ def raster_font(spec, px, chars, tracking=0.0, gamma=1.0, tabular=True, kern_min
         shift = (adv[ch] - nat[ch]) / 2 if tabular and ch in WHOLE else 0.0   # centre the figure in the cell
         ph = []
         for p in range(1 if ch in FIXED else phases):
-            nib = None if ch == " " else _phase(font_hi, ch, cw, chh, (pad + shift + p / phases) * SS, base, f, gamma)
+            if crisp:                                  # a pixel font: FreeType's monochrome, hinted (keeps M's middle)
+                nib = None if ch == " " else _mono(font, ch, cw, chh, pad + int(round(shift)), base)
+            else:
+                nib = None if ch == " " else _phase(font_hi, ch, cw, chh, (pad + shift + p / phases) * SS, base, f, gamma)
             bb = nib and nib.getbbox()
             if not bb:
                 ph.append((0, 0, 0, 0, b""))
@@ -152,7 +166,7 @@ def raster_font(spec, px, chars, tracking=0.0, gamma=1.0, tabular=True, kern_min
     h = max(asc + desc, bot_max)
     kern = {}
     lens = {c: font_hi.getlength(c, features=feats) for c in chars if c != " "}
-    for a in chars:
+    for a in ([] if crisp else chars):        # (a pixel font: no kerning)
         for b in chars:
             if a == " " or b == " ":
                 continue
