@@ -109,12 +109,12 @@ static int32_t menu_document(int32_t y, int draw)
 {
     uint32_t i;
     if (draw) {
-        cv_text(6, y + 2, &AF_L, "FELUCCA", T_THEME);
-        cv_text(6, y + 38, &AF_S, "Multi-engine synthesizer", T_TEXT);
-        cv_text(6, y + 58, &AF_M, FELUCCA_VERSION, T_THEME);
+        cv_text(6, y + 2, &AF_L, "GHOULBOX", T_THEME);
+        cv_text(6, y + 38, &AF_S, "Dungeon synth firmware", T_TEXT);
+        cv_text(6, y + 58, &AF_M, GHOULBOX_VERSION, T_THEME);
         cv_text_r(232, y + 61, &AF_S, __DATE__, T_MID, T_BG);
-        cv_text(6, y + 82, &AF_S, "(C) 2026 Leo Kuroshita", T_TEXT);
-        cv_text(6, y + 100, &AF_S, "H\xFCgelton Instruments", T_TEXT);
+        cv_text(6, y + 82, &AF_S, "on Felucca " FELUCCA_VERSION " (C) 2026", T_TEXT);
+        cv_text(6, y + 100, &AF_S, "Leo Kuroshita, H\xFCgelton", T_TEXT);
         cv_text(6, y + 118, &AF_S, "GPL-3.0-only", T_TEXT);
         cv_text(6, y + 138, &AF_S, "hugelton.github.io", T_MID);
         cv_text(6, y + 156, &AF_S, "/Felucca", T_MID);

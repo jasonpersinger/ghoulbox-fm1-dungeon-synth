@@ -20,6 +20,9 @@
 #define FELUCCA_FM4 0            /* the DIGITAL engine (eng_digital.c, four-operator FM): kept in the tree, not built
                                   * by default; replaced by FM6, its sounds convert (fm4_convert.c) */
 #endif
+#ifndef GHOULBOX_VERSION
+#define GHOULBOX_VERSION "0.1"   /* GHOULBOX's own: the ABOUT screen; the editor's version string ends " GB" it */
+#endif
 #define NENGINES 15u             /* SLICE 13 (reserved without FELUCCA_SLICE: never offered), GURDY 14 (GHOULBOX):
                                   * every engine keeps its number in every build */
 #define ENGI_SLICE 13u

@@ -389,7 +389,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         break;
     }
     case ED_INFO:
-        ed_str("FELUCCA " FELUCCA_VERSION, 24);
+        ed_str("FELUCCA " FELUCCA_VERSION " GB" GHOULBOX_VERSION, 24);   /* (the installer page wants "FELUCCA " first) */
         ed_b(NENGINES);
         ed_b(P_COUNT);
         ed_b(G_COUNT);
