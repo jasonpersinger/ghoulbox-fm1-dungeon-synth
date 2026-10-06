@@ -21,6 +21,7 @@ ENGINES = {
     "LOFI": ("eng_lofi.c", "LOFI_PRESETS"),
     "PHASE": ("eng_phase.c", "PHASE_PRESETS"),
     "NOISE": ("eng_noise.c", "NOISE_PRESETS"),
+    "GURDY": ("eng_gurdy.c", "GURDY_PRESETS"),
 }
 
 # name, EDIT 1..8, {A D S R}, filter env, mono, FX(dist, chorus, delay, reverb), suggested pattern
@@ -66,6 +67,13 @@ PRESETS = {
     "NOISE": [  # MODE (ANLG DUST LFSR META) COLR FREQ RES | TRK DENS DRFT CRSH
         ("CAVE WIND", [0, 40, 50, 90, 0, 0, 90, 0], [110, 90, 120, 120], 0, 0, (0, 40, 20, 120), 5),
         ("TORCH", [1, 30, 100, 60, 0, 60, 30, 0], [20, 90, 127, 80], 0, 0, (0, 0, 0, 70), 5),
+    ],
+    "GURDY": [  # DRN (C .. B) DLVL 5TH WHL | BUZZ COUP (HOLD 1/4 1/8 1/8T 1/16) BODY WOBL
+        ("HURDY GURDY", [2, 90, 50, 80, 70, 2, 70, 40], [8, 64, 127, 40], 0, 1, (5, 10, 0, 90), 4),
+        ("DRONE WHEEL", [2, 110, 80, 60, 0, 0, 90, 60], [40, 64, 127, 90], 0, 1, (0, 20, 0, 105), 5),
+        ("DANCE GURDY", [2, 80, 40, 100, 110, 3, 60, 25], [4, 64, 127, 30], 0, 1, (10, 0, 10, 75), 3),
+        ("TROMPETTE", [2, 70, 30, 90, 95, 1, 65, 35], [6, 64, 127, 50], 0, 1, (8, 0, 0, 90), 4),
+        ("VIELLE", [2, 0, 0, 85, 0, 0, 80, 30], [20, 64, 120, 60], 0, 1, (0, 15, 10, 95), 4),
     ],
 }
 

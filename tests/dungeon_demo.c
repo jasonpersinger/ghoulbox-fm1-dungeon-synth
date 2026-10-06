@@ -4,6 +4,7 @@
  *   build/host/dungeon_demo OUTDIR      -> OUTDIR/dungeon_tape.wav (HALL + TAPE 75 + CRSH 40),
  *                                          OUTDIR/dungeon_hall.wav (clean), OUTDIR/dungeon_room.wav
  *                                          OUTDIR/dungeon_ghoulbox.wav (the passage on GHOULBOX's own sounds),
+ *                                          OUTDIR/dungeon_gurdy.wav (the hurdy-gurdy playing the melody),
  *                                          OUTDIR/presets/NN_NAME.wav (each GHOULBOX preset alone, HALL + TAPE)
  * Not a test: an ear check of the sounds while the dungeon presets are made. */
 #define main hostsim_main
@@ -43,7 +44,8 @@ static uint32_t preset_of(uint32_t e, const char *name)
 /* the four parts' sounds: engine, preset (by name) */
 typedef struct { uint32_t e; const char *name; } snd_t;
 static const snd_t STOCK[4] = {{0, "STRINGS"}, {5, "CHOIR AAH"}, {4, "FLUTE"}, {7, "FULL ORGAN"}};
-static const snd_t GHOUL[4] = {{0, "CRYPT PAD"}, {5, "MONKS"}, {7, "TOWER FLUTE"}, {9, "GURDY DRONE"}};
+static const snd_t GHOUL[4] = {{0, "CRYPT PAD"}, {5, "MONKS"}, {7, "TOWER FLUTE"}, {ENGI_GURDY, "DRONE WHEEL"}};
+static const snd_t GURDY[4] = {{0, "CRYPT PAD"}, {5, "MONKS"}, {ENGI_GURDY, "HURDY GURDY"}, {7, "CATHEDRAL"}};
 
 static void render(const char *dir, const char *name, int rtype, int tape, int crsh, const snd_t *snd)
 {
@@ -158,11 +160,14 @@ int main(int argc, char **argv)
         {6, "FANTASY PAD", K_CHORDS}, {6, "MOURN HORN", K_MELODY}, {6, "STRING MACH", K_CHORDS},
         {3, "TOWER LEAD", K_MELODY}, {3, "CASIO CHOIR", K_CHORDS}, {3, "RECORDER", K_MELODY},
         {2, "GRIM BRASS", K_MELODY}, {11, "CAVE WIND", K_HOLD}, {11, "TORCH", K_HOLD},
+        {ENGI_GURDY, "HURDY GURDY", K_MELODY}, {ENGI_GURDY, "DRONE WHEEL", K_MELODY}, {ENGI_GURDY, "DANCE GURDY", K_MELODY},
+        {ENGI_GURDY, "TROMPETTE", K_MELODY}, {ENGI_GURDY, "VIELLE", K_MELODY},
     };
     const char *dir = argc > 1 ? argv[1] : "build/dungeon_demo";
     char sub[512];
     uint32_t k;
     render(dir, "dungeon_ghoulbox", 2, 75, 40, GHOUL);
+    render(dir, "dungeon_gurdy", 2, 75, 40, GURDY);
     render(dir, "dungeon_tape", 2, 75, 40, STOCK);
     render(dir, "dungeon_hall", 2, 0, 0, STOCK);
     render(dir, "dungeon_room", 0, 0, 0, STOCK);

@@ -177,6 +177,8 @@ if [ -f build/gen/felucca_tables.h ]; then
     run "REVERB TYPE: ROOM bit-identical, SPRING decay / chirp / stability / level, model change, cost, demos" "$OUT/reverb_test" build/fx_demo
     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/tape_test" tests/tape_test.c -lm
     run "TAPE / CRSH (GHOULBOX): off untouched, wow / flutter, high cut, hiss, bounded, crush, switch-on, cost" "$OUT/tape_test"
+    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/gurdy_test" tests/gurdy_test.c -lm
+    run "GURDY (GHOULBOX): the drone on DRN, the trompette's strokes, one wheel, corners, cost" "$OUT/gurdy_test"
     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/regress" tests/regress.c -lm
     run "regression: golden renders, health, voices, CPU budget" "$OUT/regress" tests/golden.txt tests/cpu_baseline.txt
     $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/descdump" tests/descdump.c -lm
