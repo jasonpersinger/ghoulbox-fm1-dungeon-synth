@@ -11,15 +11,23 @@ BLE MIDI・外部ストレージ・マイク・無線を FM-1 本体に載せず
 | 子機候補は ESP32-S3 系 (AtomS3 / StampS3 など) | M5StickC / Plus / Plus2 の USB-C は UART ブリッジで USB デバイスになれない |
 | USB コアは MUSB 互換 (hal/fm1_usb.h) | ホストモードの手順は MUSB 標準。ハブ無し単一デバイスなので MULTIPOINT 不要 |
 | PHY に OTG 信号の CPU 強制ビットがある (`CPU_IDDIG`, `CPU_AVALID`, `CPU_SESSEND`, `CPU_VBUSVALID`, `HOST_DISC`) と D+/D- プルダウン・線状態読み出し | VBUS コンパレータに頼らずホストセッションを始められる。相手のプルアップでデバイス在席を判定できる |
-| PC が繋がると VBUS が来る (充電検出あり)、子機では来ない | **VBUS の有無がそのまま PC / 子機の判別になる** |
+| 本体は VBUS も CC も読めない (「外部電源」表示は `usb.config` からの推定) | 役割判定はバスの状態 (SOF / D+ の線状態) だけで行う。CC での DRP はハード変更が要るので不採用 |
 
-## 判定 (起動時と抜き差し)
+## 判定 (起動時と抜き差し): CC も VBUS も使わない
 
 ```
-VBUS あり                  -> 今の装置モード (PC / 充電器)。D+ プルアップ、リセット/SOF 待ち。来なければ充電のみ
-VBUS なし, D+ High が N 回  -> 子機候補: ホストセッション開始 (IDDIG=0, VBUSVALID 強制, SESSION), 列挙, 鍵の確認
-VBUS なし, 線 Idle          -> 何も無し。周期再判定 (main loop, 数 100 ms 間隔; 既存 usb_retry の延長)
+起動時 / 切断後、約 500 ms 周期で:
+  A 装置フェーズ (300 ms): D+ プルアップ ON、リセット / SOF を待つ   -> 来た: PC。装置モードで固定 (今の動き)
+  B 探索フェーズ (50 ms):  プルアップ OFF、プルダウン ON、D+ を読む  -> N 回連続 High: 子機。ホストセッション
+                                                                  (IDDIG=0, VBUSVALID 強制, SESSION) -> 列挙 -> 鍵
+  どちらも無し -> Idle、A へ (PC が常に優先)
+ホスト中は HOST_DISC / babble で切断を見て A へ
 ```
+
+- 充電器 (BC1.2 DCP は D+/D- 短絡) は A で SOF が来ず、B で D+ Low -> Idle。充電はハードで進む。
+- A の間に子機が居ても両者がプルアップしているだけで害は無い。B で見える。
+- PC からは列挙が成立するまで「500 ms 毎の抜き差し」に見える。今の `usb_retry` (1 s) と同じ性質。
+- CC1/CC2 が Rd 以外に ADC へ繋がっていれば「ホスト在席」を即時に知れて A を省ける。基板で 1 度確認する価値はあるが、無くても成立する。
 
 ## 鍵による子機の確認
 
