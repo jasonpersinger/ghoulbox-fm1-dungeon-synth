@@ -174,3 +174,49 @@ python3 tests/target_budget.py build/felucca.dis tests/target_budget.txt   # DSP
 
 ファイル別の内訳は `clang -g -S -emit-llvm -Xclang -disable-llvm-optzns` の `!DISubprogram` で関数→ファイルを引き、
 objdump -t のサイズを合計した。
+
+## 5. 付録: JieLi BLE スタックの実測 (「BLE を入れたい」の見積り)
+
+AC79 SDK (gitcode ミラー, fw-AC79_AIoT_SDK 現行) の `apps/demo/demo_ble` (BLE 専用, Classic 無し, SDRAM 無し, FreeRTOS,
+TRANS_DATA = ペリフェラルの透過データ: BLE MIDI に最も近い構成) を同じ JieLi toolchain で実際にリンクした結果。
+SDK の既定フラグは **-Oz -flto** (Felucca は -Os)。
+
+| 項目 | 実測 |
+| --- | ---: |
+| Flash (.text: コード + rodata + RAM 初期値) | **280,576 B** |
+| 静的 RAM (.ram0_data 13,924 + .ram0_bss 25,288) | **39,212 B** |
+| ヒープ (BT の lbuf/pool と FreeRTOS タスクスタック: malloc、静的に出ない) | 推定 +20〜40 KB |
+| RAM0 (0x1C00000..0x1C7FE00) | 512 KiB: Felucca が既に全域を使う。SDRAM なし |
+
+Flash の内訳 (LTO 後のシンボルを名前で分類; 混ざるので目安): BT ホスト 40 KB、BT コントローラ 25 KB + 「その他」の大半
+(接続処理、HCI、結合された rodata テーブル 32 KB)、FreeRTOS/OS 27 KB、SDK ドライバ・システム 65 KB、RF 8 KB、
+FAT/update/キー等 Felucca に不要なもの約 25 KB。ライブラリ単体 (オブジェクト単位、-Os、gc 前) では
+btctrler.a の BLE 部分 170 KB、btstack.a の BLE 部分 81 KB、wl_rf_common.a 31 KB。
+
+**Felucca に足す場合の見込み: Flash +240〜260 KB (-Oz LTO 前提)、RAM +60〜80 KB。**
+
+| | 空き (Flash) | 判定 |
+| --- | ---: | --- |
+| 現状 | 104 KB | 入らない |
+| フェーズ 1–3 後 | 211 KB | 入らない |
+| フェーズ 1–4 後 | 260〜270 KB | ぎりぎり、余裕なし |
+| 1–4 + SLICE 外し (−32 KB) + CDC 外し (−5.5 KB) | 約 300 KB | Flash は入る (余裕 40〜60 KB) |
+
+RAM は別問題: Felucca の空きは 9 KB (RAM) + 14 KB (POOL)。60〜80 KB を作るには `dly_buf` 128 KB (ディレイ最大時間) や
+`cv_px` 59.5 KB (キャンバス)、`sl_buf` 32 KB (SLICER)、`gr_p` 28 KB (GRAIN) のどれかを削る必要がある。
+
+サイズ以外の障壁 (こちらが本質):
+1. ライブラリは SDK ランタイム前提: FreeRTOS のタスク (btctrler_task, btstack_task, ll_thread)、`os_*`、`sys_timer`、
+   `lbuf`/`malloc`、クロック・電源管理、`request_irq`。Felucca はベアメタルで、レジスタアクセスは hal/ のみ
+   (`build.py mmio_check`)。バイナリ (LLVM bitcode) の中身はこの検査を通せない。
+2. 割り込み: BLE のイベント IRQ はオーディオ ISR (最大 ~5 ms のレンダ) より上で動く必要があり、接続イベントごと
+   (7.5〜50 ms) にレンダが押される。CPU 余裕の実測が要る。
+3. 不揮発: ボンディング情報は SDK の VM 領域 (0x93000..) を使う。Felucca のデータは 0x97000.. なので配置の調停が要る。
+   RF 校正 (BTIF 0xE9000) と MAC (key_mac 0xFF000) の領域は既に温存している。
+4. ライセンス: Felucca は GPL-3.0-only。SDK のライブラリはソース無しの bitcode。同梱すると GPL の
+   Corresponding Source 要件に抵触するので、例外条項の追加 (全著作権者の同意: 外部コントリビュータを含む) か
+   別配布が必要。
+
+公式ファーム V15 は同じ石で BLE MIDI + FM 音源を動かしているので、SDK (RTOS) 上に組めば物理的には成立する。
+Felucca に足す現実的な道は「BLE 版ビルド」(SLICE/CDC を外し、フェーズ 4 まで実施、RAM を 70 KB 削る) か、
+コントローラだけ使って極小の自前 GATT (BLE MIDI 1 サービス) を書く方向 (それでも 150 KB 級 + OS アダプタ)。
