@@ -20,7 +20,8 @@ static void graph_adsr(const track_t *t, uint16_t c)
     const page_t *pg = cur_page();
     int32_t a = 4 + t->p[pg->id[0]] * 50 / 127, d = 6 + t->p[pg->id[1]] * 50 / 127, r = 6 + t->p[pg->id[3]] * 60 / 127;
     int32_t top = 6, bot = 88, sus = t->p[pg->id[2]] * 1000 / 127;          /* 0..1000 */
-    int32_t x0 = 12, x1 = x0 + a, x3 = 226 - r, i, px, py;
+    int32_t x0 = PANEL_X0 + 2, x1 = x0 + a, x3 = PANEL_X0 + PANEL_W - 4 - r, i, px, py;   /* (12 .. 226 at full width;
+                                                                       * GHOULBOX: inside the torches beside them) */
     int32_t e = 32768;                                                  /* exp(-4.6 u), Q15 */
 #define EGY(lvl) (bot - (lvl) * (bot - top) / 1000)
     cv_rect(PANEL_X0, bot + 2, PANEL_W, 1, T_RAISE);
@@ -931,7 +932,7 @@ static void graph_browse(void)
         }
         list_row(y, sel, tag, T_DIM, nm, T_TEXT, x1);
         if (hint >= 0)
-            cv_text_r(206, y + 1, &AF_S, pt, T_INK, T_THEME);
+            cv_text_r(206, y, &AF_S, pt, T_THEME, T_SURF);   /* (GHOULBOX: on the stone, as list_row's text) */
         if (favorite_has(e, k))
             cv_icon_on(214, y + 2, 12, ICON_X_STAR, T_ACCENT, T_SURF);   /* (GHOULBOX: no bar under it) */
     }
@@ -955,7 +956,7 @@ static void engine_sound_row(int32_t y)
     }
     list_row(y, 1, tag, T_DIM, nm, T_TEXT, fav ? 212 : 232);
     if (fav)
-        cv_icon_on(214, y + 2, 12, ICON_X_STAR, T_INK, T_THEME);
+        cv_icon_on(214, y + 2, 12, ICON_X_STAR, T_ACCENT, T_SURF);   /* (GHOULBOX: no bar under it) */
     (void)total;
 }
 /* user preset slots around the selected one: "U07  NAME" / EMPTY */

@@ -429,6 +429,52 @@ static int test_sound_loads(void)
         ui.force = 1; ui_draw();
         bad += check("  a list page: no torches, the full width", ui.torches == 0u && PANEL_X0 == 10);
     }
+    {   /* GHOULBOX: on every page with torches, each torch tile holds the torch on stone and nothing else (the
+         * flicker repaints only the tile: a curve through it would be cut) */
+        static const char *const PG[4] = {"", "ENV", "LFO", "FX"};
+        uint32_t k, x, y, n = 0, pages = 0;
+        track_t keep = *TSEL;
+        for (k = 0; k < 4u; k++) {
+            ui_power_on();
+            TSEL->p[P_ATK] = 0;                          /* (the steepest attack, the shortest release: the */
+            TSEL->p[P_REL] = 0;                          /* ENV curve's ends nearest the torches) */
+            TSEL->p[P_SUS] = 127;
+            if (k) go_title(PG[k]);
+            ui.force = 1; ui_draw();
+            if (!ui.torches) continue;
+            pages++;
+            for (uint32_t side = 0; side < 2u; side++) {
+                int32_t tx = side ? TORCH_RX : TORCH_LX;
+                cv_begin(12, 30, T_SURF);
+                cv_stone(0, 0, 12, 30, tx, TORCH_Y);
+                torch_draw(0, 0, side ? ui.torch_f ^ 2u : ui.torch_f);
+                for (y = 0; y < 30u; y++)
+                    for (x = 0; x < 12u; x++)
+                        n += host_screen[(Y_GRAPH + TORCH_Y + y) * 240u + (uint32_t)tx + x] != cv_px[y * 12u + x];
+            }
+        }
+        *TSEL = keep;
+        bad += check("torch tiles: only the torch on stone on HOME, ENV, LFO, FX (no graph drawn into them)", pages == 4u && n == 0u);
+    }
+    {   /* GHOULBOX: inside a stone window nothing is drawn in INK (it was text on the old THEME bar): the PRESETS
+         * row's suggested pattern, the EDIT layer's favourite star */
+        uint32_t i, x, y, ink_list = 0, ink_star = 0, eng, pre;
+        ui_power_on();
+        go_title("PRESETS");
+        ui.force = 1; ui_draw();
+        for (y = Y_GRAPH + 3u; y < (uint32_t)(Y_GRAPH + H_GRAPH - 3); y++)
+            for (x = 6; x < 234u; x++)
+                ink_list += swap16(host_screen[y * 240u + x]) == T_INK;
+        eng = TSEL->eng_req % NENGINES;
+        pre = TSEL->preset;
+        favorite_set(eng, pre, 1);
+        cv_begin(240, 20, T_SURF);
+        engine_sound_row(2);
+        for (i = 0; i < 240u * 20u; i++)
+            ink_star += swap16(cv_px[i]) == T_INK;
+        favorite_set(eng, pre, 0);
+        bad += check("no INK on stone: the PRESETS hint, the EDIT layer's star", ink_list == 0u && ink_star == 0u);
+    }
     printf("ui: undo copy %u bytes\n", (unsigned)sizeof undo);
     return bad;
 }
