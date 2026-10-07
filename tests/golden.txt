@@ -98,7 +98,7 @@ preset/GURDY/01_DRONE_WHEEL 21e6d4dcf74920a4
 preset/GURDY/02_DANCE_GURDY 144309c22ce63f5c
 preset/GURDY/03_TROMPETTE cfcec87a24a704dc
 preset/GURDY/04_VIELLE 78e6494a872006d4
-drums/sample_perc_kit f8cc0ebbac193234
+drums/drum_gm_kit a88dcac7803e88d4
 mode/ANALOG/POLY 37fb068bc75b2f5c
 mode/ANALOG/MONO 4904e99e3020a8b0
 mode/ANALOG/LEGATO 8fff1c8dc8b7ded8
@@ -113,6 +113,6 @@ sends/ANALOG/delay a402a2254e8a0a84
 sends/ANALOG/reverb 217d0dceb6ded8e8
 sends/ANALOG/all 98b9543c25342780
 sends/ANALOG/dist 1ff75ac225e918e0
-song/4track_mix f18549bdfb703204
+song/4track_mix 6667b6c911a3b548
 slicer/gate/ANALOG_ACID 07581a19222c2474
-slicer/song_gate_stut f0478744ebe9f1ec
+slicer/song_gate_stut 7e91d788f9dedecc

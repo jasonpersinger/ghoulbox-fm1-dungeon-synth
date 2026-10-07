@@ -41,14 +41,5 @@ int main(void)
     check("operator release falls after note-off", digital_env[0][0][0] < e0);
     int isolated = 1; for (uint32_t op = 1; op < 4; op++) isolated &= digital_env[0][0][op] == 1 << 24;
     check("editing one envelope leaves other operators flat", isolated);
-    memset(trk, 0, sizeof trk); host_tracks_init();
-    t->p[P_E0] = smp_perc_set();
-    int zones = 1;
-    const uint8_t notes[] = {42,44,49};
-    for (uint32_t i = 0; i < sizeof notes; i++) {
-        v->note = notes[i]; sample_note_on(t, v); const smp_zone_t *z = smp_zone(v->s[4]);
-        zones &= !v->s[6] && z->lo == notes[i] && z->hi == notes[i];
-    }
-    check("GM hats and crash outrank overlapping tom ranges", zones);
     return fails != 0;
 }

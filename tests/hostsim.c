@@ -5,10 +5,10 @@
  *   tests/run_tests.sh builds it into build/host/;
  *   build/host/hostsim ENGINE PRESET MONO OUT.wav [CHORUS]
  * env: SECS=n renders n s (the 2 s note pattern repeats), CHORD[=k] holds k keys
- * (default 4, up to 8), DRUMS=1 adds GM drum hits (part 4: SAMPLE PERC), BENCH=1 prints the render time,
+ * (default 4, up to 8), DRUMS=1 adds GM drum hits (part 4: DRUM), BENCH=1 prints the render time,
  * DIST=d, LEVEL=l, SENDS=c,d,r, SWEEP=1, NOTE=k, OCT=o, PSET=id:v,..., VSWEEP=1, PSWEEP=id:a:b,
  * PRESET=1 (the whole preset: sends, voice mode), STEPS=n,n,... (a pattern, 0 = rest; see below).
- * TRACKS=DIR: the 4-track test (tracks_demo below): a bass / pad / lead / drums (SAMPLE PERC) pattern
+ * TRACKS=DIR: the 4-track test (tracks_demo below): a bass / pad / lead / drums (DRUM) pattern
  * with live recording into DIR (mix + solos), checks, and the cost against one track. */
 #include <stdio.h>
 #include <unistd.h>
@@ -134,12 +134,17 @@ static void host_preset(track_t *t, uint32_t e, uint32_t pi)
     t->engine = t->eng_req;                       /* (DIGITAL without FELUCCA_FM4: FM6) */
 }
 
-/* Explicit legacy fixture: hidden from factory browsing, still used by saved GM projects. */
+/* A saved SAMPLE PERC sound, as 1.0.2 and earlier stored it (SET 4, the GM kit; retired since: every load
+ * turns it into DRUM, core.h drum_from_perc). Put straight into a track it plays SET 4's alias (PIANO): only
+ * for the migration tests, which pass it through a load */
 static void host_legacy_sample_perc(track_t *t)
 {
-    host_preset_values(t, 4, 0, &SMP_PRESET_TABLE[SMP_PERC_PRESET]);
-    t->engine = 4;
+    static const preset_t PERC = {"PERC", {SMP_SET_PERC, 0, 0, 0, 127, 0, 0, 0}, {0, 127, 127, 60}, 0, 0, PAT(12)};
+    host_preset_values(t, ENGI_SAMPLE, SMP_SET_PERC, &PERC);
+    t->engine = ENGI_SAMPLE;
 }
+/* the drums of the render tests: DRUM's kit (the power-on track 4; until 1.0.2 these used SAMPLE PERC) */
+static void host_drums(track_t *t) { host_preset(t, ENGI_DRUM, 0); }
 
 static void put_step(track_t *t, uint32_t i, uint32_t n, const uint8_t *notes, uint32_t time, uint32_t flags)
 {
@@ -162,7 +167,7 @@ static uint32_t busy_now(void)                   /* sounding voices of the parts
     return n;
 }
 
-/* drum hits on part 4 (SAMPLE PERC, the GM kit): kick on the beats, snare on 2 and 4, hats on the 16ths
+/* drum hits on part 4 (DRUM, the GM map): kick on the beats, snare on 2 and 4, hats on the 16ths
  * (k: 16ths since the start), each released at the next (a one-shot plays on through its release) */
 static void drum_hit(uint32_t k)
 {
@@ -185,7 +190,7 @@ static uint32_t started_since(const track_t *t, uint32_t a0)
 
 /* the demo song: T1 ANALOG ACID (16 steps), T2 the power-on pad (TRK_DEF: FM6 PAD; DIGITAL PAD until it was
  * retired) (32 steps, tied chords), T3 LOFI PULSE LD
- * (12 steps: 3 against 4), T4 SAMPLE PERC drums (16 steps, up to 3 notes a step); 120 BPM, 8 bars. Bars 5..6:
+ * (12 steps: 3 against 4), T4 DRUM drums (16 steps, up to 3 notes a step); 120 BPM, 8 bars. Bars 5..6:
  * live recording: a clap into the drums just before step 4 (quantised onto it, not triggered twice),
  * MIDI ch 3 into the lead, a two-key chord on the keys into an empty pad step. solo: 0 = the mix,
  * 1..4 = that track only. Writes DIR/NAME; returns the number of failed checks. */
@@ -211,7 +216,7 @@ static int tracks_demo(const char *dir, const char *name, uint32_t solo)
     host_preset(t1, 0, 4);
     host_preset(t2, TRK_DEF[1][0], TRK_DEF[1][1]);
     host_preset(t3, 3, 0);
-    host_legacy_sample_perc(td);                   /* saved SAMPLE PERC sound */
+    host_drums(td);                                /* DRUM KIT (SAMPLE PERC until 1.0.2) */
     for (i = 0; i < 16u; i++) {
         uint8_t n = ACID[i];
         put_step(t1, i, n ? 1u : 0u, &n, n ? ST_NOTE : ST_REST, ACIDF[i]);
@@ -294,11 +299,13 @@ static int tracks_demo(const char *dir, const char *name, uint32_t solo)
         return bmax > NVOICE;
     {
         const step_t *s4 = &td->step[4], *l1 = &t3->step[1], *p14 = &t2->step[14];
-        int ok_clap = s4->n == 4u && s4->note[3] == 39u && clap_hits == 3u;
+        /* (DRUM: the clap goes into the grid, its lane's hit, seq.c; a sampled kit took it as a 4th note) */
+        int clap = drum_track(td) ? s4->n == 3u && ((s4->hit >> DV_CLAP) & 1u) : s4->n == 4u && s4->note[3] == 39u;
+        int ok_clap = clap && clap_hits == 3u;
         int ok_lead = l1->n == 1u && l1->note[0] == 84u && l1->time == ST_NOTE;
         int ok_keys = p14->n == 2u && p14->time == ST_NOTE && p14->note[0] == 60u && p14->note[1] == 64u;
-        printf("tracks: recording: drums step 4 = %u notes (kick snare hat + clap 39: %s), hits when step 4 played right "
-               "after: %u (want 3: the clap is not triggered twice) %s\n", s4->n, s4->note[3] == 39u ? "yes" : "no", clap_hits,
+        printf("tracks: recording: drums step 4 = %u notes (kick snare hat) + clap 39: %s, hits when step 4 played right "
+               "after: %u (want 3: the clap is not triggered twice) %s\n", s4->n, clap ? "yes" : "no", clap_hits,
                ok_clap ? "ok" : "FAIL");
         printf("tracks: recording: MIDI ch 3 -> lead step 1 = %u (want 84) %s; keys -> pad step 14 = %u notes %u %u %s\n",
                l1->note[0], ok_lead ? "ok" : "FAIL", p14->n, p14->note[0], p14->note[1], ok_keys ? "ok" : "FAIL");
@@ -329,10 +336,7 @@ static double tracks_cost(const uint8_t parts[NPART][3], uint32_t *busy_max)
         int32_t o[2 * CTL];
         host_tracks_init();
         for (p = 0; p < NPART; p++) {
-            if (parts[p][0] == 4u && parts[p][1] == SMP_PERC_PRESET)
-                host_legacy_sample_perc(&trk[p]);
-            else
-                host_preset(&trk[p], parts[p][0], parts[p][1]);
+            host_preset(&trk[p], parts[p][0], parts[p][1]);
             if (parts[p][2] == DRUM_HITS)
                 continue;
             trk[p].p[P_VOICE] = V_POLY;
@@ -650,7 +654,8 @@ static int rec_test(void)
 }
 
 /* TRS MIDI IN (midi_uart.c, untested on hardware): bytes through its parser into the same queue as
- * USB, routed by channel: 1..4 -> parts 1..4, others (10 too) -> the selected track; running
+ * USB, routed by channel: ROUT CH1-4 1..4 -> parts 1..4, others (10 too) ignored; ROUT SEL all -> the
+ * selected track; running
  * status, note-on velocity 0 = note-off; a note-off on a "selected track" channel reaches the track
  * its note-on went to after another track was selected; recording into an armed track. */
 static int trs_held(const track_t *t, uint32_t note)
@@ -683,8 +688,13 @@ static int trs_test(void)
                                 0x94, 67, 90}, 21);
     ok_parts = trs_held(&trk[0], 60) && trs_held(&trk[0], 65) && trs_held(&trk[1], 62) && trs_held(&trk[2], 64) &&
                trs_held(&trk[3], 48) && !trs_held(&trk[0], 62);
-    ok_ch10 = trs_held(&trk[1], 36) && !trs_held(&trk[3], 36);   /* ch 10: no drum channel any more */
-    ok_sel = trs_held(&trk[1], 67) && !trs_held(&trk[0], 67);
+    /* ROUT CH1-4 (the default): ch 10 and ch 5 are not heard at all (kept free for other instruments) */
+    ok_ch10 = !trs_held(&trk[1], 36) && !trs_held(&trk[3], 36);  /* ch 10: no drum channel any more */
+    ok_sel = !trs_held(&trk[1], 67) && !trs_held(&trk[0], 67);
+    song.g[G_ROUTE] = 1;                            /* ROUT SEL: every channel -> the selected track */
+    trs_bytes((const uint8_t[]){0x99, 36, 110, 0x94, 67, 90}, 6);
+    ok_ch10 &= trs_held(&trk[1], 36) && !trs_held(&trk[3], 36);
+    ok_sel &= trs_held(&trk[1], 67) && !trs_held(&trk[0], 67);
     trs_bytes((const uint8_t[]){0x90, 60, 0, 65, 0, 0x81, 62, 0, 0x82, 64, 64, 0x83, 48, 0, 0x89, 36, 0}, 17);   /* vel 0 = off, 0x8n */
     ok_off = !trs_held(&trk[0], 60) && !trs_held(&trk[0], 65) && !trs_held(&trk[1], 62) && !trs_held(&trk[2], 64) &&
              !trs_held(&trk[3], 48) && !trs_held(&trk[1], 36);
@@ -697,7 +707,7 @@ static int trs_test(void)
     trs_bytes((const uint8_t[]){0x92, 72, 100}, 3);
     trs_bytes((const uint8_t[]){0x92, 72, 0}, 3);
     ok_rec = trk[2].step[0].n == 1u && trk[2].step[0].note[0] == 72u && trk[2].step[0].time == ST_NOTE && trk[1].step[0].n == 0u;
-    printf("tracks: TRS MIDI IN: ch 1..4 -> parts %s, ch 10 and ch 5 -> the selected track %s %s; note-offs "
+    printf("tracks: TRS MIDI IN: ch 1..4 -> parts %s, ch 10 and ch 5 ignored on CH1-4, the selected track on SEL %s %s; note-offs "
            "(running status, vel 0) %s\n", ok_parts ? "ok" : "FAIL", ok_ch10 ? "ok" : "FAIL", ok_sel ? "ok" : "FAIL",
            ok_off ? "ok" : "FAIL");
     printf("tracks: TRS MIDI IN: note-off after another track was selected reaches the note's track %s; ch 3 records "
@@ -791,11 +801,11 @@ static int tracks_test(const char *dir)
          * 3 + 3 + 2 notes and the hits in the budget of 8 */
         const uint8_t fm = FELUCCA_FM4 ? ENGI_DIGITAL : ENGI_FM6;
         uint8_t parts[NPART][3] = {{fm, (uint8_t)heavy[fm], 3}, {2, (uint8_t)heavy[2], 3}, {5, (uint8_t)heavy[5], 2},
-                                   {4, 4, DRUM_HITS}};
+                                   {ENGI_DRUM, 0, DRUM_HITS}};
         uint8_t full[NPART][3] = {{fm, (uint8_t)heavy[fm], 8}, {2, (uint8_t)heavy[2], 8}, {5, (uint8_t)heavy[5], 4},
-                                  {4, 4, DRUM_HITS}};
+                                  {ENGI_DRUM, 0, DRUM_HITS}};
         uint8_t vv[NPART][3] = {{5, (uint8_t)heavy[5], 4}, {5, (uint8_t)heavy[5], 4}, {0, 0, 0}, {0, 0, 0}};
-        uint8_t idle[NPART][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {4, 4, DRUM_HITS}};
+        uint8_t idle[NPART][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {ENGI_DRUM, 0, DRUM_HITS}};
         uint32_t bm2 = 0, bm3 = 0;
         double two_voice, none;
         four = tracks_cost(parts, &bm);
@@ -898,9 +908,9 @@ int main(int argc, char **argv)
                 n |= 1u << K[k];
             fm1_in.notes = (fp > FS / 10 && fp < FS * 3 / 2) ? n : 0;
         }
-        if (getenv("DRUMS") && fp % (FS / 8u) < CTL) {   /* part 4 SAMPLE PERC: drum_hit on 16ths */
+        if (getenv("DRUMS") && fp % (FS / 8u) < CTL) {   /* part 4 DRUM: drum_hit on 16ths */
             if (!f)
-                host_legacy_sample_perc(&trk[3]);
+                host_drums(&trk[3]);
             drum_hit(f / (FS / 8u));
         }
         if (getenv("DIST"))

@@ -19,6 +19,11 @@ static void fm1_audio_ack_half(void) { host_acks++; }
 static void fm1_audio_init(int32_t *b, uint32_t n, void (*isr)(void), uint32_t p)
 { (void)b; (void)n; (void)isr; (void)p; }
 void isr_alnk0(void) {}
+#define FELUCCA_UAC 1                                  /* audio.c taps USB audio: here into host_tap */
+static int32_t host_tap[2 * 64];
+static uint32_t host_tap_n;
+static void uac_tap(const int32_t *out, uint32_t n) { memcpy(host_tap, out, 8u * n); host_tap_n = n; }
+static void uac_render_start(void) {}
 #include "../firmware/src/audio.c"
 
 static int bad;
@@ -133,9 +138,62 @@ static void dma(void)
     expected = host_us * 256u / (HALF_FRAMES * 1000000u / FS);
     check("steady CPU load converges without integer smoothing bias", song.cpu_q8 >= expected - 1u && song.cpu_q8 <= expected);
 }
+/* MENU > USB LEVEL (fx.c fx_usb_fixed, audio.c audio_block): MASTER (default) as before, USB = the DAC's signal and
+ * follows the knob; FIXED: USB at the full level whatever MASTER is (MASTER 0: USB still plays, the DAC is silent),
+ * the DAC exactly USB scaled by MASTER */
+static double block_rms(const int32_t *b, uint32_t n)
+{
+    double s = 0;
+    uint32_t i;
+    for (i = 0; i < 2u * n; i++) s += (double)b[i] * b[i];
+    return sqrt(s / (2.0 * n));
+}
+static double usb_run(uint32_t fixed, uint32_t master, int dac_is_tap_scaled_ok[1], double *dac_rms)
+{
+    int32_t out[2 * 32];
+    uint32_t b, i;
+    double usb = 0, dac = 0;
+    fresh();
+    lim_env = LIM_T; dc_l = dc_r = dce_l = dce_r = 0;    /* (the master's state as at power-on: runs compare) */
+    trk[0].p[P_VOICE] = V_POLY;
+    trk[0].p[P_DIST] = trk[0].p[P_CHOR] = trk[0].p[P_DLY] = trk[0].p[P_REV] = 0;   /* (no tails between runs) */
+    trk_note_on(&trk[0], 48, 110); trk_note_on(&trk[0], 55, 110); trk_note_on(&trk[0], 64, 110);
+    fx_usb_fixed = (uint8_t)fixed;
+    song.master_q12 = master;
+    dac_is_tap_scaled_ok[0] = 1;
+    for (b = 0; b < 400u; b++) {                       /* ~0.3 s */
+        audio_block(out, 32);
+        for (i = 0; i < 64u; i++) {
+            int32_t want = fixed ? ((host_tap[i] * (int32_t)master) >> 12) << OUT_SHIFT : host_tap[i] << OUT_SHIFT;
+            if (out[i] != want) dac_is_tap_scaled_ok[0] = 0;
+        }
+        if (b >= 100u) { usb += block_rms(host_tap, 32); dac += block_rms(out, 32) / (1 << OUT_SHIFT); }
+    }
+    fx_usb_fixed = 0;
+    *dac_rms = dac / 300.0;
+    return usb / 300.0;
+}
+static void usb_level(void)
+{
+    int ok_full, ok_quiet, ok_off, ok_fixed, ok_fixed0;
+    double d_full, d_quiet, d_off, d_fixed, d_fixed0;
+    double u_full = usb_run(0, 4096, &ok_full, &d_full), u_quiet = usb_run(0, 1024, &ok_quiet, &d_quiet);
+    double u_off = usb_run(0, 0, &ok_off, &d_off), u_fixed = usb_run(1, 1024, &ok_fixed, &d_fixed);
+    double u_fixed0 = usb_run(1, 0, &ok_fixed0, &d_fixed0);
+    printf("audio: USB / DAC rms: MASTER full %.0f / %.0f, 1/4 %.0f / %.0f, 0 %.0f / %.0f; FIXED 1/4 %.0f / %.0f, 0 %.0f / %.0f\n",
+           u_full, d_full, u_quiet, d_quiet, u_off, d_off, u_fixed, d_fixed, u_fixed0, d_fixed0);
+    check("USB LEVEL MASTER (default): USB is the DAC's signal and follows the knob (0: silent)",
+          ok_full && ok_quiet && ok_off && u_full > 1000.0 && u_quiet < u_full * 0.5 && u_off == 0.0);
+    check("USB LEVEL FIXED: USB at the full level whatever MASTER is (within 0.1 dB), MASTER 0 too",
+          fabs(20.0 * log10(u_fixed / u_full)) < 0.1 && fabs(20.0 * log10(u_fixed0 / u_full)) < 0.1);
+    check("USB LEVEL FIXED: the DAC gets exactly USB scaled by MASTER (MASTER 0: silent, 1/4: -12 dB)",
+          ok_fixed && ok_fixed0 && d_fixed0 == 0.0 && fabs(20.0 * log10(d_fixed / u_fixed) + 12.04) < 0.2);
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
+    usb_level();
     overload(); dma();
     printf(bad ? "audio: %d FAILED\n" : "audio: all passed\n", bad);
     return bad != 0;

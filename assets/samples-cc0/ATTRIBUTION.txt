@@ -17,8 +17,3 @@ FLUTE/02_LDFlute_susvib_C6_v1_1.wav  <-  sgossner/VSCO-2-CE: Woodwinds/Flute/sus
 SAX/00_BrettTenor_NV_Main_A#1_vl2_rr1.wav  <-  sgossner/VCSL: Aerophones/Reed Aerophones/Tenor Saxophone/Non-Vibrato/BrettTenor_NV_Main_A#1_vl2_rr1.wav
 SAX/01_BrettTenor_NV_Main_A#2_vl2_rr1.wav  <-  sgossner/VCSL: Aerophones/Reed Aerophones/Tenor Saxophone/Non-Vibrato/BrettTenor_NV_Main_A#2_vl2_rr1.wav
 SAX/02_BrettTenor_NV_Main_A#3_vl2_rr1.wav  <-  sgossner/VCSL: Aerophones/Reed Aerophones/Tenor Saxophone/Non-Vibrato/BrettTenor_NV_Main_A#3_vl2_rr1.wav
-KIT/00_Tamb1_Hit_v2_rr1_Mid.wav  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Tambourine 1/Tamb1_Hit_v2_rr1_Mid.wav
-KIT/01_Mid_ShakerDouble_Down_rr1.wav  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Shaker, Small/Mid_ShakerDouble_Down_rr1.wav
-KIT/02_Conga_HitN_v2_rr1_Sum.wav  <-  sgossner/VCSL: Membranophones/Struck Membranophones/Conga/Conga_HitN_v2_rr1_Sum.wav
-KIT/03_Claves1_Hit_v2_rr1_Mid.wav  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Claves/Claves1_Hit_v2_rr1_Mid.wav
-KIT/04_wood_click_mp.wav  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Woodblock/wood_click_mp.wav

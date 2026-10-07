@@ -70,5 +70,5 @@ cpu/FM6/07_PLUCK 886
 cpu/SLICE/00_CHOP 982
 cpu/SLICE/01_STUTTER 1008
 cpu/mix/idle 286
-cpu/mix/idle_drums 478
-cpu/mix/3parts_full_drums 1561
+cpu/mix/idle_drums 552
+cpu/mix/3parts_full_drums 1574

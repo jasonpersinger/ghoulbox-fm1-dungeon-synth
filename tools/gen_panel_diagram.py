@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
-"""The FM-1 controls diagram of the README (1200 px wide, the style of the 1.0 feature sheet: dark
-rounded cards, white Inter Tight text, Fukiai line icons): a photo of the panel with every control
-labelled by its Felucca function in small cards, leader lines ending in a dot on the control, and
-cards for the hold actions.
+"""The FM-1 controls cheat sheet of the README (1200 px wide, the style of the 1.0 feature sheet: dark
+rounded cards, white Inter Tight text, Fukiai line icons). On top a small, dimmed photo of the panel with
+each group of controls marked by a coloured band and its number; below, in two columns, one card per
+group: rows of a keycap (the pill the device's key hints use, tools/gen_aa_keycaps.py) and what the
+control does. Hold actions carry the clock icon.
 
-  gen_panel_diagram.py PHOTO.jpg OUT.svg [--png OUT.png] [--jpg OUT.jpg]
+  gen_panel_diagram.py PHOTO.jpg OUT.svg [--lang en|ja] [--ja-font NotoSansJP.ttf] [--png OUT.png] [--jpg OUT.jpg]
 
-PHOTO is the 1750 x 1050 photo of the panel the earlier diagram used; the control positions below
-are in its pixels. The text is written as outlines (Inter Tight, assets/fonts,
-OFL-1.1; icons from web/fukiai.ttf, MIT), so the SVG needs no font. --png / --jpg render it with
-rsvg-convert. Checked: every dot inside its control's box on the photo, every text inside its card,
-no two texts, cards or leader lines overlapping or crossing.
+PHOTO is the 1750 x 1050 photo of the panel (docs/manual/fm1_photo.jpg); every control's box (CTRL) is
+measured in its pixels, and each band is its controls' boxes and a small margin. Everything else is in
+one table (GROUPS), English and Japanese side by side. The text is written as outlines (Inter Tight,
+assets/fonts, OFL-1.1; for --lang ja the function texts in Noto Sans JP, OFL-1.1, given with --ja-font;
+icons from web/fukiai.ttf, MIT), so the SVG needs no font. --png / --jpg render it with rsvg-convert.
+Checked: every text, keycap and icon inside its card (every keycap's label inside its pill), nothing
+overlapping, the cards apart, the bands and their numbers on the photo and apart, each band around the
+centres of all its group's controls and of no other group's.
 """
 import argparse
 import base64
@@ -22,6 +26,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from fontTools import subset
 from fontTools.pens.boundsPen import BoundsPen
 from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.ttLib import TTFont
@@ -32,10 +37,106 @@ ROOT = Path(__file__).resolve().parents[1]
 FONT = ROOT / "assets/fonts/InterTight[wght].ttf"
 ICONS = ROOT / "web/fukiai.ttf"
 
-W, H = 1200, 838
+W = 1200
 BG, CARD = "#1e1e1e", "#484848"                         # sampled from the feature sheet
+KEY, INK = "#d7d7d7", "#1e1e1e"                         # keycap: mix(BG, TEXT, 78 %), its label BG (gen_ui_palettes)
 R = 17                                                  # card corner radius (feature sheet)
 DIM = 0.62                                              # opacity of secondary text
+HOLD_ICON = "symbol_clock"
+
+# ------------------------------------------------------------------------------------------------ the table
+# A group: its number on the photo (0: none, the clock), its band colour, the column, the title, a note
+# beside the title, the bands (each the controls it frames, CTRL below) and the rows. A row: the keycaps
+# ("+" between two: pressed together), hold (the clock before them), the text and a second, dim line.
+COLORS = {1: "#f2b866", 2: "#7ec8e3", 3: "#f28b82", 4: "#8fd694", 5: "#c9a0f0"}   # 4: PLAY's green
+
+GROUPS = [
+    dict(n=1, col=0, title=("Knobs", "ノブ"), note=None,
+         bands=[("SELECT", "MASTER", "ALGORITHM", "PRESETS"), ("KNOB 1", "KNOB 2", "KNOB 3", "KNOB 4")],
+         rows=[
+             (("SELECT",), 0, ("Tempo (BPM)", "テンポ（BPM）"),
+              ("MENU > BPM LOCK keeps it fixed", "MENU > BPM LOCK で固定")),
+             (("MASTER",), 0, ("Volume", "音量"), None),
+             (("ALGORITHM",), 0, ("Track T1–T4, on every page", "トラック T1–T4 を選ぶ（全ページ）"), None),
+             (("PRESETS",), 0, ("The track's sound", "トラックの音色"),
+              ("on HOME and SAVE > PRESETS", "HOME と SAVE > PRESETS で")),
+             (("KNOB 1–4",), 0, ("The four columns of the page", "ページの 4 列を編集"), None),
+         ]),
+    dict(n=2, col=0, title=("Page buttons", "ページボタン"), note=("again: the next page", "もう一度で次のページ"),
+         bands=[("FX", "SCL", "ENV", "LFO", "EDIT", "GLO"), ("HOME", "SAVE", "ARP", "SEQ")],
+         rows=[
+             (("FX",), 0, ("Effects and SLICER", "エフェクト、SLICER"), None),
+             (("SCL",), 0, ("Scale, chord keys", "スケール、コードキー"), None),
+             (("ENV",), 0, ("Envelope", "エンベロープ"), None),
+             (("LFO",), 0, ("LFO, modulation matrix", "LFO、モジュレーション"), None),
+             (("EDIT",), 0, ("Engine parameters", "エンジンのパラメーター"), None),
+             (("GLO",), 0, ("Mixer, global, system", "ミキサー、全体設定"), None),
+             (("HOME",), 0, ("Home screen", "ホーム画面"), None),
+             (("SAVE",), 0, ("Presets, user sounds, projects", "プリセット、ユーザー音色、プロジェクト"), None),
+             (("ARP",), 0, ("Arpeggiator; flashes on the beat", "アルペジエーター（拍で点滅）"), None),
+             (("SEQ",), 0, ("Sequencer: steps, pattern", "シーケンサー（ステップ、パターン）"), None),
+         ]),
+    dict(n=3, col=0, title=("Keys", "鍵盤"), note=None,
+         bands=[("KEYS",)],
+         rows=[
+             (("KEYS",), 0, ("Play the selected track, F3–G5", "選んだトラックを演奏（F3–G5）"),
+              ("STEP page: enter notes (drum tracks: a step grid)", "STEP ページ: 音を入力（ドラムはステップグリッド）")),
+         ]),
+    dict(n=4, col=1, title=("Transport", "再生・録音"), note=None,
+         bands=[("PLAY", "REC")],
+         rows=[
+             (("PLAY",), 0, ("Start / stop all four tracks", "4 トラックを再生・停止"),
+              ("lit green while playing", "再生中は緑に点灯")),
+             (("REC",), 0, ("Arm the track to record, on every page", "選んだトラックを録音待機（全ページ）"),
+              ("stopped: starts playing too", "停止中なら再生も始まる")),
+         ]),
+    dict(n=5, col=1, title=("Octave", "オクターブ"), note=None,
+         bands=[("OCT-", "OCT+")],
+         rows=[
+             (("OCT−",), 0, ("Octave down", "オクターブ下げ"),
+              ("action pages, dialogs, menu: back", "アクションページ・ダイアログ・メニュー: 戻る")),
+             (("OCT+",), 0, ("Octave up", "オクターブ上げ"),
+              ("action pages, dialogs, menu: do it", "アクションページ・ダイアログ・メニュー: 実行")),
+             (("OCT−", "OCT+"), 0, ("Octave reset", "オクターブをリセット"), None),
+         ]),
+    dict(n=0, col=1, title=("Hold", "長押し"), note=None, bands=[],
+         rows=[
+             (("FX",), 1, ("Performance effects, mutes on black keys", "演奏エフェクト、黒鍵でミュート"), None),
+             (("GLO",), 1, ("Mute, solo, tap tempo; KNOB 1–4 levels", "ミュート・ソロ・タップ、ノブで音量"), None),
+             (("SCL",), 1, ("A key sets the root; scale, chords", "鍵盤でルート、スケール・コード"), None),
+             (("EDIT",), 1, ("A white key picks the engine", "白鍵でエンジンを選ぶ"), None),
+             (("SAVE",), 1, ("Undo the last load (again: redo)", "直前の読み込みを取り消し（再度でやり直し）"), None),
+             (("HOME",), 1, ("Menu", "メニュー"), None),
+             (("SEQ",), 1, ("Song: chain patterns", "ソング（パターンをつなぐ）"), None),
+             (("GLO", "SELECT"), 1, ("Tempo, even with BPM LOCK", "テンポ（BPM LOCK 中も）"), None),
+             (("GLO", "PLAY"), 1, ("Restart from the top", "頭から再スタート"), None),
+         ]),
+]
+TITLE = ("FM-1 controls in Felucca 1.0", "Felucca 1.0 の FM-1 操作")   # the SVG's <title> only
+
+# Every control's box on the photo (its pixels), measured on it: the knobs are the part darker than the
+# panel around them (knob and shadow, the printed names excluded), the buttons and OCT-/+ their bright caps
+# between the dark gaps, the keys the bed inside its dark outline. Each contains the anchor the earlier,
+# leader-line diagram used for it (panel_en.svg's knobs, OCT- and keys; the buttons on the photo).
+CTRL = {
+    "MASTER": (124, 117, 219, 237), "SELECT": (299, 117, 394, 240),
+    "PRESETS": (114, 287, 217, 410), "ALGORITHM": (286, 286, 394, 413),
+    "KNOB 1": (919, 113, 1019, 238), "KNOB 2": (1108, 115, 1203, 238),
+    "KNOB 3": (1294, 112, 1389, 238), "KNOB 4": (1477, 113, 1577, 236),
+    "FX": (962, 319, 1037, 394), "SCL": (1066, 318, 1141, 393), "ENV": (1170, 318, 1245, 393),
+    "LFO": (1274, 318, 1349, 393), "EDIT": (1378, 317, 1452, 392), "GLO": (1482, 317, 1557, 392),
+    "HOME": (963, 421, 1038, 497), "SAVE": (1068, 420, 1143, 496), "ARP": (1172, 420, 1247, 496),
+    "SEQ": (1276, 420, 1351, 495), "PLAY": (1380, 419, 1455, 495), "REC": (1483, 419, 1559, 495),
+    "OCT-": (154, 461, 241, 509), "OCT+": (284, 461, 371, 508),
+    "KEYS": (91, 585, 1652, 951),
+}
+BAND_M = 8                                              # a band: its controls' boxes and this margin
+
+
+def band_box(names):
+    bs = [CTRL[n] for n in names]
+    return (min(b[0] for b in bs) - BAND_M, min(b[1] for b in bs) - BAND_M,
+            max(b[2] for b in bs) + BAND_M, max(b[3] for b in bs) + BAND_M)
 
 # --------------------------------------------------------------------------------------------- text
 class Face:
@@ -64,19 +165,46 @@ class Face:
         self.gs[name].draw(pen)
         return pen.bounds                       # font units, y up; None when empty
 
-    def width(self, s, size, track=0.0):
-        n = sum(self.hmtx[self.cmap[ord(c)]][0] for c in s)
-        return n * size / self.upm + track * size * max(len(s) - 1, 0)
+    def gname(self, c):
+        if ord(c) not in self.cmap:
+            raise SystemExit(f"{self.tag}: no glyph for {c!r}")
+        return self.cmap[ord(c)]
+
+    def width(self, s, size):
+        return sum(self.hmtx[self.gname(c)][0] for c in s) * size / self.upm
 
 
 defs = []         # glyph outlines, once each
 out = []          # svg elements
-boxes = []        # (x0, y0, x1, y1, label, container)
+boxes = []        # (x0, y0, x1, y1, label, container): texts, keycaps, icons, badges
+solids = []       # cards and the photo: (x0, y0, x1, y1, name)
+marks = []        # bands and badges on the photo: (x0, y0, x1, y1, name)
 desc = []         # every text, for <desc>
+FACES = {}
 
 
-TEXT = {w: Face(instancer.instantiateVariableFont(TTFont(FONT), {"wght": w}), f"t{w}_") for w in (450, 600)}
-ICON = Face(TTFont(ICONS), "i")
+def load_faces(ja_font, ja_text):
+    for w in (450, 600):
+        FACES["lat", w] = Face(instancer.instantiateVariableFont(TTFont(FONT), {"wght": w}), f"t{w}_")
+    if ja_font:
+        f = TTFont(ja_font)
+        opt = subset.Options()
+        opt.layout_features = []
+        opt.notdef_outline = False
+        sub = subset.Subsetter(opt)
+        sub.populate(unicodes=sorted({ord(c) for c in ja_text}))
+        sub.subset(f)
+        for w in (450, 600):
+            FACES["ja", w] = Face(instancer.instantiateVariableFont(f if w == 600 else TTFont(_sub_copy(f)),
+                                                                     {"wght": w}), f"j{w}_")
+    FACES["icon"] = Face(TTFont(ICONS), "i")
+
+
+def _sub_copy(f):
+    buf = io.BytesIO()
+    f.save(buf)
+    buf.seek(0)
+    return buf
 
 
 def ink(face, items, k, ox, oy):
@@ -90,340 +218,298 @@ def ink(face, items, k, ox, oy):
     return min(xs), min(ys), max(xs), max(ys)
 
 
-def text(s, x, y, size, weight=450, anchor="start", op=1.0, track=0.0, inside=None):
-    """s at baseline y; anchor start / middle / end. inside = (x0, y0, x1, y1) it must fit in."""
-    f = TEXT[weight]
-    w = f.width(s, size, track)
+def text(s, x, y, size, weight=450, anchor="start", op=1.0, inside=None, fam="lat", fill=None, reg=True):
+    """s at baseline y; anchor start / middle / end; inside = the box it must fit in. Returns its ink box."""
+    f = FACES[fam, weight]
+    w = f.width(s, size)
     x0 = x - (w / 2 if anchor == "middle" else w if anchor == "end" else 0)
     k = size / f.upm
     parts, items, pen_x = [], [], 0.0
     for c in s:
-        g = f.cmap[ord(c)]
+        g = f.gname(c)
         gid = f.glyph(g)
         if gid:
             parts.append(f'<use href="#{gid}" x="{pen_x:.0f}"/>')
             items.append((g, pen_x))
-        pen_x += f.hmtx[g][0] + track * f.upm
+        pen_x += f.hmtx[g][0]
     o = f' fill-opacity="{op}"' if op < 1 else ""
-    out.append(f'<g transform="translate({x0:.2f} {y:.2f}) scale({k:.5f} {-k:.5f})"{o}>{"".join(parts)}</g>')
-    ix0, iy0, ix1, iy1 = ink(f, items, k, x0, y)
-    # the line box (cap height and descenders) or the ink, whichever is larger
-    boxes.append((min(x0, ix0), min(y - size * 0.74, iy0), max(x0 + w, ix1), max(y + size * 0.22, iy1), s, inside))
-    desc.append(s)
-    return w
+    fl = f' fill="{fill}"' if fill else ""
+    out.append(f'<g transform="translate({x0:.2f} {y:.2f}) scale({k:.5f} {-k:.5f})"{fl}{o}>{"".join(parts)}</g>')
+    ib = ink(f, items, k, x0, y)
+    if reg:
+        # the line box (cap height and descenders) or the ink, whichever is larger
+        boxes.append((min(x0, ib[0]), min(y - size * 0.74, ib[1]), max(x0 + w, ib[2]), max(y + size * 0.22, ib[3]),
+                      s, inside))
+        desc.append(s)
+    return ib
 
 
 def icon(name, x, y, size, op=1.0, inside=None):
     """Fukiai glyph name, its em box with the top-left at (x, y)"""
-    k = size / ICON.upm
-    asc = ICON.font["hhea"].ascent
+    f = FACES["icon"]
+    k = size / f.upm
+    asc = f.font["hhea"].ascent
     o = f' fill-opacity="{op}"' if op < 1 else ""
-    out.append(f'<use href="#{ICON.glyph(name)}" transform="translate({x:.2f} {y + asc * k:.2f}) '
+    out.append(f'<use href="#{f.glyph(name)}" transform="translate({x:.2f} {y + asc * k:.2f}) '
                f'scale({k:.5f} {-k:.5f})"{o}/>')
-    ix0, iy0, ix1, iy1 = ink(ICON, [(name, 0)], k, x, y + asc * k)
+    ix0, iy0, ix1, iy1 = ink(f, [(name, 0)], k, x, y + asc * k)
     boxes.append((min(x, ix0), min(y, iy0), max(x + size, ix1), max(y + size, iy1), name, inside))
 
 
-def rect(x, y, w, h, r, fill="none", stroke=None, sw=1.5, op=1.0):
-    s = f' stroke="#fff" stroke-width="{sw}" stroke-opacity="{op}"' if stroke else ""
-    out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{r}" fill="{fill}"{s}/>')
+def rect(x, y, w, h, r, fill="none", stroke=None, sw=1.5, fop=1.0):
+    s = f' stroke="{stroke}" stroke-width="{sw}"' if stroke else ""
+    o = f' fill-opacity="{fop}"' if fop < 1 else ""
+    out.append(f'<rect x="{x:.2f}" y="{y:.2f}" width="{w:.2f}" height="{h:.2f}" rx="{r}" fill="{fill}"{o}{s}/>')
     return (x, y, x + w, y + h)
 
 
-def card(x0, y0, x1, y1, title, ico):
-    rect(x0, y0, x1 - x0, y1 - y0, R, fill=CARD)
-    box = (x0, y0, x1, y1)
-    size = 21
-    tw = TEXT[600].width(title, size)
-    gap, isz = 9, 22
-    left = (x0 + x1) / 2 - (tw + gap + isz) / 2
-    icon(ico, left, y0 + 15, isz, inside=box)
-    text(title, left + isz + gap, y0 + 34, size, 600, inside=box)
-    return box
+# ------------------------------------------------------------------------------------------- keycaps
+CAP_H, CAP_R, CAP_SIZE, CAP_PAD = 24, 7.5, 14, 6.5     # gen_aa_keycaps' 13 / 4 / 9 / 3 px, about x 1.85
+bad_caps = []
+
+
+def cap_ink(label):
+    f = FACES["lat", 600]
+    items, pen_x = [], 0.0
+    for c in label:
+        g = f.gname(c)
+        items.append((g, pen_x))
+        pen_x += f.hmtx[g][0]
+    k = CAP_SIZE / f.upm
+    x0, _, x1, _ = ink(f, items, k, 0, 0)
+    return x0, x1
+
+
+def cap_w(label):
+    x0, x1 = cap_ink(label)
+    return x1 - x0 + 2 * CAP_PAD
+
+
+def keycap(label, x, ymid, inside):
+    """the pill CAP_PAD each side of the label's ink, the caps centred on ymid; returns its right edge"""
+    f = FACES["lat", 600]
+    ix0, ix1 = cap_ink(label)
+    w = ix1 - ix0 + 2 * CAP_PAD
+    pill = rect(x, ymid - CAP_H / 2, w, CAP_H, CAP_R, fill=KEY)
+    cap = f.font["OS/2"].sCapHeight * CAP_SIZE / f.upm
+    lb = text(label, x + CAP_PAD - ix0, ymid + cap / 2, CAP_SIZE, 600, fill=INK, reg=False)
+    if not (pill[0] + CAP_PAD - 0.5 <= lb[0] and lb[2] <= pill[2] - CAP_PAD + 0.5 and pill[1] + 3 <= lb[1]
+            and lb[3] <= pill[3] - 3):
+        bad_caps.append(f"label {label!r} off its pill")
+    boxes.append(pill + ("cap " + label, inside))
+    desc.append(label)
+    return pill[2]
+
+
+def lead_w(caps, hold):
+    """the width of a row's lead: the clock, the keycaps and the '+' between them"""
+    w = (HOLD_SZ + 8 if hold else 0) + sum(cap_w(c) for c in caps)
+    return w + (len(caps) - 1) * PLUS_W
+
+
+HOLD_SZ, PLUS_W = 20, 22
 
 
 # --------------------------------------------------------------------------------------------- photo
-# the photo's crop (inside the device body) and where it goes on the canvas
-CROP = (70, 60, 1680, 960)
-PX, PY, PW = 205, 112, 760
+CROP = (70, 60, 1680, 980)                              # the body, the key bed's bottom edge (951) included
+PW = 640
+PX, PY = (W - PW) / 2, 24                               # the cards' margin M; no title above
 PS = PW / (CROP[2] - CROP[0])
 PH = (CROP[3] - CROP[1]) * PS
 PHOTO = (PX, PY, PX + PW, PY + PH)
 
-# control: (anchor x, y on the photo, the control's box on the photo). The anchors of the knobs, OCT- and
-# the keys are the label anchors of the earlier diagram; the buttons, OCT+ and the boxes are
-# measured on the photo.
-BTN_X = (997, 1105, 1207, 1315, 1417, 1525)
-CTRL = {
-    "MASTER": (175, 178, (125, 130, 225, 230)), "SELECT": (355, 178, (295, 130, 400, 230)),
-    "PRESETS": (175, 350, (120, 305, 225, 400)), "ALGORITHM": (355, 350, (290, 305, 400, 400)),
-    "OCT-": (198, 487, (152, 460, 240, 505)), "OCT+": (328, 487, (284, 460, 372, 505)),
-    "KEYS": (870, 850, (90, 570, 1620, 915)),
-}
-for i, x in enumerate((978, 1163, 1348, 1533)):
-    CTRL[f"KNOB {i + 1}"] = (x, 178, (x - 45, 130, x + 45, 225))
-for row, y, names in ((0, 352, "FX SCL ENV LFO EDIT GLO"), (1, 454, "HOME SAVE ARP SEQ PLAY REC")):
-    for x, n in zip(BTN_X, names.split()):
-        CTRL[n] = (x, y, (x - 33, y - 28, x + 33, y + 30))
 
-
-def at(name):
-    """the canvas point of a control's anchor"""
-    x, y, _ = CTRL[name]
+def at(x, y):
     return PX + (x - CROP[0]) * PS, PY + (y - CROP[1]) * PS
 
 
-def photo_y(y):
-    return PY + (y - CROP[1]) * PS
-
-
 def photo(path):
-    from PIL import Image
+    from PIL import Image, ImageEnhance
     im = Image.open(path).convert("RGB")
     assert im.size == (1750, 1050), im.size
     im = im.crop(CROP).resize((PW * 2, round(PH * 2)), Image.LANCZOS)
+    im = ImageEnhance.Brightness(ImageEnhance.Color(im).enhance(0.5)).enhance(0.55)
     buf = io.BytesIO()
-    im.save(buf, "JPEG", quality=86, optimize=True)
+    im.save(buf, "JPEG", quality=84, optimize=True)
     data = base64.b64encode(buf.getvalue()).decode()
     defs.append(f'<clipPath id="pc"><rect x="{PX}" y="{PY}" width="{PW}" height="{PH:.2f}" rx="{R}"/></clipPath>')
-    out.append(f'<rect x="{PX}" y="{PY}" width="{PW}" height="{PH:.2f}" rx="{R}" fill="{BG}"/>')
     out.append(f'<image x="{PX}" y="{PY}" width="{PW}" height="{PH:.2f}" clip-path="url(#pc)" '
                f'preserveAspectRatio="none" href="data:image/jpeg;base64,{data}"/>')
+    solids.append(PHOTO + ("photo",))
 
 
-# --------------------------------------------------------------------------------------------- labels
-solids = []       # cards and the photo: (x0, y0, x1, y1, name), none may overlap
-lines = []        # leader segments ((x0, y0), (x1, y1), name), none may cross another leader
-dots = []
+BADGE_R = 12
 
 
-def label(x0, y0, w, h, printed, func, hold=None):
-    """a small card: the printed name (small caps), the function, the hold action (clock icon)"""
-    rect(x0, y0, w, h, 10, fill=CARD)
-    box = (x0, y0, x0 + w, y0 + h)
-    solids.append(box + (printed,))
-    text(printed, x0 + 12, y0 + 18, 11, 600, op=DIM, track=0.08, inside=box)
-    text(func, x0 + 12, y0 + 37, 14.5, 600, inside=box)
-    if hold:
-        icon("symbol_stopwatch", x0 + 12, y0 + 43, 12, op=DIM, inside=box)
-        text(hold, x0 + 28, y0 + 53.5, 12.5, 450, op=DIM, inside=box)
-    return box
+def badge(n, cx, cy, reg_list, inside=None):
+    color = COLORS[n]
+    out.append(f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="{BADGE_R}" fill="{color}"/>')
+    b = (cx - BADGE_R, cy - BADGE_R, cx + BADGE_R, cy + BADGE_R)
+    t = text(str(n), cx, cy + 5.3, 15, 600, "middle", fill=INK, reg=False)
+    if not (b[0] + 3 <= t[0] and t[2] <= b[2] - 3 and b[1] + 3 <= t[1] and t[3] <= b[3] - 3):
+        bad_caps.append(f"badge {n}: number off its circle")
+    reg_list.append(b + (f"badge {n}", inside) if reg_list is boxes else b + (f"badge {n}",))
 
 
-def leader(name, *pts):
-    """from the control's dot through pts (canvas points); the last one is on a card's edge"""
-    p = [at(name)] + list(pts)
-    for a, b in zip(p, p[1:]):
-        lines.append((a, b, name))
-    d = " ".join(f"{x:.1f},{y:.1f}" for x, y in p)
-    out.append(f'<polyline points="{d}" fill="none" stroke="{BG}" stroke-opacity="0.75" stroke-width="3.6" '
-               f'stroke-linejoin="round" stroke-linecap="round"/>')
-    out.append(f'<polyline points="{d}" fill="none" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>')
-    dots.append((name, p[0]))
+def bands():
+    for g in GROUPS:
+        for i, names in enumerate(g["bands"]):
+            a, b = (at(*p) for p in zip(*[iter(band_box(names))] * 2))
+            rect(a[0], a[1], b[0] - a[0], b[1] - a[1], 7, fill=COLORS[g["n"]], fop=0.13,
+                 stroke=COLORS[g["n"]], sw=2)
+            marks.append((a[0], a[1], b[0], b[1], f"band {g['n']}.{i}"))
+    for g in GROUPS:                                 # the numbers on every band's top-left corner (on the photo)
+        for i, names in enumerate(g["bands"]):
+            a = at(*band_box(names)[:2])
+            badge(g["n"], max(a[0] + 2, PHOTO[0] + BADGE_R + 4), max(a[1] + 2, PHOTO[1] + BADGE_R + 4), marks)
 
 
-def draw_dots():
-    for _, (x, y) in dots:
-        out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4.2" fill="#fff" stroke="{BG}" stroke-width="2"/>')
+# --------------------------------------------------------------------------------------------- cards
+M, GAP, CGAP = 24, 16, 14
+CW = (W - 2 * M - GAP) / 2
+ROW, SUB = 34, 19
+HEAD = 56
 
 
-def build(photo_path):
+def card_h(g):
+    return HEAD + sum(ROW + (SUB if r[3] else 0) for r in g["rows"]) + 12
+
+
+def card(g, x0, y0, L):
+    x1, y1 = x0 + CW, y0 + card_h(g)
+    rect(x0, y0, CW, y1 - y0, R, fill=CARD)
+    box = (x0, y0, x1, y1)
+    solids.append(box + (g["title"][0],))
+    if g["n"]:
+        badge(g["n"], x0 + 20 + BADGE_R, y0 + 28, boxes, box)
+    else:
+        icon(HOLD_ICON, x0 + 20, y0 + 16, 24, inside=box)
+    fam = "ja" if L else "lat"
+    text(g["title"][L], x0 + 20 + 2 * BADGE_R + 10, y0 + 35, 20, 600, inside=box, fam=fam)
+    if g["note"]:
+        text(g["note"][L], x1 - 20, y0 + 34, 14, 450, "end", op=DIM, inside=box, fam=fam)
+    tx = x0 + 20 + max(lead_w(r[0], r[1]) for r in g["rows"]) + 14
+    y = y0 + HEAD
+    for caps, hold, main, sub in g["rows"]:
+        mid = y + ROW / 2 - 4
+        x = x0 + 20
+        if hold:
+            icon(HOLD_ICON, x, mid - HOLD_SZ / 2, HOLD_SZ, op=0.85, inside=box)
+            x += HOLD_SZ + 8
+        for i, c in enumerate(caps):
+            if i:
+                text("+", x + PLUS_W / 2, mid + 5.5, 16, 600, "middle", op=0.85, inside=box)
+                x += PLUS_W
+            x = keycap(c, x, mid, box)
+        text(main[L], tx, mid + 5.5, 16, 450, inside=box, fam=fam)
+        if sub:
+            text(sub[L], tx, mid + 5.5 + SUB, 13.5, 450, op=DIM, inside=box, fam=fam)
+        y += ROW + (SUB if sub else 0)
+    return y1
+
+
+def build(photo_path, L):
+    top = PY + PH + 20
+    hs = [top, top]
+    for g in GROUPS:
+        hs[g["col"]] += card_h(g) + CGAP
+    H = round(max(hs) - CGAP + M)
     out.append(f'<rect width="{W}" height="{H}" fill="{BG}"/>')
-    title = "FM-1 controls in Felucca 1.0"
-    tw = TEXT[600].width(title, 21)
-    left = W / 2 - (tw + 31) / 2
-    icon("ui_knob", left, 13, 22)
-    text(title, left + 31, 32, 21, 600)
     photo(photo_path)
-
-    LW, LH, GAP = 160, 62, 8
-    # left: MASTER, PRESETS, ALGORITHM, OCT-, OCT+
-    left_items = (("MASTER", "Volume", None, None), ("PRESETS", "Sound", None, None),
-                  ("ALGORITHM", "Track T1–T4", None, 425), ("OCT-", "Octave −, back", None, None),
-                  ("OCT+", "Octave +, do it", None, 538))
-    step = (PH - LH) / (len(left_items) - 1)
-    for i, (n, f, hold, lane) in enumerate(left_items):
-        y0 = PY + i * step
-        b = label(23, y0, LW, LH, n.replace("-", "−"), f, hold)
-        ax, ay = at(n)
-        pts = []
-        if lane:
-            pts += [(ax, photo_y(lane)), (PX + 8, photo_y(lane))]
-        else:
-            pts += [(PX + 8, ay)]
-        pts.append((b[2], (b[1] + b[3]) / 2))
-        leader(n, *pts)
-
-    # top: SELECT, KNOB 1-4
-    b = label(285, 50, 150, 54, "SELECT", "BPM")
-    leader("SELECT", (at("SELECT")[0], b[3]))
-    k1, k4 = at("KNOB 1")[0], at("KNOB 4")[0]
-    b = rect(k1 - 42, 50, k4 - k1 + 84, 54, 10, fill=CARD)
-    solids.append(b + ("KNOB 1-4",))
-    text("KNOB 1 – 4", b[0] + 12, 68, 11, 600, op=DIM, track=0.08, inside=b)
-    text("The four columns of the page", b[0] + 12, 87, 14.5, 600, inside=b)
-    for i in range(4):
-        x = at(f"KNOB {i + 1}")[0]
-        leader(f"KNOB {i + 1}", (x, b[3]))
-    # the hold legend, top right
-    icon("symbol_stopwatch", 990, 70, 14, op=0.8)
-    text("what a button does held", 1009, 82, 13.5, 450, op=0.8)
-
-    # right: the top row of buttons, lanes above the row (FX the highest, so no leader crosses)
-    top = (("FX", "Effects", "FX layer"), ("SCL", "Scale, chords", "SCL layer"), ("ENV", "Envelope", None),
-           ("LFO", "LFO, mod matrix", None), ("EDIT", "Engine", "EDIT layer"), ("GLO", "Mixer, global", "GLO layer"))
-    RX, RW = 987, 190
-    step = (PH - LH) / 5
-    for i, (n, f, hold) in enumerate(top):
-        y0 = PY + i * step
-        b = label(RX, y0, RW, LH, n, f, hold)
-        ax, ay = at(n)
-        lane = photo_y(250 + i * 12)
-        leader(n, (ax, lane), (PX + PW - 8, lane), (b[0], (b[1] + b[3]) / 2))
-
-    # bottom: the keys and the bottom row of buttons, straight down out of the photo, then to their card
-    bottom = (("KEYS", "Keys F3 – G5", "play the track"), ("HOME", "Home", "menu"), ("SAVE", "Save, load", "undo"),
-              ("ARP", "Arpeggiator", None), ("SEQ", "Sequencer", "song"), ("PLAY", "Play, stop", None),
-              ("REC", "Record", None))
-    BW, BY = 102, PY + PH + 24
-    gap = (PW + 20 - len(bottom) * BW) / (len(bottom) - 1)
-    for i, (n, f, hold) in enumerate(bottom):
-        x0 = PX - 20 + i * (BW + gap)
-        if n == "KEYS":
-            rect(x0, BY, BW, LH, 10, fill=CARD)
-            b = (x0, BY, x0 + BW, BY + LH)
-            solids.append(b + (n,))
-            text("KEYS", x0 + 12, BY + 18, 11, 600, op=DIM, track=0.08, inside=b)
-            text("F3 – G5", x0 + 12, BY + 37, 14.5, 600, inside=b)
-            text(hold, x0 + 12, BY + 53.5, 12.5, 450, op=DIM, inside=b)
-        else:
-            b = label(x0, BY, BW, LH, n, f, hold)
-        ax, ay = at(n)
-        leader(n, (ax, PY + PH - 6), ((b[0] + b[2]) / 2, b[1]))
-    draw_dots()
-
-    # the summary cards
-    def rows_of(box, items, name_w, y0, step=24, size=15):
-        y = y0
-        for name, lns in items:
-            text(name, box[0] + 26, y, size, 600, inside=box)
-            for ln in lns:
-                text(ln, box[0] + 26 + name_w, y, size, 450, op=0.85, inside=box)
-                y += step - 4
-            y += 4 + (step - 20)
-
-    CY = BY + LH + 16
-    B = card(23, CY, 527, H - 9, "Hold for a quick layer", "control_fx")
-    rows_of(B, (("FX", ("repeat, reverse, filter sweeps, tape stop, freeze,",
-                        "harmonizer; mutes on the black keys")),
-                ("GLO", ("mute, solo, tap tempo; KNOB 1–4 track levels",)),
-                ("SCL", ("a key sets the root; scale, chord keys",)),
-                ("EDIT", ("a white key picks the engine",))), 58, CY + 65)
-    C = card(541, CY, 845, H - 9, "Hold a button", "symbol_stopwatch")
-    rows_of(C, (("SAVE", ("undo, and redo",)), ("HOME", ("the menu",)), ("SEQ", ("SONG: chain patterns",))),
-            70, CY + 73, step=30)
-    D = card(859, CY, 1177, H - 9, "OCT+ and OCT−", "control_arrow_up_down")
-    y = CY + 73
-    for ln, op in (("Octave up and down, both: reset", 0.85),
-                   ("On action pages, dialogs, the menu:", 0.85),
-                   ("OCT+ does it, OCT− goes back", 1.0)):
-        text(ln, (D[0] + D[2]) / 2, y, 15, 600 if op == 1.0 else 450, "middle", op=op, inside=D)
-        y += 30
-    solids.extend([B + ("quick layers",), C + ("hold",), D + ("oct",), PHOTO + ("photo",)])
+    bands()
+    ys = [top, top]
+    for g in GROUPS:
+        c = g["col"]
+        ys[c] = card(g, M + c * (CW + GAP), ys[c], L) + CGAP
+    return H
 
 
-def cross(a, b, c, d):
-    """segments ab and cd properly cross (touching at an end does not count)"""
-    def o(p, q, r):
-        v = (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
-        return 0 if abs(v) < 1e-6 else (1 if v > 0 else -1)
-    return o(a, b, c) * o(a, b, d) < 0 and o(c, d, a) * o(c, d, b) < 0
+# --------------------------------------------------------------------------------------------- checks
+def check(H):
+    bad = list(bad_caps)
 
+    def over(a, b, e=0.5):
+        return a[0] < b[2] - e and b[0] < a[2] - e and a[1] < b[3] - e and b[1] < a[3] - e
 
-def check():
-    bad = []
-    for name, (x, y) in dots:                       # the dot is on its control
-        cx, cy, (x0, y0, x1, y1) = CTRL[name]
-        if not (x0 <= cx <= x1 and y0 <= cy <= y1):
-            bad.append(f"anchor of {name} off its control box")
-        if not (PHOTO[0] + 4 <= x <= PHOTO[2] - 4 and PHOTO[1] + 4 <= y <= PHOTO[3] - 4):
-            bad.append(f"dot of {name} off the photo: {x:.0f},{y:.0f}")
-        if abs(x - (PX + (cx - CROP[0]) * PS)) > 0.01 or abs(y - (PY + (cy - CROP[1]) * PS)) > 0.01:
-            bad.append(f"dot of {name} not at its anchor")
-        for other, (ox, oy, ob) in CTRL.items():   # and on no other control
-            if other != name and other != "KEYS" and name != "KEYS" and ob[0] <= cx <= ob[2] and ob[1] <= cy <= ob[3]:
-                bad.append(f"anchor of {name} inside {other}")
     for b in boxes:
         x0, y0, x1, y1, s, c = b
         if not (0 <= x0 and x1 <= W and 0 <= y0 and y1 <= H):
             bad.append(f"off the canvas: {s!r}")
-        if c and not (c[0] + 6 <= x0 and x1 <= c[2] - 6 and c[1] + 4 <= y0 and y1 <= c[3] - 4):
-            bad.append(f"outside its box: {s!r} {tuple(round(v) for v in b[:4])} in {c}")
+        if c and not (c[0] + 12 <= x0 and x1 <= c[2] - 12 and c[1] + 8 <= y0 and y1 <= c[3] - 6):
+            bad.append(f"outside its card: {s!r} {tuple(round(v) for v in b[:4])} in {tuple(round(v) for v in c)}")
     for i, a in enumerate(boxes):
         for b in boxes[i + 1:]:
-            if a[0] < b[2] - 0.5 and b[0] < a[2] - 0.5 and a[1] < b[3] - 0.5 and b[1] < a[3] - 0.5:
+            if over(a, b):
                 bad.append(f"overlap: {a[4]!r} / {b[4]!r}")
     for i, a in enumerate(solids):
         if not (0 <= a[0] and a[2] <= W and 0 <= a[1] and a[3] <= H):
             bad.append(f"card off the canvas: {a[4]}")
         for b in solids[i + 1:]:
-            if a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]:
-                bad.append(f"cards overlap: {a[4]} / {b[4]}")
-    for i, (a0, a1, an) in enumerate(lines):
-        for b0, b1, bn in lines[i + 1:]:
-            if an != bn and cross(a0, a1, b0, b1):
-                bad.append(f"leaders cross: {an} / {bn}")
-        for t in boxes:                               # no leader through a text
-            if seg_hits_box(a0, a1, t[:4]):
-                bad.append(f"leader of {an} through {t[4]!r}")
-        for other, (_, _, ob) in CTRL.items():       # nor over another control (the keys excepted)
-            if other not in (an, "KEYS"):
-                cb = (PX + (ob[0] - CROP[0]) * PS, PY + (ob[1] - CROP[1]) * PS,
-                      PX + (ob[2] - CROP[0]) * PS, PY + (ob[3] - CROP[1]) * PS)
-                if seg_hits_box(a0, a1, cb):
-                    bad.append(f"leader of {an} over {other}")
+            if over(a, b, -6):                       # at least 6 px apart
+                bad.append(f"cards too close: {a[4]} / {b[4]}")
+    for i, a in enumerate(marks):
+        if not (PHOTO[0] + 2 <= a[0] and a[2] <= PHOTO[2] - 2 and PHOTO[1] + 2 <= a[1] and a[3] <= PHOTO[3] - 2):
+            bad.append(f"off the photo: {a[4]}")
+        for b in marks[i + 1:]:
+            if a[4].startswith("band") and b[4].startswith("band") and over(a, b, -3):
+                bad.append(f"bands touch: {a[4]} / {b[4]}")
+            if a[4].startswith("badge") and b[4].startswith("badge") and over(a, b, -2):
+                bad.append(f"badges touch: {a[4]} / {b[4]}")
+    for g in GROUPS:                                 # each band frames its controls and no other group's
+        for i, names in enumerate(g["bands"]):
+            x0, y0, x1, y1 = band_box(names)
+            for h in GROUPS:
+                for n in (n for nn in h["bands"] for n in nn):
+                    c = CTRL[n]
+                    cx, cy = (c[0] + c[2]) / 2, (c[1] + c[3]) / 2
+                    inside = x0 < cx < x1 and y0 < cy < y1
+                    if n in names and not inside or h is not g and inside:
+                        bad.append(f"band {g['n']}.{i}: {n} {'inside' if inside else 'outside'}")
     return bad
-
-
-def seg_hits_box(a, b, box):
-    x0, y0, x1, y1 = box
-    for i in range(41):
-        t = i / 40
-        x, y = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
-        if x0 < x < x1 and y0 < y < y1:
-            return True
-    return False
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("photo")
     ap.add_argument("svg")
+    ap.add_argument("--lang", choices=("en", "ja"), default="en")
+    ap.add_argument("--ja-font", help="Noto Sans JP (variable, wght), for --lang ja")
     ap.add_argument("--png")
     ap.add_argument("--jpg")
     a = ap.parse_args()
-    build(a.photo)
-    bad = check()
+    L = a.lang == "ja"
+    if L and not a.ja_font:
+        ap.error("--lang ja needs --ja-font")
+    ja_text = ""
+    if L:
+        ja_text = "".join(g["title"][1] + (g["note"][1] if g["note"] else "") +
+                                     "".join(r[2][1] + (r[3][1] if r[3] else "") for r in g["rows"]) for g in GROUPS)
+    load_faces(a.ja_font if L else None, ja_text)
+    H = build(a.photo, L)
+    bad = check(H)
     if bad:
         print("\n".join(bad), file=sys.stderr)
         sys.exit(1)
-    d = " / ".join(desc).replace("&", "&amp;").replace("<", "&lt;")
+    d = " / ".join(desc).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    t = TITLE[L].replace("&", "&amp;")
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" fill="#fff">'
-           f'<title>FM-1 controls in Felucca 1.0</title><desc>{d}</desc>\n'
+           f'<title>{t}</title><desc>{d}</desc>\n'
            f'<defs>{"".join(defs)}</defs>\n' + "\n".join(out) + "\n</svg>\n")
     Path(a.svg).write_text(svg, encoding="utf-8")
-    print(f"{a.svg}: {W} x {H}, {len(dots)} dots, {len(boxes)} texts, {len(solids)} cards, "
-          f"{len(lines)} leader segments checked, {len(svg)} bytes")
+    print(f"{a.svg}: {W} x {H}, {len(boxes)} texts / keycaps / icons, {len(solids)} cards, {len(marks)} marks "
+          f"checked, {len(svg)} bytes")
     for out_path in (a.png, a.jpg):
         if not out_path:
             continue
-        png = out_path if out_path == a.png else out_path + ".tmp.png"
+        png = out_path + ".tmp.png"
         subprocess.run(["rsvg-convert", "-w", str(W), "-h", str(H), "-o", png, a.svg], check=True)
+        from PIL import Image
+        im = Image.open(png).convert("RGB")
         if out_path == a.jpg:
-            from PIL import Image
-            Image.open(png).convert("RGB").save(out_path, "JPEG", quality=90, optimize=True, progressive=True,
-                                                 subsampling=0)
-            Path(png).unlink()
+            im.save(out_path, "JPEG", quality=90, optimize=True, progressive=True, subsampling=0)
+        else:
+            im.save(out_path, "PNG", optimize=True)
+        Path(png).unlink()
         print(f"{out_path}: {Path(out_path).stat().st_size} bytes")
 
 

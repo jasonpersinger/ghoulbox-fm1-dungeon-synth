@@ -47,6 +47,9 @@
  * follows FM1_LED_DIM_NS (one bit up or down a tick: the widths straddle the target by a bit's time). Only
  * if the whole shift were shorter than the pulse would the rest be waited (console `inp`: dim_pulse_ns,
  * dim_bits). An LED in both is fully lit. FM1_LED_DIM_DIV > 1 also skips frames (keep >= 200 Hz).
+ * Two glows (MENU > LEDS): fm1_led_dim_level(0) FM1_LED_DIM_NS (DIM HI, the default), (1) FM1_LED_DIM_LO_NS
+ * (DIM LO, ~1/60). The tick reads the target from fm1__dim_t (TIMER4 ticks, set here only, never divided):
+ * both are shorter than the shift (~3-5 us measured, dim_pulse_ns 3125 at 14 of 16 bits), so neither waits.
  */
 #pragma once
 #include <stdint.h>
@@ -68,6 +71,9 @@
 #define FM1_SETTLE_US 10u
 #ifndef FM1_LED_DIM_NS
 #define FM1_LED_DIM_NS 3200u      /* a dim LED's pulse per frame (ns; a lit one ~95 us): ~1/30 the brightness */
+#endif
+#ifndef FM1_LED_DIM_LO_NS
+#define FM1_LED_DIM_LO_NS 1600u   /* the darker glow (MENU > LEDS DIM LO): ~1/60 */
 #endif
 #ifndef FM1_LED_DIM_DIV
 #define FM1_LED_DIM_DIV 1u        /* a dim LED: the pulse on 1 frame in DIV (1: every frame, ~910 Hz) */
@@ -329,8 +335,14 @@ static void fm1__frame(void)
 }
 
 /* one column per call, from a timer ISR (see top) */
-#define FM1__DIM_T ((FM1_LED_DIM_NS * FM1_TICKS_PER_US + 500u) / 1000u)   /* the pulse in TIMER4 ticks */
+#define FM1__DIM_T(ns) (((ns) * FM1_TICKS_PER_US + 500u) / 1000u)   /* a pulse in TIMER4 ticks */
 static uint8_t fm1__tick_col, fm1__dim_k = 16u;   /* the bits of the shift the dim pulse spans (0..16) */
+static uint16_t fm1__dim_t = FM1__DIM_T(FM1_LED_DIM_NS);   /* the pulse the tick aims at (fm1_led_dim_level) */
+/* the glow (main loop, any time; fm1__dim_k follows it in a few frames): 0 FM1_LED_DIM_NS, 1 FM1_LED_DIM_LO_NS */
+static void fm1_led_dim_level(uint32_t lo)
+{
+    fm1__dim_t = (uint16_t)(lo ? FM1__DIM_T(FM1_LED_DIM_LO_NS) : FM1__DIM_T(FM1_LED_DIM_NS));
+}
 #if FM1_LED_DIM_DIV > 1
 static uint8_t fm1__dim_ph;
 #endif
@@ -357,15 +369,15 @@ static void fm1_input_tick(void)
 #endif
         dim = fm1_led_dim[p] & ~lit;
     if (dim) {                                     /* the dim pulse of column p: over the first k bits */
-        uint32_t t1, d;
+        uint32_t t1, d, T = fm1__dim_t;
         t1 = fm1_ticks();                          /* (before the write: d spans one write and the bits) */
         fm1__led_lines(lit | dim);
         fm1__sr_bits(w, 0, k);                     /* (the 595 still drives column p) */
         d = fm1_ticks() - t1;
-        while (k == 16u && d < FM1__DIM_T)         /* only a shift shorter than the pulse waits */
+        while (k == 16u && d < T)                 /* only a shift shorter than the pulse waits */
             d = fm1_ticks() - t1;
         fm1__led_lines(0);
-        fm1__dim_k = (uint8_t)(d > FM1__DIM_T ? (k ? k - 1u : 0u) : d < FM1__DIM_T && k < 16u ? k + 1u : k);
+        fm1__dim_k = (uint8_t)(d > T ? (k ? k - 1u : 0u) : d < T && k < 16u ? k + 1u : k);
         fm1_in_stat.dim_n++;
         fm1_in_stat.dim_sum += d;
     } else {

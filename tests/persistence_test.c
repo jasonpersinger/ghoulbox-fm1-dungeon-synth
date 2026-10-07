@@ -93,6 +93,129 @@ static void reset(void)
     irq_start_race = irq_races = 0;
 }
 
+/* ---- 1.0.3: the retired FM6 bank's patches move into the user presets on the first boot (up_fm6.c) ---- */
+static uint8_t mig_pre[0x100000];
+static fm6_bank_t mig_bank;
+
+static void mig_rec(up_bank_t *b, uint32_t i, uint32_t engine, int16_t slot, char tag)
+{
+    up_rec_t *r = &b->r[i];
+    uint32_t k;
+    memset(r, 0, sizeof *r);
+    r->used = UP_USED; r->ver = UP_VER; r->engine = (uint8_t)engine; r->np = P_COUNT;
+    r->name[0] = tag;
+    for (k = 0; k < P_COUNT; k++) up_set_value(r, k, param_desc_of(engine, k)->def);
+    up_set_value(r, P_E7, slot);
+    up_set_value(r, P_E0, (int16_t)(tag & 7));          /* (each record another sound) */
+}
+
+/* a 1.0.2 flash: user presets on B3 (slot 1), F2 (2), B5 empty (3), DRUM (4), B1 (18); the bank written twice */
+static void mig_setup(void)
+{
+    static up_bank_t b[2];
+    memset(nor, 0xFF, sizeof nor);
+    memset(b, 0, sizeof b);
+    for (uint32_t i = 0; i < 2u; i++) { b[i].magic = UP_BANK_MAGIC; b[i].rsize = sizeof(up_rec_t); b[i].nslot = UP_PER_BANK; }
+    mig_rec(&b[0], 0, ENGI_FM6, FM6_NFACTORY + 2, 'A');
+    mig_rec(&b[0], 1, ENGI_FM6, 1, 'B');
+    mig_rec(&b[0], 2, ENGI_FM6, FM6_NFACTORY + 4, 'C');
+    mig_rec(&b[0], 3, ENGI_DRUM, FM6_NFACTORY + 2, 'D');
+    mig_rec(&b[1], 1, ENGI_FM6, FM6_NFACTORY + 0, 'E');
+    st_save(OBJ_UPRESET0, &b[0], sizeof b[0]);
+    st_save(OBJ_UPRESET0 + 1, &b[1], sizeof b[1]);
+    memset(&mig_bank, 0, sizeof mig_bank);
+    mig_bank.magic = FM6_BANK_MAGIC; mig_bank.ver = 1; mig_bank.nslot = FM6_BANK_N; mig_bank.used = 1u | 1u << 2;
+    memcpy(mig_bank.v[2], FM6_FACTORY[4], FM6_PACKED); memcpy(mig_bank.v[2] + 118, "OLD BANK 1", 10);
+    st_save(OBJ_FM6BANK, &mig_bank, sizeof mig_bank);   /* A: an older bank */
+    memcpy(mig_bank.v[0], FM6_FACTORY[6], FM6_PACKED); memcpy(mig_bank.v[0] + 118, "NEW B1    ", 10);
+    memcpy(mig_bank.v[2] + 118, "NEW B3    ", 10);
+    st_save(OBJ_FM6BANK, &mig_bank, sizeof mig_bank);   /* B: the newest */
+}
+
+static void mig_boot(void)                               /* a power-on: RAM lost, the stores from flash */
+{
+    memset(up_bank, 0, sizeof up_bank);
+    memset(&upf, 0, sizeof upf);
+    up_boot();
+}
+
+/* the presets play what 1.0.2 played: slot 1 the newest B3, 18 B1, 2 F2, 3 init (an empty B5), DRUM none */
+static int mig_ok(void)
+{
+    uint8_t pk[FM6_PACKED];
+    return !upf_get(0, pk) && !memcmp(pk + 118, "NEW B3    ", 10) && !upf_get(17, pk) &&
+           !memcmp(pk + 118, "NEW B1    ", 10) && upf_get(1, pk) && upf_get(2, pk) && upf_get(3, pk);
+}
+
+static int mig_test(void)
+{
+    int bad = 0, ok = 1;
+    uint32_t cut, before, cuts = 0;
+    uint8_t pk[FM6_PACKED];
+    upf_t got;
+    reset();
+    mig_setup();
+    memcpy(mig_pre, nor, sizeof nor);
+    mig_boot();
+    bad += check("FM6 bank -> user presets: B slots get the bank's newest patches", mig_ok());
+    bad += check("  .. written into A (the bank's older copy); the bank's newest copy (B) still whole",
+                 st_load(OBJ_UPFM6, &got, sizeof got) == (int)sizeof got && !memcmp(&got, &upf, sizeof got) &&
+                     ((st_hdr_t *)(nor + 0x9F000))->type == OBJ_UPFM6 && st_load(OBJ_FM6BANK, &mig_bank, sizeof mig_bank) > 0 &&
+                     !memcmp(mig_bank.v[0] + 118, "NEW B1", 6));
+    up_load(0);
+    bad += check("  .. UP_LOAD 1 plays the bank's B3, SLOT OWN", !memcmp(fm6_patch[song.sel] + FP_NAME, "NEW B3    ", 10) &&
+                 TSEL->p[P_E7] == FM6_OWN);
+    up_load(1);
+    bad += check("  .. UP_LOAD 2 (F2) plays F2, SLOT F2", !memcmp(fm6_patch[song.sel] + FP_NAME, FM6_FACTORY[1] + 118, 10) &&
+                 TSEL->p[P_E7] == 1);
+    up_load(2);
+    bad += check("  .. UP_LOAD 3 (an empty B5) plays the init voice, as before",
+                 !memcmp(fm6_patch[song.sel] + FP_NAME, "INIT VOICE", 10) && TSEL->p[P_E7] == FM6_OWN);
+    before = erases;
+    mig_boot();
+    bad += check("  .. the next boot: done (no write), the same patches", mig_ok() && erases == before);
+    /* a power cut at every write step of the migration: the next boot ends with the same result */
+    for (cut = 0; cut < 64u && ok; cut++) {
+        memcpy(nor, mig_pre, sizeof nor);
+        fail_after = (int)cut;
+        mig_boot();                                      /* (writes stop at the cut: the rest fails) */
+        if (fail_after > 0) break;                       /* (this boot finished before the cut) */
+        fail_after = -1;
+        cuts++;
+        mig_boot();
+        ok &= mig_ok() && st_load(OBJ_UPFM6, &got, sizeof got) == (int)sizeof got;
+    }
+    memcpy(nor, mig_pre, sizeof nor);
+    erase_error = 1;
+    mig_boot();                                          /* a cut before the erase */
+    erase_error = 0;
+    mig_boot();
+    ok &= mig_ok();
+    bad += check("a power cut at any step of the migration loses nothing (the next boot redoes it)", ok && cuts >= 10u);
+    /* after it: a preset save writes the other sector (the bank's last copy); a cut there keeps the first copy */
+    memcpy(nor, mig_pre, sizeof nor);
+    fail_after = -1;
+    mig_boot();
+    trk[song.sel].eng_req = ENGI_FM6;
+    fm6_load_slot(song.sel, 3);
+    fail_after = (int)((sizeof(up_bank_t) + 255u) / 256u + 1u + 3u);   /* the preset bank's write passes, the patches' fails */
+    up_store(20, "CUT");
+    fail_after = -1;
+    mig_boot();
+    bad += check("a cut while a preset's patch is written: the others kept, that preset without one",
+                 mig_ok() && upf_get(20, pk));
+    up_store(20, "SAVED");
+    mig_boot();
+    bad += check("saved again: its patch, and the bank's sectors now both hold the patches object",
+                 mig_ok() && !upf_get(20, pk) && !memcmp(pk + 118, FM6_FACTORY[3] + 118, 10) &&
+                     ((st_hdr_t *)(nor + 0x9F000))->type == OBJ_UPFM6 && ((st_hdr_t *)(nor + 0xFE000))->type == OBJ_UPFM6);
+    memset(nor, 0xFF, sizeof nor);                        /* a device that never had a bank: nothing written */
+    before = erases;
+    mig_boot();
+    bad += check("no bank: nothing to move, nothing written", erases == before && upf_valid(&upf));
+    return bad;
+}
+
 int main(void)
 {
     int bad = 0, ok;
@@ -328,6 +451,7 @@ int main(void)
     settings_save();
     bad += check("PLAY consumed before the settings snapshot defers the write",
                   irq_races == 3u && song.playing && !transport_req && persist_pending && erases == before);
+    bad += mig_test();
     printf("%s\n", bad ? "PERSISTENCE TEST FAILED" : "persistence test passed");
     return bad != 0;
 }

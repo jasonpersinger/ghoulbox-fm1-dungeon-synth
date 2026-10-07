@@ -309,12 +309,10 @@ static int kits(void)
     bad += check("  MIDI IN on the DRUM track: one hit, no chord kept", !mchord[0].id);
     midi(0x83, 38, 0);
     song.sel = 0;
-    trk[0].eng_req = trk[0].engine = 4;                             /* SAMPLE PERC: the GM kit */
-    trk[0].p[P_CHRD] = CH_DIA3;
-    if (smp_perc_set() >= 0) {
-        trk[0].p[P_E0] = (int16_t)smp_perc_set();
-        bad += check("SAMPLE PERC (a kit): CHRD ignored", chord_kit(&trk[0]) && chord_build(&trk[0], 38, out) == 1u);
-    }
+    trk[0].eng_req = trk[0].engine = ENGI_SAMPLE;                   /* SAMPLE: no set is a kit (PERC, retired, */
+    trk[0].p[P_CHRD] = CH_DIA3;                                     /* loads as DRUM; its SET 4 is a PIANO alias) */
+    trk[0].p[P_E0] = SMP_SET_PERC;
+    bad += check("SAMPLE SET 4 (once PERC): chords, no kit", !chord_kit(&trk[0]) && chord_build(&trk[0], 60, out) == 3u);
     trk[0].p[P_E0] = 0;
     bad += check("SAMPLE with a melodic set: chords", !chord_kit(&trk[0]) && chord_build(&trk[0], 60, out) == 3u);
     return bad;

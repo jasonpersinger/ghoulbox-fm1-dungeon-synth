@@ -8,7 +8,8 @@
  *    sends, RATE, VIB, an engine parameter), bipolar sources and amounts, sums, clamping to the ranges,
  *    per-voice sources on per-block destinations (the latest note-on), RAND without the shared rng.
  * 3. MIDI: CC1 / CC11 / CC121 and channel aftertouch over USB (packets) and TRS (bytes, running status) reach
- *    the matrix of the channel's track (ch 1..4 the parts, others the selected track).
+ *    the matrix of the channel's track (ch 1..4 the parts, others ignored with ROUT CH1-4; with ROUT SEL every
+ *    channel the selected track).
  * 4. cost: instructions per sample (kernel-counted) of the heaviest PHYS preset and of a 4-part mix with every
  *    slot of every part active, against the same with the matrix off; fails above MOD_COST_MAX.
  * 5. demos: LFO -> CUT, VEL -> AMP, MODW -> VIB, LFO -> TRIO PW, AT -> WHEEL DRV as WAVs in DEMO_DIR. */
@@ -402,12 +403,17 @@ static void test_midi(void)
     pkt(0xB0, 1, 100);                           /* ch 1 CC1 */
     pkt(0xB2, 11, 40);                           /* ch 3 CC11 */
     pkt(0xD3, 77, 0);                            /* ch 4 aftertouch */
-    pkt(0xB6, 1, 55);                            /* ch 7: the selected track (2) */
+    pkt(0xB6, 1, 55);                            /* ch 7: ignored with ROUT CH1-4 (#68) */
     pkt(0xB0, 7, 10);                            /* other CCs: ignored */
     blocks(1);
     check("USB: CC1 ch 1 -> part 1, CC11 ch 3 -> part 3, AT ch 4 -> part 4",
           trk[0].mw == 100 && trk[2].ex_off == 127 - 40 && trk[3].at == 77 && trk[0].at == 0 && trk[0].ex_off == 0);
-    check("USB: CC1 on ch 7 -> the selected track (2)", trk[1].mw == 55 && trk[2].mw == 0);
+    check("USB: ROUT CH1-4: CC1 on ch 7 reaches no track", trk[1].mw == 0 && trk[2].mw == 0);
+    song.g[G_ROUTE] = 1;
+    pkt(0xB6, 1, 55);                            /* ROUT SEL: ch 7 -> the selected track (2) */
+    blocks(1);
+    check("USB: ROUT SEL: CC1 on ch 7 -> the selected track (2)", trk[1].mw == 55 && trk[2].mw == 0);
+    song.g[G_ROUTE] = 0;
     pkt(0xB0, 121, 0);                           /* reset all controllers */
     blocks(1);
     check("CC121 resets MODW / AT / EXPR of the channel's track", trk[0].mw == 0 && trk[1].mw == 55);
@@ -418,7 +424,13 @@ static void test_midi(void)
     blocks(1);
     check("TRS: CC1, running status, realtime between, CC11, AT (1 data byte, running status) -> parts",
           trk[0].mw == 0x7F && trk[0].ex_off == 127 - 0x20 && trk[2].at == 0x34 && trk[0].at == 0);
-    check("TRS: ch 5 -> the selected track (2)", trk[1].mw == 9);
+    check("TRS: ROUT CH1-4: ch 5 is ignored", trk[1].mw == 0);
+    song.g[G_ROUTE] = 1;
+    for (i = 14; i < sizeof TRS; i++)           /* the ch 5 CC1 again with ROUT SEL */
+        um_byte(TRS[i]);
+    blocks(1);
+    song.g[G_ROUTE] = 0;
+    check("TRS: ROUT SEL: ch 5 -> the selected track (2)", trk[1].mw == 9);
     check("MODW -> PAN +63 through MIDI: the part is on the right (fresh FX)", in_child(pan_e2e));
 }
 /* ------------------------------------------------------------------ 4 --- */

@@ -8,7 +8,7 @@
  * the pen, the one whose offset is nearer the previous glyph's, plus that phase's ink offset; a glyph with one
  * phase (figures, .) at the rounded pen as before; restated here too.
  * How close that lands to the font's own spacing is tests/text_spacing_test.py's question. Every string below, in S M L, THEME on SURF and TEXT on BG, in every palette: the end pen and every
- * pixel must be identical (MONO expands its gray with G = 2 R, the gray rule; the prototype's G = 2 R + R / 16
+ * pixel must be identical (GREY expands its gray with G = 2 R, the gray rule; the prototype's G = 2 R + R / 16
  * differed by one green LSB there, and that is the only difference to the mock renders). */
 #include <math.h>
 #include <stdint.h>

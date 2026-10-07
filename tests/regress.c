@@ -3,7 +3,7 @@
 /* Regression suite of the FELUCCA DSP on the Mac (same sources as the firmware, through hostsim.c).
  *   build/host/regress [GOLDEN_FILE CPU_FILE]      (run_tests.sh builds and runs it)
  *
- * 1. golden renders: every engine x factory preset, the GM kit (SAMPLE PERC), the voice modes (POLY / MONO /
+ * 1. golden renders: every engine x factory preset, the GM map on DRUM (SAMPLE PERC until 1.0.2), the voice modes (POLY / MONO /
  *    LEGATO / UNISON) of three engines, the FX sends, a 4-track sequencer mix, and the SLICER (slicer.c:
  *    GATE / STUT on the phrase, and on the 4-track mix with the transport). Each render plays
  *    a fixed phrase (notes, an overlap, a chord, note-offs, the release tail) and is reduced to a
@@ -204,13 +204,13 @@ static void job_sends(const job_t *j)           /* arg: 0 dry, 1 chorus, 2 delay
     phrase(t, 60);
 }
 
-static void job_drums(const job_t *j)           /* every GM note through SAMPLE PERC on part 4, a roll */
+static void job_drums(const job_t *j)           /* every GM note through DRUM on part 4, a roll */
 {
     track_t *t = &trk[3];
     uint32_t n, k = 0;
     (void)j;
     host_tracks_init();
-    host_legacy_sample_perc(t);
+    host_drums(t);
     for (n = 35; n <= 81u; n++, k++) {
         input_on(t, n, 60u + (n * 7u) % 60u);
         run_to(at(0.06 * (k + 1)));
@@ -248,7 +248,7 @@ static void job_slicer(const job_t *j)
 
 /* the 4-track mix: T1 ANALOG ACID, T2 the power-on pad (TRK_DEF: FM6 PAD since DIGITAL was retired; DIGITAL PAD
  * before) (tied chords), T3 LOFI lead (12 steps against 16),
- * T4 SAMPLE PERC drums; 120 BPM, 4 bars (the hostsim TRACKS demo without the recording), stop, the tail.
+ * T4 DRUM drums (SAMPLE PERC until 1.0.2); 120 BPM, 4 bars (the hostsim TRACKS demo without the recording), stop, the tail.
  * arg 1: with the SLICER (GATE on the pad, STUT on the acid line and the drums, SWING 20 %) */
 static void job_song(const job_t *j)
 {
@@ -264,7 +264,7 @@ static void job_song(const job_t *j)
     host_preset(t1, 0, 4);
     host_preset(t2, TRK_DEF[1][0], TRK_DEF[1][1]);
     host_preset(t3, 3, 0);
-    host_legacy_sample_perc(td);
+    host_drums(td);
     for (i = 0; i < 16u; i++) {
         uint8_t n = ACID[i];
         put_step(t1, i, n ? 1u : 0u, &n, n ? ST_NOTE : ST_REST, ACIDF[i]);
@@ -330,10 +330,7 @@ static void job_cpu(const job_t *j)
     uint64_t i0, t0;
     host_tracks_init();
     for (p = 0; p < NPART; p++) {
-        if (parts[p][0] == 4u && parts[p][1] == SMP_PERC_PRESET)
-            host_legacy_sample_perc(&trk[p]);
-        else
-            host_preset(&trk[p], parts[p][0], parts[p][1]);
+        host_preset(&trk[p], parts[p][0], parts[p][1]);
         if (parts[p][2] == DRUM_HITS)
             continue;
         trk[p].p[P_VOICE] = V_POLY;
@@ -466,21 +463,18 @@ static void midi_pkt(uint32_t st, uint32_t d1, uint32_t d2)   /* as usb.c: the q
     midi_in_q[mi_w++ % MQ] = (st >> 4) | st << 8 | d1 << 16 | d2 << 24;
 }
 
-/* the shared budget: 4 POLY parts (ANALOG, DIGITAL (without FELUCCA_FM4 its BELL converted: FM6), VOICE, SAMPLE PERC)
+/* the shared budget: 4 POLY parts (ANALOG, DIGITAL (without FELUCCA_FM4 its BELL converted: FM6), VOICE, SAMPLE PIANO)
  * play random notes on and off for
  * 6 s, up to 8 held each; after every block: at most 8 part voices active, none still fading (a stolen voice
  * fades within its one block), the VOICE part at most 4; then all off: every voice free */
 static int chk_budget(char *msg, uint32_t n)
 {
-    static const uint8_t E[NPART][2] = {{0, 1}, {1, 1}, {5, 1}, {4, 4}};
+    static const uint8_t E[NPART][2] = {{0, 1}, {1, 1}, {5, 1}, {4, 0}};   /* (SAMPLE PERC until 1.0.2) */
     uint8_t held[NPART][128] = {{0}};
     uint32_t p, k, worst = 0, vworst = 0, fading = 0, kills0 = voice_kills;
     host_tracks_init();
     for (p = 0; p < NPART; p++) {
-        if (E[p][0] == 4u && E[p][1] == SMP_PERC_PRESET)
-            host_legacy_sample_perc(&trk[p]);
-        else
-            host_preset(&trk[p], E[p][0], E[p][1]);
+        host_preset(&trk[p], E[p][0], E[p][1]);
         trk[p].p[P_VOICE] = V_POLY;
         trk[p].p[P_AMODE] = 0;
         trk[p].p[P_SUS] = 100;
@@ -881,8 +875,10 @@ static int chk_voice_cap(char *msg, uint32_t n)
     return most[0] == 4u && most[1] == 4u;
 }
 
-/* no hanging notes: 6 s of random MIDI note-ons / offs on channels 1..4 (the parts), 5, 10 and 16 (the
- * selected track), and keys, while the selected track changes; the parts in random voice modes,
+/* no hanging notes: 6 s of random MIDI note-ons / offs on channels 1..4 (the parts), 5, 10 and 16 (ignored
+ * with ROUT CH1-4, the selected track with SEL), and keys, while the selected track changes; round 1 with ROUT
+ * CH1-4, round 2 SEL, round 3 switching ROUT every 0.5 s (CH1-4 lets go of channels 5..16's notes,
+ * seq.c events_block); the parts in random voice modes,
  * some with ARP, SUS 127 (a hanging note keeps sounding). A channel's note-off goes to the same channel
  * as its note-on. Then every held note off: no gate may stay on, no ARP may still hold a key, every voice
  * must be free (also the same note held on two "selected track" channels across a selection change). */
@@ -895,6 +891,7 @@ static int chk_hang(char *msg, uint32_t n)
     int bad = 0;
     for (round = 0; round < 3u && !bad; round++) {
         host_tracks_init();
+        song.g[G_ROUTE] = round ? 1 : 0;
         for (k = 0; k < NPART; k++) {
             host_preset(&trk[k], rnd(NENGINES), rnd(4));
             trk[k].p[P_VOICE] = (int16_t)rnd(4);
@@ -904,6 +901,8 @@ static int chk_hang(char *msg, uint32_t n)
         }
         for (k = 0; k < 6u * FS / CTL; k++) {
             uint32_t r = rnd(16);
+            if (round == 2u && k % (FS / CTL / 2u) == 0u)
+                song.g[G_ROUTE] ^= 1;              /* ROUT changed with notes held */
             if (r < 6u) {                          /* MIDI */
                 uint32_t ci = rnd(7), note = 36u + rnd(36);
                 if (on[ci][note]) {
@@ -949,7 +948,7 @@ static int chk_hang(char *msg, uint32_t n)
         }
     }
     snprintf(msg, n, "%u random MIDI / key events on ch 1-4, 5, 10, 16 and the keys, track selection changing, "
-             "3 rounds: %s", ev, bad ? who : "no gate left on, every voice free");
+             "3 rounds (ROUT CH1-4, SEL, switching): %s", ev, bad ? who : "no gate left on, every voice free");
     return !bad;
 }
 
@@ -1033,7 +1032,7 @@ int main(int argc, char **argv)
             j->e = (uint8_t)e;
             j->pi = (uint8_t)pi;
         }
-    add(J_DRUMS, "drums/sample_perc_kit");
+    add(J_DRUMS, "drums/drum_gm_kit");
     for (i = 0; i < 3u; i++)
         for (k0 = 0; k0 < 4u && eng_ok(MODE_E[i][0]); k0++) {
             job_t *j;
@@ -1101,7 +1100,7 @@ int main(int argc, char **argv)
             j->e = (uint8_t)e;
             j->pi = (uint8_t)pi;
         }
-    {   /* mixes: idle (subtracted from the presets' counts), idle + drums (part 4 SAMPLE PERC), FM (DIGITAL with
+    {   /* mixes: idle (subtracted from the presets' counts), idle + drums (part 4 DRUM; SAMPLE PERC until 1.0.2), FM (DIGITAL with
          * FELUCCA_FM4, else FM6) + PHASE + VOICE asking 8 + 8 + 4 + the drums (the budget keeps 8; FM6 plays 6) */
         job_t *j = add(J_CPU, "cpu/mix/idle");
         memset(cpu_parts[ncpu], 0, sizeof cpu_parts[ncpu]);
@@ -1109,7 +1108,7 @@ int main(int argc, char **argv)
         j->e = 0xFF;
         j = add(J_CPU, "cpu/mix/idle_drums");
         memset(cpu_parts[ncpu], 0, sizeof cpu_parts[ncpu]);
-        cpu_parts[ncpu][3][0] = 4, cpu_parts[ncpu][3][1] = 4, cpu_parts[ncpu][3][2] = DRUM_HITS;
+        cpu_parts[ncpu][3][0] = ENGI_DRUM, cpu_parts[ncpu][3][1] = 0, cpu_parts[ncpu][3][2] = DRUM_HITS;
         j->parts = (const uint8_t (*)[3])cpu_parts[ncpu++];
         j->e = 0xFF;
         j = add(J_CPU, "cpu/mix/3parts_full_drums");
@@ -1117,7 +1116,7 @@ int main(int argc, char **argv)
         cpu_parts[ncpu][0][0] = FELUCCA_FM4 ? ENGI_DIGITAL : ENGI_FM6, cpu_parts[ncpu][0][1] = 0, cpu_parts[ncpu][0][2] = 8;
         cpu_parts[ncpu][1][0] = 2, cpu_parts[ncpu][1][1] = 0, cpu_parts[ncpu][1][2] = 8;
         cpu_parts[ncpu][2][0] = 5, cpu_parts[ncpu][2][1] = 0, cpu_parts[ncpu][2][2] = 4;
-        cpu_parts[ncpu][3][0] = 4, cpu_parts[ncpu][3][1] = 4, cpu_parts[ncpu][3][2] = DRUM_HITS;
+        cpu_parts[ncpu][3][0] = ENGI_DRUM, cpu_parts[ncpu][3][1] = 0, cpu_parts[ncpu][3][2] = DRUM_HITS;
         j->parts = (const uint8_t (*)[3])cpu_parts[ncpu++];
         j->e = 0xFF;
     }

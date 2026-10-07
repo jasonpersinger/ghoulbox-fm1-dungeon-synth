@@ -13,7 +13,8 @@
  *   - fast repeats (40 ms apart) are all heard;
  *   - the encoders still count one step per detent (their decoder is not touched);
  *   - the LED scan through fm1_input_tick: lit LEDs all of their tick, dim ones a pulse over the start of the
- *     595 shift (no wait) that settles to FM1_LED_DIM_NS +-30 % on every column whatever the bus speed, every
+ *     595 shift (no wait) that settles to FM1_LED_DIM_NS (DIM HI) or FM1_LED_DIM_LO_NS (DIM LO, fm1_led_dim_level)
+ *     +-30 % on every column whatever the bus speed, every
  *     frame, each only on its own column, the lines dark at every latch; the cost of a tick.
  * The GPIO / timer helpers of the header are compiled, never called. */
 #include <stdint.h>
@@ -307,6 +308,32 @@ int main(void)
         printf("encoder 0: one cycle -> %d step(s)\n", (int)s);
         check("an encoder detent cycle is one step", s == 1 || s == -1);
     }
+    {   /* #63: a knob left alone on its detent, one contact chattering (runs of 1..5 frames), or both contacts
+         * lost together (the row they share disturbed, 1..5 frames): ~4 min each of every rest state, no step */
+        uint32_t rest, mode, f, g, moved = 0;
+        const uint8_t *m = FM1_ENC[0];
+        for (mode = 0; mode < 3u; mode++)
+            for (rest = 0; rest < 4u; rest++) {
+                reset();
+                for (f = 0, g = 0; f < 200000u; f++) {
+                    uint32_t st = rest;
+                    if (g) {
+                        st ^= mode == 0u ? 2u : mode == 1u ? 1u : 3u;
+                        g--;
+                    } else if (rnd(300) == 0u) {
+                        g = 1u + rnd(5);
+                    }
+                    if (f < 100u)
+                        st = rest;                     /* (the power-on state is the detent) */
+                    memset((void *)fm1_in.raw, 0, sizeof fm1_in.raw);
+                    fm1_in.raw[m[0]] |= (uint8_t)(((st >> 1) & 1u) << m[1]);
+                    fm1_in.raw[m[2]] |= (uint8_t)((st & 1u) << m[3]);
+                    fm1__frame();
+                    moved |= fm1_in.enc_steps[0] != 0;
+                }
+            }
+        check("#63 a still knob: one contact chattering or both lost together never steps", !moved);
+    }
 
     {   /* the LEDs through fm1_input_tick (the GPIO as memory): each tick writes the lines dark (the key read),
          * then, a dim-only LED on column p: lit | dim of p, the first bits of the shift, dark; the rest of the shift,
@@ -314,17 +341,19 @@ int main(void)
          * pulse: the rest waited) to 4 TIMER4 ticks an access (a bit ~1 us): the pulse within 30 % of
          * FM1_LED_DIM_NS on every column once settled, nothing of another column, ever */
         static const uint32_t BUS[] = {0u, 1u, 2u, 4u};
-        uint32_t bi;
+        uint32_t bi, lv;
+        for (lv = 0; lv < 2u; lv++)                     /* both glows: DIM HI (FM1_LED_DIM_NS), DIM LO */
         for (bi = 0; bi < sizeof BUS / sizeof BUS[0]; bi++) {
             uint32_t t, col, prev, lit[FM1_NCOL][5], dimw[FM1_NCOL][5], frames = 400u, bad = 0, badw = 0, r;
             uint32_t pulse_min[FM1_NCOL], pulse_max = 0, pulses = 0, waits = 0, kmin = 16u, kmax = 0u, c, pmin = ~0u;
-            const uint32_t T = (FM1_LED_DIM_NS * FM1_TICKS_PER_US + 500u) / 1000u;
-            char what[96];
+            const uint32_t NS = lv ? FM1_LED_DIM_LO_NS : FM1_LED_DIM_NS, T = (NS * FM1_TICKS_PER_US + 500u) / 1000u;
+            char what[112];
             memset(lit, 0, sizeof lit);
             memset(dimw, 0, sizeof dimw);
             for (c = 0; c < FM1_NCOL; c++)
                 pulse_min[c] = ~0u;
             reset();
+            fm1_led_dim_level(lv);
             FM1_PR(FM1_PA, FM1_IN) = FM1_PR(FM1_PB, FM1_IN) = 0xFFFFFFFFu;   /* rows open */
             memset(fm1_led, 0, sizeof fm1_led);
             memset(fm1_led_dim, 0, sizeof fm1_led_dim);
@@ -377,19 +406,20 @@ int main(void)
                      (unsigned)host_bus);
             check(what, !bad && !badw && !latch_lit && latches == frames * FM1_NCOL && lit[3][2] == frames &&
                   lit[7][3] == frames && !lit[2][2] && !lit[3][4] && !lit[4][1]);
-            snprintf(what, sizeof what, "  dim: a pulse every frame on its own column, %u..%u ns (target %u +-30 %%)",
-                     (unsigned)(pmin * 1000u / FM1_TICKS_PER_US), (unsigned)(pulse_max * 1000u / FM1_TICKS_PER_US),
-                     (unsigned)FM1_LED_DIM_NS);
+            snprintf(what, sizeof what, "  dim %s: a pulse every frame on its own column, %u..%u ns (target %u +-30 %%)",
+                     lv ? "LO" : "HI", (unsigned)(pmin * 1000u / FM1_TICKS_PER_US),
+                     (unsigned)(pulse_max * 1000u / FM1_TICKS_PER_US), (unsigned)NS);
             check(what, pulses == frames / FM1_LED_DIM_DIV * 4u && dimw[3][4] == frames / FM1_LED_DIM_DIV &&
                   dimw[4][1] == frames / FM1_LED_DIM_DIV && dimw[4][4] == frames / FM1_LED_DIM_DIV &&
                   dimw[10][1] == frames / FM1_LED_DIM_DIV && dimw[0][3] == frames / FM1_LED_DIM_DIV &&
                   !dimw[3][2] && !dimw[5][1] && !dimw[9][1] && !dimw[7][3] &&
                   pmin * 10u >= T * 7u && pulse_max * 10u <= T * 13u);
-            printf("LEDs, bus %u: the pulse spans %u..%u bits of the shift%s\n", (unsigned)host_bus, (unsigned)kmin,
+            printf("LEDs %s, bus %u: the pulse spans %u..%u bits of the shift%s\n", lv ? "LO" : "HI", (unsigned)host_bus, (unsigned)kmin,
                    (unsigned)kmax, waits ? " (the shift shorter than the pulse: the rest waited)" : " (no wait)");
         }
         host_bus = 0;
         host_step = 2400u;
+        fm1_led_dim_level(0);
         printf("LEDs: refresh %u Hz lit, %u Hz dim\n", (unsigned)(1000000u / (FM1_NCOL * TICK_US)),
                (unsigned)(1000000u / (FM1_NCOL * TICK_US * FM1_LED_DIM_DIV)));
         {   /* the host cost of a tick, the dim LEDs on and off (no bus time: the shift waits out the pulse) */

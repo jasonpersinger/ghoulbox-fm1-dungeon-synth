@@ -6,6 +6,9 @@
 #define __attribute__(x)
 #define NENGINES 9u
 #define UP_SLOTS 32u
+#define ENGI_SAMPLE 4u                           /* (core.h: SAMPLE, DRUM, the retired PERC set) */
+#define ENGI_DRUM 10u
+#define SMP_SET_PERC 4u
 static uint8_t fx_lowcut;
 static void fm1_led_key(unsigned k, int on) { (void)k; (void)on; }
 static int fm1_enc_take(unsigned k) { (void)k; return 0; }
@@ -23,20 +26,25 @@ int main(void)
 {
     persist_t original = {0}, p;
     original.magic = PERSIST_MAGIC;
-    original.palette = 4; original.bold = original.lowcut = original.zoom = 1;   /* old id 4: MONO */
+    original.palette = 4; original.bold = original.lowcut = original.zoom = 1;   /* old id 4: MONO, now GREY */
     original.panel = PANEL_DEFAULT; original.panel.enc[0] = 3;
     original.favorites.factory[8][0] = 1;
     original.favorites.user = 1u << 31; original.favorites.filter = 1;
     p = original;
     assert(settings_import(&p, sizeof p) == 1); settings_init();
-    assert(settings.palette == UI_MONO_INDEX && fx_lowcut && settings.zoom && panel.enc[0] == 3);
-    assert(p.palette == palette_to_stored(UI_MONO_INDEX));        /* migrated in place */
-    {   /* every old id maps to a palette; tagged ids round trip; anything else is MONO */
+    assert(settings.palette == UI_GREY_INDEX && fx_lowcut && settings.zoom && panel.enc[0] == 3);
+    assert(p.palette == palette_to_stored(UI_GREY_INDEX));        /* migrated in place */
+    {   /* every old id maps to a palette; tagged ids round trip; anything else is GREY */
         persist_t q = original;
         for (uint32_t i = 0; i < 20u; i++) assert(palette_from_stored(i) < NPALETTES);
         assert(palette_from_stored(13) == 6u && palette_from_stored(11) == 7u && palette_from_stored(19) == 7u);
         for (uint32_t i = 0; i < NPALETTES; i++) assert(palette_from_stored(palette_to_stored(i)) == i);
-        assert(palette_from_stored(40) == UI_MONO_INDEX && !palette_stored_ok(40) && palette_stored_ok(3));
+        assert(palette_from_stored(40) == UI_GREY_INDEX && !palette_stored_ok(40) && palette_stored_ok(3));
+        /* 1.0.2: the old MONO keeps its id as GREY (a saved MONO looks the same); the new black and white MONO is
+         * appended, a new id */
+        assert(palette_from_stored(UI_PAL_TAG + 0u) == UI_GREY_INDEX && !strcmp(UI_PALETTES[UI_GREY_INDEX].name, "GREY"));
+        assert(UI_BW_INDEX == NPALETTES - 1u && !strcmp(UI_PALETTES[UI_BW_INDEX].name, "MONO") &&
+               palette_from_stored(UI_PAL_TAG + UI_BW_INDEX) == UI_BW_INDEX && palette_stored_ok(UI_PAL_TAG + UI_BW_INDEX));
         q.palette = palette_to_stored(5);
         assert(settings_import(&q, sizeof q) == 1 && settings.palette == 5u);
         settings.magic = SETTINGS_MAGIC_OLD; settings.palette = 13; settings_init();   /* retained SET3 */
@@ -45,6 +53,16 @@ int main(void)
     }
 #ifdef FELUCCA_FAVORITES
     assert(favorite_has(8, 0) && favorite_has(NENGINES, 31) && favorites.filter);
+    {   /* SAMPLE's PERC starred (preset 4, retired): DRUM's kit (preset 0) instead; SAMPLE's others kept; twice the same */
+        persist_t q = original;
+        q.favorites.factory[ENGI_SAMPLE][0] = 1u << SMP_SET_PERC | 1u << 2;
+        assert(settings_import(&q, sizeof q) == 1 && favorites.factory[ENGI_SAMPLE][0] == 1u << 2 &&
+               favorites.factory[ENGI_DRUM][0] == 1u);
+        settings_export(&q);
+        assert(settings_import(&q, sizeof q) == 1 && favorites.factory[ENGI_SAMPLE][0] == 1u << 2 &&
+               favorites.factory[ENGI_DRUM][0] == 1u);
+        p = original; assert(settings_import(&p, sizeof p) == 1);
+    }
 #endif
     settings.lowcut = 0;
     settings_export(&p);
@@ -96,8 +114,27 @@ int main(void)
         settings_leds = LEDS_DIM;
         settings_export(&p);
         assert(p.zoom == 0u && settings_import(&p, sizeof p) == 1 && settings_leds == LEDS_DIM);
-        assert(leds_stored_ok(0u) && leds_stored_ok(1u) && !leds_stored_ok(2u) && !leds_stored_ok(LEDS_TAG | 2u) &&
-               !leds_stored_ok(LEDS_TAG + 4u) && leds_from_stored(LEDS_TAG | 3u) == LEDS_DIM && leds_from_stored(7u) == LEDS_DIM);
+        assert(leds_stored_ok(0u) && leds_stored_ok(1u) && !leds_stored_ok(2u) && leds_stored_ok(LEDS_TAG | 2u) &&
+               leds_stored_ok(LEDS_TAG | 3u) && !leds_stored_ok(LEDS_TAG + 4u) && leds_from_stored(LEDS_TAG + 4u) == LEDS_DIM &&
+               leds_from_stored(7u) == LEDS_DIM && leds_from_stored(2u) == LEDS_DIM);
+        /* the modes appended (append-only: DIM 0, INV 1 as before): OFF 2, DIM LO 3, each saved and read back,
+         * twice the same */
+        {
+            uint32_t m;
+            static const uint32_t ADDED[2] = {LEDS_OFF, LEDS_DIM_LO};
+            assert(LEDS_DIM == 0 && LEDS_INV == 1 && LEDS_OFF == 2 && LEDS_DIM_LO == 3 && LEDS_COUNT == 4);
+            for (m = 0; m < 2u; m++) {
+                settings_leds = (uint8_t)ADDED[m];
+                settings_export(&p);
+                assert(p.zoom == (LEDS_TAG | ADDED[m]) && leds_stored_ok(p.zoom));
+                q = p; settings_export(&q); assert(!memcmp(&q, &p, sizeof q));
+                settings_leds = LEDS_DIM;
+                assert(settings_import(&p, sizeof p) == 1 && settings_leds == ADDED[m]);
+            }
+            settings_leds = LEDS_DIM;
+            settings_export(&p);
+            assert(p.zoom == 0u);
+        }
         p = original; p.magic = 0x50455231u;           /* PER1: no zoom field, DIM */
         memcpy((uint8_t *)&p + 8, &PANEL_DEFAULT, sizeof(panel_t));
         settings_leds = LEDS_INV;

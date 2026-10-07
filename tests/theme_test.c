@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* The palettes and the real canvas/text renderer (src/gfx.c): MONO stays gray in every token and blend,
+/* The palettes and the real canvas/text renderer (src/gfx.c): GREY stays gray in every token and blend, MONO is
+ * black and white in every token (one grey: DIM LINE RAISE LANE) and neutral in every blend,
  * every palette's text contrast, the alpha blend, the ramp cache, the fonts' metrics and the ellipsis.
  * Optional: a palette sheet (PPM). */
 #include <stdint.h>
@@ -19,6 +20,9 @@ static uint16_t sheet[SHEET_W * SHEET_H];
 static unsigned channel(uint16_t c, unsigned n)
 { return n == 0 ? c >> 11 : n == 1 ? (c >> 5) & 63 : c & 31; }
 static int gray(uint16_t c) { return channel(c, 0) == channel(c, 2) && channel(c, 1) == channel(c, 0) * 2u; }
+/* MONO's blends: R = B, G within 2 of 2 R (blended per channel, the 5-6-5 rounding) */
+static int neutral(uint16_t c)
+{ return channel(c, 0) == channel(c, 2) && (int)channel(c, 1) - 2 * (int)channel(c, 0) >= -2 && (int)channel(c, 1) - 2 * (int)channel(c, 0) <= 2; }
 static double luminance(uint16_t color)
 {
     const double weight[] = {0.2126, 0.7152, 0.0722};
@@ -41,14 +45,33 @@ int main(int argc, char **argv)
     static const uint8_t pd[] = {0x08, 0xf0};
     const aafont_t probe = {1, 1, 'A', 'A', 0, 0, pg, pd, 0, 0, 0};
     double worst = 100;
-    assert(NPALETTES == 9u && !strcmp(UI_PALETTES[0].name, "MONO") && !strcmp(UI_PALETTES[7].name, "HI-CON") &&
-           !strcmp(UI_PALETTES[8].name, "CRYPT") && UI_CRYPT_INDEX == 8u);   /* (GHOULBOX's, appended) */
+    assert(NPALETTES == 11u && !strcmp(UI_PALETTES[0].name, "GREY") && !strcmp(UI_PALETTES[7].name, "HI-CON") &&
+           !strcmp(UI_PALETTES[8].name, "CRYPT") && UI_CRYPT_INDEX == 8u &&
+           !strcmp(UI_PALETTES[9].name, "NIGHT") && !strcmp(UI_PALETTES[10].name, "MONO") && UI_BW_INDEX == 10u);
+    /* (#50, 1.0.2: appended, the ids stay; GREY is the MONO of 1.0.1, id 0; GHOULBOX's CRYPT keeps its id 8) */
+    for (unsigned st = ST_FLAT; st <= ST_LINE; st++) {   /* MONO: every token black or white, in FLAT and LINE */
+        uint16_t *tok = &ux.bg;
+        ux.style = (uint8_t)st;
+        palette_set(UI_BW_INDEX);
+        assert(&ux.grid - tok == 15);
+        for (unsigned i = 0; i < 16; i++) {
+            /* the one grey: DIM (inactive), LINE (tracks), RAISE (wells under white text), LANE (the piano roll) */
+            int grey_ok = tok[i] == UI_BW_GREY && (&tok[i] == &ux.dim || &tok[i] == &ux.line || &tok[i] == &ux.raise ||
+                                                   &tok[i] == &ux.lane);
+            if (!(tok[i] == 0x0000u || tok[i] == 0xFFFFu || grey_ok))
+                printf("MONO (%s): token %u = %04x is not black or white\n", st ? "LINE" : "FLAT", i, tok[i]);
+            assert(tok[i] == 0x0000u || tok[i] == 0xFFFFu || grey_ok);
+        }
+        assert(T_BG == 0u && T_SURF == 0u && T_TEXT == 0xFFFFu && T_SEL == 0xFFFFu && T_INK == 0u && T_REC == 0xFFFFu);
+        assert(T_STONE == 0u && T_EDGE == UI_BW_GREY);   /* GHOULBOX's stone: black specks, the grey outer line */
+    }
+    ux.style = ST_FLAT;
     for (unsigned p = 0; p < NPALETTES; p++) {
         uint16_t *tok = &ux.bg;
         palette_set(p);
-        if (p == UI_MONO_INDEX)
+        if (p == UI_GREY_INDEX)
             for (unsigned i = 0; i < 14; i++) assert(gray(tok[i]));      /* every token, derived ones too (RAISE, KEY the last) */
-        if (p == UI_MONO_INDEX)
+        if (p == UI_GREY_INDEX)
             assert(gray(T_STONE) && gray(T_EDGE));                     /* GHOULBOX's tokens too */
         assert(contrast(T_TEXT, T_STONE) >= 7.0 && contrast(T_THEME, T_STONE) >= 3.5);   /* text on the stone */
         /* text and the things read on the screen; the generator checks the same (tools/gen_ui_palettes.py) */
@@ -56,7 +79,8 @@ int main(int argc, char **argv)
             {T_TEXT, T_BG, 12.0}, {T_TEXT, T_SURF, 9.0}, {T_MID, T_BG, 5.0}, {T_MID, T_SURF, 4.0},
             {T_THEME, T_BG, 4.5}, {T_THEME, T_SURF, 4.5}, {T_ACCENT, T_BG, 4.5}, {T_ACCENT, T_SURF, 4.5},
             {T_INK, T_SEL, 4.5}, {T_INK, T_THEME, 4.5}, {T_DIM, T_BG, 2.2}, {T_LINE, T_BG, 1.25}, {T_REC, T_BG, 3.0},
-            {T_INK, T_KEY, 4.5}, {T_KEY, T_BG, 3.0}, {T_KEY, T_SURF, 2.5}, {T_INK, T_DIM, 1.8}, {T_INK, T_ACCENT, 4.5}};
+            {T_INK, T_KEY, 4.5}, {T_KEY, T_BG, 3.0}, {T_KEY, T_SURF, 2.5}, {T_INK, T_DIM, 1.8}, {T_INK, T_ACCENT, 4.5},
+            {T_TEXT, T_RAISE, 7.0}};
         double min = 100;
         for (unsigned i = 0; i < sizeof c / sizeof c[0]; i++) {
             double r = contrast(c[i].fg, c[i].bg);
@@ -68,7 +92,7 @@ int main(int argc, char **argv)
         printf("%-7s text %.1f:1, labels %.1f:1, values %.1f:1, selection %.1f:1\n", UI_PALETTES[p].name,
                contrast(T_TEXT, T_BG), contrast(T_MID, T_BG), contrast(T_THEME, T_BG), contrast(T_INK, T_SEL));
         assert((p == 6u) == ux.light);                         /* PAPER is the light one */
-        assert(T_REC == (p == UI_MONO_INDEX ? T_ACCENT : ux.light ? UI_REC_LIGHT : UI_REC_DARK));
+        assert(T_REC == (p == UI_GREY_INDEX || p == UI_BW_INDEX ? T_ACCENT : ux.light ? UI_REC_LIGHT : UI_REC_DARK));
         /* the blend: transparent, solid and an edge between the two, on two backgrounds */
         for (unsigned b = 0; b < 2; b++) {
             uint16_t under = b ? T_SEL : T_BG, ink = b ? T_INK : T_THEME;
@@ -79,7 +103,8 @@ int main(int argc, char **argv)
                 unsigned a = channel(under, k), z = channel(ink, k), m = channel(swap16(cv_px[1]), k);
                 assert(m >= (a < z ? a : z) && m <= (a > z ? a : z));   /* no halo */
             }
-            if (p == UI_MONO_INDEX) assert(gray(swap16(cv_px[1])));
+            if (p == UI_GREY_INDEX) assert(gray(swap16(cv_px[1])));
+            if (p == UI_BW_INDEX) assert(neutral(swap16(cv_px[1])));
         }
         assert(text_w(&AF_S, UI_PALETTES[p].name) <= 60);     /* the COLOR row's value */
         cv_begin(240, 124, T_BG);
@@ -103,7 +128,8 @@ int main(int argc, char **argv)
         for (unsigned y = 0; y < 124; y++)
             for (unsigned x = 0; x < 240; x++) {
                 uint16_t v = swap16(cv_px[y * 240 + x]);
-                if (p == UI_MONO_INDEX) assert(gray(v));          /* every blended pixel of MONO */
+                if (p == UI_GREY_INDEX) assert(gray(v));          /* every blended pixel of GREY */
+                if (p == UI_BW_INDEX) assert(neutral(v));         /* and of MONO */
                 sheet[(p / 4 * 124 + y) * 960 + p % 4 * 240 + x] = v;
             }
     }
@@ -114,9 +140,9 @@ int main(int argc, char **argv)
     palette_set(6);
     cv_begin(3, 1, T_BG); cv_text(0, 0, &probe, "A", T_THEME);
     assert(swap16(cv_px[1]) != green);
-    /* fonts: VT323 S 17 px, M 20 px, L 32 px (GHOULBOX; Felucca: Inter Tight 12 / 15 / 28); tabular digits; the
+    /* fonts: VT323 S 17 px, M 20 px, L 36 px (GHOULBOX; Felucca: Inter Tight 12 / 15 / 28); tabular digits; the
      * ellipsis; L has capitals only */
-    assert(AF_S.h == 18 && AF_S.asc == 14 && AF_M.h == 20 && AF_M.asc == 16 && AF_L.h == 33 && AF_L.asc == 26);
+    assert(AF_S.h == 18 && AF_S.asc == 13 && AF_M.h == 20 && AF_M.asc == 15 && AF_L.h == 37 && AF_L.asc == 28);
     assert(text_w(&AF_M, "0000") == text_w(&AF_M, "1111") && text_w(&AF_S, "1.25") == text_w(&AF_S, "8.75"));
     assert(glyph(&AF_S, (uint8_t)ELLIPSIS) != glyph(&AF_S, '?') && glyph(&AF_M, (uint8_t)ELLIPSIS) != glyph(&AF_M, '?'));
     assert(text_w(&AF_L, "abc") == text_w(&AF_L, "ABC"));
@@ -188,6 +214,6 @@ int main(int argc, char **argv)
         printf("faces: S alpha values other than 0 / 15: %u\n", bad_alpha);
         assert(bad_alpha == 0u);
     }
-    printf("Palettes: MONO gray, contrast (worst margin x%.2f), blending, ramp cache, font metrics and ellipsis passed.\n", worst);
+    printf("Palettes: GREY gray, MONO black and white, contrast (worst margin x%.2f), blending, ramp cache, font metrics and ellipsis passed.\n", worst);
     return 0;
 }

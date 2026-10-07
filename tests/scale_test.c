@@ -61,12 +61,10 @@ static void mapping_test(void)
     for (k = 0; k < 27u; k++)
         assert(kb_map(t, k) == 48u + k);
     t->p[P_QUANT] = 2;
-    t->engine = t->eng_req = 4;                /* SAMPLE PERC (the GM kit, any part): the first C is the kick */
-    if (smp_perc_set() >= 0) {
-        t->p[P_E0] = (int16_t)smp_perc_set();
-        for (k = 0; k < 27u; k++)
-            assert(kb_map(t, k) == 29u + k);
-    }
+    host_preset(t, ENGI_DRUM, 0);              /* DRUM (the GM map, any part; SAMPLE PERC until 1.0.2): the first */
+    t->engine = t->eng_req = ENGI_DRUM;        /* C is the kick */
+    for (k = 0; k < 27u; k++)
+        assert(kb_map(t, k) == 29u + k);
     t->engine = t->eng_req = 0;                /* SNAP (QNT 1, the old ON): every key, rounded down */
     t->p[P_QUANT] = 1;
     t->p[P_SCALE] = 2;                         /* C minor */
@@ -258,15 +256,6 @@ static void seq_quant_test(void)
     events_block(CTL);
     assert(t->seq_n == 3 && t->seq_notes[0] == 37 && t->seq_notes[1] == 39 && t->seq_notes[2] == DRUM_LANE_NOTE[0]);
     seq_stop();
-    if (smp_perc_set() >= 0) {
-        host_preset(t, 4, 0);
-        t->engine = t->eng_req = 4;
-        t->p[P_E0] = (int16_t)smp_perc_set();
-        seq_start();
-        events_block(CTL);
-        assert(t->seq_n == 3 && t->seq_notes[0] == 37 && t->seq_notes[1] == 39);
-        seq_stop();
-    }
     assert(gated(t) == 0);
     puts("scales: QNT SEQ snaps the sequence as it plays (steps unchanged), no stuck notes over scale changes, kits never");
 }

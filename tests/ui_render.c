@@ -1,25 +1,38 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
-/* Renders of the firmware UI (firmware/src/ui*.c on tests/ui_test.c's stubs), the layout lint, the MONO check
- * and the host draw cost.
+/* Renders of the firmware UI (firmware/src/ui*.c on tests/ui_test.c's stubs), the layout lint, the GREY and MONO
+ * checks and the host draw cost.
  *   ui_render OUTDIR [SLOTDIR]   (run by tests/run_tests.sh; tests/ui_render.py makes the PNGs;
- *                                 SLOTDIR: filmstrips of the rolling digits, MONO and GREEN)
+ *                                 SLOTDIR: filmstrips of the rolling digits, GREY MONO and GREEN)
  * Layout lint, over every screen below in every palette, every page of every engine and every value of every
  * column: the ink box of every text and icon drawn (gfx.c GFX_HOOK_TEXT) as it lands on the screen. A finding:
  * a box off the screen, cut by its canvas, partly covered by a later strip or fill, overlapping another box, or
  * ellipsised when it is not free text (labels and values must fit; names and messages may be ellipsised), or
  * spilling out of its cell: touching a rounded rectangle of its canvas (gfx.c cv_rrect: a cell, card, row, button,
- * GFX_HOOK_CELL) without lying inside it, though still on the screen (the FX map's REVERSE).
- * MONO: every pixel of every screen is RGB565 gray (R = B, G = 2 R).
- * Rolling digits: every frame of a header BPM roll and a card roll, up and down, in every palette (lint, MONO).
+ * GFX_HOOK_CELL) without lying inside it, though still on the screen (the FX map's REVERSE), or drawn in the
+ * colour it is drawn on (gfx.c GFX_HOOK_INK: a text, icon or keycap label that cannot be seen; MONO's tokens share
+ * values, DIM and RAISE its one grey).
+ * GREY: every pixel of every screen is RGB565 gray (R = B, G = 2 R). MONO (black and white, blended per channel):
+ * every pixel is neutral (R = B, G within 2 of 2 R).
+ * MENU > STYLE LINE: every screen again in every palette, the same lint; a text or icon on a divider
+ * (ui_draw.c lcd_rule, GFX_HOOK_RULE: the rules between the strips; cv_rule's are cells) is a finding too.
+ * Rolling digits: every frame of a header BPM roll and a card roll, up and down, in every palette (lint, GREY, MONO).
  * FM6 charts (ui_graph.c graph_fm6, its parts through FM6_CHART_HOOK), every algorithm and every chart drawn: no two
  * operator boxes overlapping or touching, no route, loop, bus or label inside a box or touching one it does not
  * connect, no two nets (one gap's routes that share an operator, the output, the loop, the label) sharing or
  * touching a pixel, everything inside the panel.
- * Output: OUTDIR/ppm/<PALETTE>_<screen>.ppm for MONO GREEN PAPER CRYPT, OUTDIR/report.txt (findings, ellipsised free
- * text, the draw cost), OUTDIR/text_audit.tsv (MONO, per screen: texts, icons and keycaps with their ink-box px, the
- * ellipsised ones, the texts closer than 2 px to their cell's edge, the words).
- * Exit 1 on a finding or a MONO pixel off gray. */
+ * Output: OUTDIR/ppm/<PALETTE>_<screen>.ppm for GREY MONO GREEN PAPER NIGHT CRYPT, OUTDIR/report.txt (findings,
+ * ellipsised free text, the draw cost), OUTDIR/text_audit.tsv (GREY, per screen: texts, icons and keycaps with their
+ * ink-box px, the ellipsised ones, the texts closer than 2 px to their cell's edge, the words).
+ * Alignment (gfx.c GFX_HOOK_ALIGN): every place where a text, icon or keycap is meant to sit centred (in a cell, a
+ * chip, a button, a row, a column, a knob, a strip) or on a line shared with its neighbours (an icon on its label's
+ * line, a word on its keycap's, a unit on its value's baseline) declares its box; the ink drawn there (a text: its
+ * glyphs' boxes across, its capitals' band up and down; an icon: its cell's nibbles; a keycap: its pill; also the
+ * keycaps' labels in their pills, from the data, and rows of keys or bars against their panel) is measured against
+ * it, on every screen above in FLAT and LINE and every palette, the page / value sweep, and align_sweeps (every value
+ * each place can show). 0.5 px is the odd pixel left over (it goes left / up); 1 px or more is a finding.
+ * OUTDIR/align.txt: per place, how often measured, the worst offsets and where.
+ * Exit 1 on a finding, a GREY pixel off gray, a MONO one off neutral, or an alignment 1 px or more off. */
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -30,7 +43,7 @@ typedef struct { int16_t x0, y0, x1, y1; uint8_t flags; char s[28]; } rbox_t;
 static rbox_t pend[256], scr[1200];
 static int16_t cells[64][4];                    /* GFX_HOOK_CELL: the cells and cards of the canvas being drawn */
 static uint32_t ncells, nspill;
-static FILE *aud;                               /* OUTDIR/text_audit.tsv: MONO, the text of each screen */
+static FILE *aud;                               /* OUTDIR/text_audit.tsv: GREY, the text of each screen */
 static char tight[400];                         /* .. the texts of this screen closer than 2 px to their cell's edge */
 static uint32_t ntight;
 static uint32_t npend, nscr, nfind, nfree;
@@ -39,8 +52,123 @@ static FILE *rep;
 static const char *cur_name = "";
 static char free_seen[64][40];
 static uint32_t nfree_seen;
+/* the alignment check (gfx.c GFX_HOOK_ALIGN): a place declares the box its next item(s) are meant to be centred in,
+ * across and / or up and down; the items' ink as drawn (a text: its glyphs' boxes across, its capitals' band up and
+ * down, a text of no letter or figure: across only; an icon: the ink of its cell; a keycap: its pill; a cushion: the
+ * cushion) against the box: the offset of the ink's centre from the box's, in half pixels. 0.5 is the odd pixel
+ * left over (it goes left / up: a +0.5 is counted apart); 1 px or more is a finding. Per place (its tag): how
+ * often it was measured, the worst offsets and where, in OUTDIR/align.txt */
+typedef struct { int32_t x0, y0, x1, y1, ix0, iy0, ix1, iy1; uint32_t mode, left, nv; const char *tag; char s[24]; } al_t;
+typedef struct { const char *tag; uint32_t n, nfail, half_lo, half_hi; int32_t wh2, wv2; char ex_h[112], ex_v[112]; } alstat_t;
+static al_t al_stk[8];
+static uint32_t al_n, al_fail, al_lost, al_count, al_off;
+static int32_t al_cy0, al_cy1;                  /* GFX_HOOK_PEN: the capitals' band of the text being hooked */
+static alstat_t al_st[160];
+static uint32_t al_nst;
+static FILE *al_rep;
+static alstat_t *al_stat(const char *tag)
+{
+    uint32_t i;
+    for (i = 0; i < al_nst && strcmp(al_st[i].tag, tag); i++) ;
+    if (i == al_nst && al_nst < 160u) { memset(&al_st[i], 0, sizeof al_st[i]); al_st[i].tag = tag; al_nst++; }
+    return &al_st[i < 160u ? i : 159u];
+}
+/* one measurement: offsets in half pixels (h2, v2; 99: not measured) */
+static void al_record(const char *tag, int32_t h2, int32_t v2, const char *s, int32_t bx0, int32_t by0, int32_t bx1,
+                      int32_t by1, int32_t ix0, int32_t iy0, int32_t ix1, int32_t iy1)
+{
+    alstat_t *a = al_stat(tag);
+    int32_t ah = h2 == 99 ? 0 : h2 < 0 ? -h2 : h2, av = v2 == 99 ? 0 : v2 < 0 ? -v2 : v2;
+    a->n++;
+    al_count++;
+    if (h2 == 1 || v2 == 1) a->half_hi++;
+    if (h2 == -1 || v2 == -1) a->half_lo++;
+    if (ah > a->wh2 || (!a->ex_h[0] && h2 != 99)) {
+        if (ah > a->wh2) a->wh2 = ah;
+        snprintf(a->ex_h, sizeof a->ex_h, "%+.1f '%s' %s ink x %d..%d box %d..%d", h2 / 2.0, s, cur_name, ix0, ix1, bx0, bx1);
+    }
+    if (av > a->wv2 || (!a->ex_v[0] && v2 != 99)) {
+        if (av > a->wv2) a->wv2 = av;
+        snprintf(a->ex_v, sizeof a->ex_v, "%+.1f '%s' %s ink y %d..%d box %d..%d", v2 / 2.0, s, cur_name, iy0, iy1, by0, by1);
+    }
+    if (ah >= 2 || av >= 2) {
+        a->nfail++;
+        al_fail++;
+        if (al_rep && a->nfail <= 3u)
+            fprintf(al_rep, "OFF  %-28s %-26s '%s' across %+.1f, up/down %+.1f  (ink %d,%d-%d,%d box %d,%d-%d,%d)\n", tag, cur_name,
+                    s, h2 == 99 ? 0.0 : h2 / 2.0, v2 == 99 ? 0.0 : v2 / 2.0, ix0, iy0, ix1, iy1, bx0, by0, bx1, by1);
+    }
+}
+static void hk_align(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t mode, const char *tag)
+{
+    al_t *a;
+    if (al_off) return;                         /* (the draw cost: timed without the check)  */
+    if (al_n >= 8u) { al_lost++; return; }
+    a = &al_stk[al_n++];
+    memset(a, 0, sizeof *a);
+    a->x0 = x0; a->y0 = y0; a->x1 = x1; a->y1 = y1; a->mode = mode; a->tag = tag;
+    a->left = mode >> 8 ? mode >> 8 : 1u;
+    a->ix0 = a->iy0 = 1 << 20; a->ix1 = a->iy1 = -(1 << 20);
+}
+/* an item drawn (cell: a cv_rrect, else ink): its extent across (x0..x1), up and down (y0..y1; vy 0: none), to the
+ * place declared last (AL_PASS, its item done: to the one before it too) */
+static void al_item_k(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int vy, const char *s, int cell)
+{
+    al_t *a;
+    int32_t h2 = 99, v2 = 99;
+    uint32_t pass;
+    if (!al_n) return;
+    a = &al_stk[al_n - 1u];
+    if (!(a->mode & 32u) != !cell) return;          /* (AL_CELLS: its cells only; else ink only) */
+    if (x0 < a->ix0) a->ix0 = x0;
+    if (x1 > a->ix1) a->ix1 = x1;
+    if (vy) {
+        if (y0 < a->iy0) a->iy0 = y0;
+        if (y1 > a->iy1) a->iy1 = y1;
+        a->nv++;
+    }
+    if (!a->s[0] || strlen(a->s) + strlen(s) + 2u < sizeof a->s)
+        snprintf(a->s + strlen(a->s), sizeof a->s - strlen(a->s), "%s%s", a->s[0] ? "+" : "", s);
+    if (--a->left) return;
+    al_n--;
+    pass = a->mode & 16u;
+    if (a->mode & 1u) h2 = (a->ix0 + a->ix1) - (a->x0 + a->x1);       /* AL_H: the centres */
+    if (a->mode & 8u) h2 = 2 * (a->ix1 - a->x1);                      /* AL_R: the right edges */
+    if (a->nv && (a->mode & 2u)) v2 = (a->iy0 + a->iy1) - (a->y0 + a->y1);
+    if (a->nv && (a->mode & 4u)) v2 = 2 * (a->iy1 - a->y1);           /* AL_B: the baselines (capitals' bottoms) */
+    al_record(a->tag, h2, v2, a->s, a->x0, a->y0, a->x1, a->y1, a->ix0, a->iy0, a->ix1, a->iy1);
+    if (pass) al_item_k(x0, y0, x1, y1, vy, s, cell);
+}
+static void al_item(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int vy, const char *s) { al_item_k(x0, y0, x1, y1, vy, s, 0); }
+static int al_alnum(const char *s)
+{
+    for (; *s; s++)
+        if ((*s >= 'A' && *s <= 'Z') || (*s >= 'a' && *s <= 'z') || (*s >= '0' && *s <= '9')) return 1;
+    return 0;
+}
+static void al_text(int32_t x0, int32_t y0, int32_t x1, int32_t y1, const char *s, uint32_t flags)
+{
+    if (!al_n || ((flags & 4u) && !strcmp(s, "icon"))) return;      /* (an icon: GFX_HOOK_ICON) */
+    if (flags & 4u) al_item(x0, y0, x1, y1, 1, s);                    /* a keycap: its pill */
+    else al_item(x0, al_cy0, x1, al_cy1, al_alnum(s), s);
+}
+static void al_flush(void)                      /* a canvas blitted or begun: declared places left without their items */
+{
+    uint32_t i;
+    for (i = 0; i < al_n; i++)
+        if (al_rep && al_lost + i < 12u) fprintf(al_rep, "LOST %-28s %s (declared, nothing drawn after it)\n", al_stk[i].tag, cur_name);
+    al_lost += al_n;
+    al_n = 0;
+}
+static int32_t icon_cell(uint32_t *size, uint32_t id);
+static void hk_icon(int32_t x, int32_t y, uint32_t size, uint32_t id);   /* (after the icons: their cells' nibbles) */
+#define GFX_HOOK_ALIGN(x0, y0, x1, y1, mode, tag) hk_align(x0, (y0) + cv_oy, x1, (y1) + cv_oy, mode, tag)
+#define GFX_HOOK_PEN(y, f) (al_n ? (al_cy0 = (y) + cv_oy + (f)->g[glyph((f), 'H')].by, al_cy1 = al_cy0 + (f)->g[glyph((f), 'H')].bh) : 0)
+#define GFX_HOOK_ITEM(x0, y0, x1, y1) al_item(x0, (y0) + cv_oy, x1, (y1) + cv_oy, 1, "cushion")
+#define GFX_HOOK_ICON(x, y, size, id) hk_icon(x, (y) + cv_oy, size, id)
 static void hk_text(int32_t x0, int32_t y0, int32_t x1, int32_t y1, const char *s, uint32_t flags)
 {
+    al_text(x0, y0, x1, y1, s, flags);
     n_text++;
     if (npend >= 256u) return;
     pend[npend] = (rbox_t){(int16_t)x0, (int16_t)y0, (int16_t)x1, (int16_t)y1, (uint8_t)flags, {0}};
@@ -49,6 +177,7 @@ static void hk_text(int32_t x0, int32_t y0, int32_t x1, int32_t y1, const char *
 }
 static void hk_cell(int32_t x0, int32_t y0, int32_t x1, int32_t y1)
 {
+    al_item_k(x0, y0, x1, y1, 1, "cell", 1);
     if (ncells < 64u) {
         cells[ncells][0] = (int16_t)x0; cells[ncells][1] = (int16_t)y0;
         cells[ncells][2] = (int16_t)x1; cells[ncells][3] = (int16_t)y1;
@@ -57,16 +186,83 @@ static void hk_cell(int32_t x0, int32_t y0, int32_t x1, int32_t y1)
 }
 static void hk_blit(uint32_t x, uint32_t y, uint32_t r0, uint32_t w, uint32_t h);
 static void hk_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
+/* STYLE LINE: the dividers drawn on the screen (ui_draw.c lcd_rule) while no later blit or fill covers them */
+static int16_t rules[32][4];
+static uint32_t nrules;
+static void hk_rule(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
+{
+    if (nrules < 32u) {
+        rules[nrules][0] = (int16_t)x; rules[nrules][1] = (int16_t)y;
+        rules[nrules][2] = (int16_t)(x + w); rules[nrules][3] = (int16_t)(y + h);
+        nrules++;
+    }
+}
+static void rules_cover(int32_t x0, int32_t y0, int32_t x1, int32_t y1)
+{
+    uint32_t i, k = 0;
+    for (i = 0; i < nrules; i++)
+        if (!(rules[i][0] >= x0 && rules[i][2] <= x1 && rules[i][1] >= y0 && rules[i][3] <= y1))
+            memcpy(rules[k++], rules[i], sizeof rules[i]);
+    nrules = k;
+}
 #define GFX_HOOK_TEXT(x0, y0, x1, y1, s, flags) hk_text(x0, y0, x1, y1, s, flags)
 #define GFX_HOOK_BLIT(x, y, r0) hk_blit(x, y, r0, cv_w, cv_h)
-#define GFX_HOOK_BEGIN() (npend = ncells = 0)
+#define GFX_HOOK_BEGIN() (npend = ncells = 0, al_flush())
 #define GFX_HOOK_CELL(x0, y0, x1, y1) hk_cell(x0, y0, x1, y1)
+#define GFX_HOOK_RULE(x, y, w, h) hk_rule(x, y, w, h)
+static uint32_t nink;                           /* GFX_HOOK_INK: inks drawn on their own colour */
+static void hk_ink(uint16_t ink, uint16_t bg);
+#define GFX_HOOK_INK(ink, bg) hk_ink(ink, bg)
 #define GFX_HOOK_PIXELS(n) (px_visited += (n))
 #define UI_FILL_HOOK(x, y, w, h) hk_fill(x, y, w, h)
 static void fm6_hook(uint32_t kind, uint32_t a, uint32_t b);
 #define FM6_CHART_HOOK(kind, a, b) fm6_hook(kind, a, b)
+/* MENU > LARGE: the tall cards' values by the face they got (ui_draw.c LARGE_HOOK), the characters L lacked */
+static uint64_t lg_n[4];
+static char lg_miss[96], lg_wide[16][12], lg_small[16][12];
+static uint32_t lg_nwide, lg_nsmall;
+static void lg_hook(const char *s, int why);
+#define LARGE_HOOK(s, why) lg_hook(s, why)
 #define UI_TEST_NO_MAIN 1
 #include "ui_test.c"
+
+static uint8_t large_on;                         /* the LARGE pass: every scene with MENU > LARGE ON */
+static void lg_hook(const char *s, int why)
+{
+    uint32_t i;
+    lg_n[why & 3]++;
+    if (why == 1)
+        for (; *s; s++) {
+            uint32_t c = fold(&AF_L, (uint8_t)*s);
+            if (glyph_at(&AF_L, c) < 0 && !strchr(lg_miss, (int)c) && strlen(lg_miss) + 1u < sizeof lg_miss)
+                lg_miss[strlen(lg_miss)] = (char)c;
+        }
+    if (why == 2 || why == 3) {                     /* a few of each, distinct */
+        char (*l)[12] = why == 2 ? lg_wide : lg_small;
+        uint32_t *n = why == 2 ? &lg_nwide : &lg_nsmall;
+        for (i = 0; i < *n && strcmp(l[i], s); i++) ;
+        if (i == *n && *n < 16u) snprintf(l[(*n)++], 12, "%s", s);
+    }
+}
+
+/* an icon drawn: its ink, read from its cell's nibbles here (not icons.c icon_ink's table: measured, not trusted) */
+static void hk_icon(int32_t x, int32_t y, uint32_t size, uint32_t id)
+{
+    int32_t k, x0 = 99, y0 = 99, x1 = -1, y1 = -1;
+    uint32_t i;
+    const uint8_t *c;
+    if (!al_n || (k = icon_cell(&size, id)) < 0) return;
+    c = (size == 24u ? AI24_DATA : size == 16u ? AI16_DATA : AI12_DATA) + (uint32_t)k * (size * size / 2u);
+    for (i = 0; i < size * size; i++)
+        if ((c[i >> 1] >> ((i & 1u) ? 0 : 4)) & 15u) {
+            int32_t px = (int32_t)(i % size), py = (int32_t)(i / size);
+            if (px < x0) x0 = px;
+            if (px + 1 > x1) x1 = px + 1;
+            if (py < y0) y0 = py;
+            if (py + 1 > y1) y1 = py + 1;
+        }
+    al_item(x + x0, y + y0, x + x1, y + y1, 1, "icon");
+}
 
 /* the FM6 chart lint: each part of a chart (FMH_*) drawn alone onto a canvas of SENT, its pixels kept in fmp_mask
  * (bit: the part), then the canvas as drawn restored with the part on it; at FMH_END the parts are checked */
@@ -198,7 +394,11 @@ static void cover(int32_t x0, int32_t y0, int32_t x1, int32_t y1)
     }
     nscr = k;
 }
-static void hk_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h) { cover((int32_t)x, (int32_t)y, (int32_t)(x + w), (int32_t)(y + h)); }
+static void hk_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
+{
+    cover((int32_t)x, (int32_t)y, (int32_t)(x + w), (int32_t)(y + h));
+    rules_cover((int32_t)x, (int32_t)y, (int32_t)(x + w), (int32_t)(y + h));
+}
 /* a text across two bands (the menu and the document draw 124 + 85 rows): each band draws its part, the same
  * screen box twice, cut at the band edge; together they are whole (flag 16) */
 static int split_pair(rbox_t *b)
@@ -256,6 +456,7 @@ static void contain(int32_t x, int32_t y)
 static void hk_blit(uint32_t x, uint32_t y, uint32_t r0, uint32_t w, uint32_t h)
 {
     uint32_t i, k = 0;
+    al_flush();
     contain((int32_t)x, (int32_t)y);
     ncells = 0;
     blit_px += (uint64_t)w * (h > r0 ? h - r0 : 0u);
@@ -267,6 +468,7 @@ static void hk_blit(uint32_t x, uint32_t y, uint32_t r0, uint32_t w, uint32_t h)
         if (!split_pair(&b)) pend[k++] = b;
     }
     cover((int32_t)x, (int32_t)(y + r0), (int32_t)(x + w), (int32_t)(y + h));
+    rules_cover((int32_t)x, (int32_t)(y + r0), (int32_t)(x + w), (int32_t)(y + h));
     for (i = 0; i < k && nscr < 1200u; i++)
         scr[nscr++] = pend[i];
     npend = 0;
@@ -292,10 +494,15 @@ static void lint(void)
             const rbox_t *o = &scr[j];
             if (b->x0 < o->x1 && o->x0 < b->x1 && b->y0 < o->y1 && o->y0 < b->y1) finding("overlaps", b, o);
         }
+        for (j = 0; j < nrules; j++) {               /* a divider is a cell edge: nothing on it */
+            const int16_t *r = rules[j];
+            rbox_t o = {r[0], r[1], r[2], r[3], 0, "divider"};
+            if (b->x0 < r[2] && r[0] < b->x1 && b->y0 < r[3] && r[1] < b->y1) finding("touches a divider", b, &o);
+        }
     }
 }
 
-/* the audit of one screen (MONO): its texts (count, ink-box px), icons, keycaps, the ellipsised and tight texts,
+/* the audit of one screen (GREY): its texts (count, ink-box px), icons, keycaps, the ellipsised and tight texts,
  * and the words themselves */
 static FILE *audf;
 static void audit_scene(const char *name)
@@ -315,17 +522,28 @@ static void audit_scene(const char *name)
     }
     fprintf(audf, "%s\t%u\t%u\t%u\t%u\t%u\t%u\t%u\t%u\t%s\t%s\n", name, nt, at, ni, ai, nk, ak, ne, ntight, words, tight);
 }
+/* GREY: every pixel RGB565 gray (R = B, G = 2 R); MONO (black and white, its edges blended per channel): neutral
+ * (R = B, G within 2 of 2 R, the 5-6-5 rounding). Other palettes: nothing */
 static uint32_t mono_bad;
 static void mono_check(void)
 {
-    uint32_t i;
+    uint32_t i, bw = settings.palette == UI_BW_INDEX;
+    if (settings.palette != UI_GREY_INDEX && !bw) return;
     for (i = 0; i < 240u * 240u; i++) {
         uint16_t c = swap16(host_screen[i]);
-        if ((c >> 11) != (c & 31u) || ((c >> 5) & 63u) != (c >> 11) * 2u) {
-            if (!mono_bad) fprintf(rep, "MONO %s: pixel %u,%u = %04x off gray\n", cur_name, i % 240u, i / 240u, c);
+        int32_t d = (int32_t)((c >> 5) & 63u) - (int32_t)(c >> 11) * 2;
+        if ((c >> 11) != (c & 31u) || (bw ? d < -2 || d > 2 : d != 0)) {
+            if (!mono_bad) fprintf(rep, "%s %s: pixel %u,%u = %04x off %s\n", bw ? "MONO" : "GREY", cur_name, i % 240u, i / 240u, c,
+                                   bw ? "neutral" : "gray");
             mono_bad++;
         }
     }
+}
+static void hk_ink(uint16_t ink, uint16_t bg)
+{
+    if (ink != bg) return;
+    if (nink < 20u) fprintf(rep, "%s: ink %04x drawn on its own colour (%s)\n", cur_name, ink, UI_PALETTES[settings.palette % NPALETTES].name);
+    nink++;
 }
 static void write_ppm(const char *dir, const char *pal, const char *name)
 {
@@ -350,6 +568,7 @@ static void state(void)                          /* a playing song with steps on
 {
     uint32_t i;
     ui_power_on();
+    if (large_on) ui_prefs |= PREF_LARGE;
     song.playing = 1;
     song.g[G_BPM] = 124;
     for (i = 0; i < NTRK; i++) trk[i].seq_idx = 5;
@@ -400,9 +619,9 @@ enum { S_HOME, S_HOME_IDLE, S_MESSAGE, S_MESSAGE_KEY, S_PRESETS, S_PRESETS_NOFAV
        S_FM6_ALG1, S_FM6_ALG5, S_FM6_ALG22, S_FM6_ALG32,
        S_CONFIRM_SEQ, S_CONFIRM_PROJ, S_CONFIRM_USER, S_CONFIRM_PAT, S_CONFIRM_MOTION, S_CONFIRM_ERASE,
        S_MENU, S_MENU_SPEAKER, S_ABOUT, S_ABOUT_REC, S_ABOUT_CREDITS, S_ABOUT_END, S_UBOOT, S_CALIBRATION, S_HEAD_MSG,
-       S_BATT0, S_BATT1, S_BATT2, S_BATT3, S_BATT_USB, S_MOTION_REC, S_MOTION_OFF, S_SONG_HOME,
-       S_FX_PEEK, S_FX_HELD, S_FX_WAIT, S_FX_HARM, S_MENU_HOLD, S_MENU_LEDS, S_REVERB,
-       S_GLO_PEEK, S_GLO_ACTIVE, S_GLO_EXT, S_SCL_PEEK, S_SCL_ACTIVE, S_EDIT_PEEK, S_EDIT_ACTIVE, S_EDIT_USER, S_LAYER_HINT,
+       S_BATT0, S_BATT1, S_BATT2, S_BATT3, S_BATT_USB, S_MOTION_REC, S_MOTION_OFF, S_MOTION_CARD, S_SONG_HOME,
+       S_FX_PEEK, S_FX_HELD, S_FX_WAIT, S_FX_HARM, S_MENU_HOLD, S_MENU_LEDS, S_MENU_END, S_REVERB,
+       S_GLO_PEEK, S_GLO_ACTIVE, S_GLO_EXT, S_SCL_PEEK, S_SCL_ACTIVE, S_EDIT_PEEK, S_EDIT_ACTIVE, S_EDIT_USER, S_LAYER_HINT, S_LAYER_LOCK, S_LAYER_LOCK_FX,
        S_NAME_USER, S_NAME_TYPING, S_NAME_123, S_NAME_EMPTY, S_NAME_FULL, S_NAME_PLAYING, S_PROJECT_NAMED, S_SONG_NAMED,
        S_USER_FOOT, S_SLICES_BREAK, S_SLICES_USR,
        S_ROLL_EMPTY, S_ROLL_ACID, S_ROLL_CHORDS, S_ROLL_TIES, S_ROLL_LEN32, S_ROLL_HIGH, S_ROLL_LOW, S_ROLL_WIDE, S_ROLL_PLAYING,
@@ -413,10 +632,10 @@ static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "message", "mes
     "voice", "global", "system", "edit_analog", FELUCCA_FM4 ? "edit_digital" : "edit_fm6", "op_env", "edit_wheel", "edit_sample",
     "edit_grain", "edit_phys", "alg_1", "alg_2", "alg_3", "alg_4", "alg_5", "alg_6", "alg_7", "alg_8", "op_level", "fm6_alg_01", "fm6_alg_05", "fm6_alg_22", "fm6_alg_32", "confirm_seq", "confirm_project", "confirm_user", "confirm_pattern",
     "confirm_motion", "confirm_erase", "menu", "menu_speaker", "about", "about_rec", "about_credits", "about_end", "uboot", "calibration", "head_msg",
-    "batt_0", "batt_1", "batt_2", "batt_3", "batt_usb", "motion_rec", "motion_off", "song_home",
-    "perform_peek", "perform_held", "perform_wait", "perform_harm", "menu_hold", "menu_leds", "reverb_spring",
+    "batt_0", "batt_1", "batt_2", "batt_3", "batt_usb", "motion_rec", "motion_off", "motion_card", "song_home",
+    "perform_peek", "perform_held", "perform_wait", "perform_harm", "menu_hold", "menu_leds", "menu_end", "reverb_spring",
     "layer_glo_peek", "layer_glo_active", "layer_glo_ext", "layer_scl_peek", "layer_scl_active", "layer_edit_peek",
-    "layer_edit_active", "layer_edit_user", "layer_hint",
+    "layer_edit_active", "layer_edit_user", "layer_hint", "layer_lock", "layer_lock_fx",
     "name_user", "name_typing", "name_123", "name_empty", "name_full", "name_playing", "project_named", "song_named",
     "user_foot", "slices_break", "slices_usr",
     "roll_empty", "roll_acid", "roll_chords", "roll_ties", "roll_len32_p2", "roll_high", "roll_low", "roll_wide", "roll_playing",
@@ -429,6 +648,7 @@ static void mock_state(int s)
 {
     uint32_t i;
     ui_power_on();
+    if (large_on) ui_prefs |= PREF_LARGE;
     usb.config = 0;
     song.batt_raw = 600;
     for (i = 0; i < SCOPE_N; i++) {                  /* a saw with a little second harmonic */
@@ -668,7 +888,7 @@ static void setup(int s)
     case S_CONFIRM_MOTION: ui.confirm = CF_CLEAR_MOTION; ui.confirm_trk = 3; break;
     case S_CONFIRM_ERASE: song.playing = 0; up_store(6, "A VERY LONG SOUND NAME"); ui.confirm = CF_ERASE_USER; ui.confirm_trk = 6; break;
     case S_MENU: ui.menu = 1; ui.menu_sel = 0; song.rec = 1; break;
-    case S_MENU_SPEAKER: ui.menu = 1; ui.menu_sel = 1; settings.lowcut = 2; break;
+    case S_MENU_SPEAKER: ui.menu = 1; ui.menu_sel = MI_LOWCUT; settings.lowcut = 2; break;
     case S_ABOUT: ui.menu = 2; ui.menu_scroll = 0; break;
     case S_HEAD_MSG: ui_message("LOADED CRYPT PAD"); break;   /* (GHOULBOX: a message in the header window) */
     case S_ABOUT_REC: ui.menu = 2; ui.menu_scroll = 0; song.rec = 1; break;          /* the REC mark beside OCT- BACK */
@@ -683,6 +903,13 @@ static void setup(int s)
     case S_BATT_USB: usb.config = 1; usb.suspended = 0; song.batt_raw = 500; go_home(); break;
     case S_MOTION_REC: song.rec = 1u << song.sel; go_page(GR_MOTION); break;    /* recording into the motion */
     case S_MOTION_OFF: song.playing = 0; go_page(GR_MOTION); ui.act = 4; break;  /* stopped, CLEAR picked */
+    case S_MOTION_CARD: {                                          /* #63: HOME, MOTION drives KNOB 1 and 3 (3 just turned) */
+        const engine_t *en = ENGINES[TSEL->eng_req];
+        motion_set_event(TSEL, 2, en->knob[0], TSEL->p[en->knob[0]]);
+        motion_set_event(TSEL, 6, en->knob[2], TSEL->p[en->knob[2]]);
+        go_home(); ui.hot_col = 2; ui.hot_t = 30;
+        break;
+    }
     case S_SONG_HOME:                            /* the song playing: the disc and its row in the header */
         song.playing = 0; project_save(0); project_save(1);
         chain_config.count = 2;
@@ -712,6 +939,7 @@ static void setup(int s)
     case S_REVERB: go_title("REVERB"); song.g[G_RTYPE] = 1; ui.hot_col = 0; ui.hot_t = 30; break;   /* TYPE: SPRING */
     case S_MENU_HOLD: ui.menu = 1; ui.menu_sel = MI_HOLD; settings_hold = 2; break;
     case S_MENU_LEDS: ui.menu = 1; ui.menu_sel = MI_LEDS; settings_leds = LEDS_INV; break;
+    case S_MENU_END: ui.menu = 1; ui.menu_sel = MI_COUNT - 1u; ui_prefs = 0xFF; break;   /* scrolled down, every flag set */
     /* the GLO SCL EDIT layers (ui_layer.c): just opened (a peek), and in use: GLO with T2 muted, T3 soloed (its key
      * held) and KNOB 1 turned; with CLK EXT (TAP dimmed); SCL at D# minor, KNOB 2 turned; EDIT on DIGITAL preset 3,
      * a favourite; a user preset; the hint after a tap */
@@ -729,6 +957,9 @@ static void setup(int s)
     case S_EDIT_USER: song.playing = 0; eng(6); up_store(6, "MY LONG TRIO NAME"); up_load(6); favorite_set(NENGINES, 6, 1);
         go_home(); ui.layer = LAYER_EDIT; break;
     case S_LAYER_HINT: go_page(GR_TRK); ui.msg_t = 0; layer_tap(LAYER_GLO); break;
+    /* #83: locked open by a double tap (the lock after the header's name): EDIT and FX */
+    case S_LAYER_LOCK: go_title("ENV"); ui.layer = ui.lock = LAYER_EDIT; break;
+    case S_LAYER_LOCK_FX: go_title("ENV"); ui.layer = ui.lock = LAYER_FX; break;
     /* NAME (ui_name.c): USER SAVE prefilled; a letter cycling (RS: S, R next); 123 on a project; an empty project name
      * (the placeholder); 12 of the widest letters, the cursor past them; playing (OCT+ dim) */
     case S_NAME_USER: song.playing = 0; go_page(GR_USER); ui.uslot = 6; name_open(NK_USER_SAVE, 6); break;
@@ -775,7 +1006,7 @@ static void setup(int s)
 }
 static void draw(int s)
 {
-    nscr = npend = 0;
+    nscr = npend = nrules = 0;
     ntight = 0;
     tight[0] = 0;
     memset(host_screen, 0, sizeof host_screen);
@@ -789,7 +1020,25 @@ static void draw(int s)
 }
 
 /* every value of every column on every page of every engine: labels and values fit their column */
-static uint32_t nsweep;
+static uint32_t nsweep, nmotion;
+/* #63: the page drawn again with MOTION driving each of its cards' track parameters (the motion icon beside
+ * every label, the long ones too): the lint over it; the motion cleared again */
+static void sweep_motion(void)
+{
+    uint32_t c, any = 0;
+    for (c = 0; c < 4u; c++) {
+        int16_t *vp = 0;
+        const param_desc_t *d = ui.home ? home_param(c, &vp) : page_desc(cur_page(), c, &vp);
+        uintptr_t id = vp ? ((uintptr_t)vp - (uintptr_t)TSEL->p) / sizeof *vp : P_COUNT;
+        if (d && d->label && d->label[0] != '-' && id < P_COUNT && !motion_set_event(TSEL, c, (uint32_t)id, *vp))
+            any = 1;
+    }
+    if (!any) return;
+    draw(-1);
+    for (c = 0; c < 4u; c++) nmotion += (card_mot >> c) & 1u;
+    lint();
+    memset(&motion, 0, sizeof motion);
+}
 static void sweep_columns(void)
 {
     uint32_t e, i, c;
@@ -799,11 +1048,11 @@ static void sweep_columns(void)
             continue;                                    /* (DIGITAL without FELUCCA_FM4: no track has it) */
         for (i = 0; i < NPAGES; i++) {
             state();
-            pal(UI_MONO_INDEX);
+            pal(UI_GREY_INDEX);
             eng(e);
             ui.home = 0; ui.page = (uint8_t)i; page_entered();
             if (!page_visible(i)) continue;
-            snprintf(name, sizeof name, "%s/%s", ENGINES[e]->name, PAGES[i].title);
+            snprintf(name, sizeof name, "%s%s/%s", large_on ? "LARGE " : "", ENGINES[e]->name, PAGES[i].title);
             cur_name = name;
             for (c = 0; c < 4u; c++) {
                 int16_t *vp;
@@ -825,17 +1074,19 @@ static void sweep_columns(void)
             }
             draw(-1);                                    /* the whole page */
             lint();
+            sweep_motion();
         }
-        state(); pal(UI_MONO_INDEX); eng(e); go_home();   /* HOME's four knobs of this engine */
-        snprintf(name, sizeof name, "%s/HOME", ENGINES[e]->name);
+        state(); pal(UI_GREY_INDEX); eng(e); go_home();   /* HOME's four knobs of this engine */
+        snprintf(name, sizeof name, "%s%s/HOME", large_on ? "LARGE " : "", ENGINES[e]->name);
         cur_name = name;
         draw(-1);
         lint();
+        sweep_motion();
     }
     for (e = 0; e < 4u; e++) {                           /* the MOD page: every source and destination */
         int32_t v;
-        state(); pal(UI_MONO_INDEX); go_title("MOD");
-        cur_name = "MOD sweep";
+        state(); pal(UI_GREY_INDEX); go_title("MOD");
+        cur_name = large_on ? "LARGE MOD sweep" : "MOD sweep";
         for (v = 0; v < MD_N; v++) {
             TSEL->p[P_M1SRC] = (int16_t)(v % MS_N); TSEL->p[P_M1DST] = (int16_t)v; TSEL->p[P_M1AMT] = (int16_t)(e * 40 - 64);
             mod_ui_slot = (uint8_t)(v & 3u);
@@ -846,7 +1097,7 @@ static void sweep_columns(void)
 }
 
 /* the rolling digits (ui_draw.c roll_*): GLOBAL, SELECT and KNOB 4 turned together, BPM 129 -> 130 in the header
- * and TUNE 19 -> 20 on a card, then back. Every frame is linted and (MONO) checked for gray; with a directory,
+ * and TUNE 19 -> 20 on a card, then back. Every frame is linted and (GREY, MONO) checked for gray; with a directory,
  * filmstrips of both (each frame side by side, x4: the static frame before, then the roll's frames) as
  * DIR/<PALETTE>_bpm_roll.ppm and DIR/<PALETTE>_card_roll.ppm, the up roll above the down roll. */
 #define FS_N (1u + ROLL_FRAMES)                   /* frames per filmstrip row */
@@ -911,7 +1162,7 @@ static void roll_frames(const char *dir)
                 if (k == 1u) roll_turns(row ? -1 : 1);
                 else ui_draw();
                 lint();
-                if (p == UI_MONO_INDEX) mono_check();
+                mono_check();
                 roll_film_put(bimg, biw, row, k, HX, 0, HW, HH);
                 roll_film_put(cimg, ciw, row, k, CARD_X(3), Y_LABEL, COL_W, COL_H);
             }
@@ -922,7 +1173,7 @@ static void roll_frames(const char *dir)
             }
             for (k = 0; k < 8u; k++) ui_draw();
         }
-        if (dir && (!strcmp(UI_PALETTES[p].name, "MONO") || !strcmp(UI_PALETTES[p].name, "GREEN"))) {
+        if (dir && (p == UI_GREY_INDEX || p == UI_BW_INDEX || !strcmp(UI_PALETTES[p].name, "GREEN"))) {
             roll_film_save(dir, UI_PALETTES[p].name, "bpm_roll", bimg, biw, bih);
             roll_film_save(dir, UI_PALETTES[p].name, "card_roll", cimg, ciw, cih);
         }
@@ -963,15 +1214,177 @@ static void roll_cost(void)
             t_full / CLOCKS_PER_SEC / N * 1e6, (unsigned long long)(px_full / N), (unsigned long long)(bl_full / N));
 }
 
+/* the alignment check over every value its places can show, beyond the screens above (FLAT and LINE, GREY): the
+ * track cushions 1..4 at 12 16 24 px; every icon in a card's icon slot; the dialogs of every kind; every menu row with
+ * each of its values; NAME's every key, letter and cycle in ABC and 123, the field holding every character; the
+ * piano roll's C labels C-1 .. C9; the drum lanes of every kit; the mixer's LEVEL, PAN and REV over their ranges */
+static void align_sweeps(void)
+{
+    uint32_t st, i, k, nf = nfind;
+    FILE *r0 = rep, *nul = fopen("/dev/null", "w");
+    int32_t v;
+    if (nul) rep = nul;                              /* (not lint scenes: their draws pile up) */
+    for (st = ST_FLAT; st <= ST_LINE; st++) {
+        state(); pal(UI_GREY_INDEX);
+        ui_style = (uint8_t)st; style_apply();
+        cur_name = st ? "sweep LINE: cushions" : "sweep FLAT: cushions";
+        for (k = 0; k < NTRK; k++)
+            for (i = 0; i < 3u; i++) {
+                cv_begin(40, 40, T_SURF);
+                cv_icon_on(4, 4, i == 0u ? 12u : i == 1u ? 16u : 24u, trk_icon(k, 1), T_ACCENT, T_SURF);
+            }
+        cur_name = st ? "sweep LINE: card icons" : "sweep FLAT: card icons";
+        for (i = 0; i < ICON_COUNT; i++) {
+            ui.force = 1;
+            draw_column(i & 3u, "LVL", "64", "", T_THEME, 500, i);
+            ui.col[i & 3u][0] = 0;
+        }
+        cur_name = st ? "sweep LINE: LARGE card icons" : "sweep FLAT: LARGE card icons";
+        ui_prefs = PREF_LARGE; ui.home = 1;             /* (tall: HOME) */
+        for (i = 0; i < ICON_COUNT; i++) {
+            ui.force = 1; ui.hot_col = (uint8_t)(i & 3u); ui.hot_t = (uint8_t)(i & 4u);
+            draw_column(i & 3u, "LVL", i & 8u ? "OFF" : "64", i & 16u ? "%" : "", T_THEME, 500, i);
+            ui.col[i & 3u][0] = 0;
+        }
+        ui.layer = LAYER_FX;                            /* (the labels in M: a layer's cards) */
+        for (i = 0; i < ICON_COUNT; i++) {
+            ui.force = 1; ui.hot_col = (uint8_t)(i & 3u); ui.hot_t = (uint8_t)(i & 4u);
+            draw_column(i & 3u, "LVL", "64", "", T_THEME, 500, i);
+            ui.col[i & 3u][0] = 0;
+        }
+        ui.layer = 0; ui.hot_t = 0; ui_prefs = 0;
+        cur_name = st ? "sweep LINE: dialogs" : "sweep FLAT: dialogs";
+        for (i = CF_CLEAR_SEQ; i <= CF_ERASE_USER; i++)
+            for (k = 0; k < 4u; k++) {
+                ui.confirm = (uint8_t)i; ui.confirm_trk = (uint8_t)k;
+                draw_confirm();
+            }
+        ui.confirm = 0;
+        cur_name = st ? "sweep LINE: menu rows" : "sweep FLAT: menu rows";
+        ui.menu = 1;
+        for (i = 0; i < MI_COUNT; i++)
+            for (k = 0; k < 4u; k++) {
+                ui.menu_sel = (uint8_t)i; ui_prefs = k & 1u ? 0xFFu : 0u; settings_hold = (uint8_t)k; settings.lowcut = (uint8_t)(k % 3u);
+                settings_leds = (uint8_t)(k % LEDS_COUNT); ui.force = 1;   /* (every LEDS name) */
+                draw_menu();
+            }
+        ui.menu = 0; ui_prefs = 0; settings_hold = 0; settings.lowcut = 0; settings_leds = 0;
+        state(); pal(UI_GREY_INDEX);
+        cur_name = st ? "sweep LINE: NAME" : "sweep FLAT: NAME";
+        song.playing = 0; go_page(GR_USER); name_open(NK_USER_SAVE, 6);
+        for (k = 0; k < 2u; k++) {                       /* ABC, 123: every key cycling, every letter typed next */
+            nm.num = (uint8_t)k;
+            for (i = 0; i <= 16u; i++) {
+                uint32_t n = i ? str_len(nm_group(i - 1u)) : 1u, j;
+                for (j = 0; j < n; j++) {
+                    nm.key = (uint8_t)i; nm.tap = (uint8_t)j;
+                    nm_draw_panel();
+                }
+            }
+        }
+        nm.key = 0;
+        for (i = 0; i < sizeof NM_SET - 1u; i += NM_LEN) {   /* the field: every character */
+            for (k = 0; k < NM_LEN; k++) nm.s[k] = NM_SET[(i + k) % (sizeof NM_SET - 1u)];
+            nm.s[NM_LEN] = 0; nm.len = NM_LEN; nm.cur = 0;
+            nm_draw_field();
+        }
+        name_close();
+        cur_name = st ? "sweep LINE: piano roll" : "sweep FLAT: piano roll";
+        roll_scene(S_ROLL_ACID);
+        for (v = 0; v + PR_ROWS <= 128; v++) {
+            proll.lo = (uint8_t)v;
+            cv_begin(240, H_GRAPH, T_SURF);
+            graph_roll(TSEL, T_THEME);
+        }
+        state(); pal(UI_GREY_INDEX);
+        cur_name = st ? "sweep LINE: drum kits" : "sweep FLAT: drum kits";
+        for (k = 0; k < 4u; k++) {
+            drum(k);
+            for (i = 0; i < NLANE; i++) {
+                ui.lane = (uint8_t)i;
+                cv_begin(240, H_GRAPH, T_SURF);
+                graph_grid(TSEL, T_THEME);
+            }
+        }
+        state(); pal(UI_GREY_INDEX);
+        cur_name = st ? "sweep LINE: mixer" : "sweep FLAT: mixer";
+        go_page(GR_TRK);
+        for (v = 0; v < 256; v++) {                    /* (then with LARGE: the strip) */
+            ui_prefs = v >= 128 ? PREF_LARGE : 0u;
+            trk[0].p[P_LEVEL] = (int16_t)(v & 127); trk[0].p[P_PAN] = (int16_t)((v & 127) - 64); trk[0].p[P_REV] = (int16_t)(v & 127);
+            trk[1].p[P_MUTE] = (int16_t)(v & 1); song.rec = v & 2 ? 2u : 0u; ui.hot_t = (uint8_t)(v & 4); ui.hot_col = 3;
+            ts.meter[0] = (uint8_t)(v % (TS_MH - 1));
+            ui.force = 1;
+            draw_tracks();
+        }
+        ui_prefs = 0; ui.hot_t = 0;
+        ui.force = 0;
+    }
+    ui_style = ST_FLAT; style_apply();
+    state();
+    nscr = npend = nrules = 0;
+    nfind = nf;
+    rep = r0;
+    if (nul) fclose(nul);
+}
+
+/* the keycaps' labels in their pills (tools/gen_aa_keycaps.py), from the data: the label's ink (nibbles 6..15) in the
+ * pill (KC_H rows, its width) */
+static void al_keycaps(void)
+{
+    uint32_t id;
+    cur_name = "keycap data";
+    for (id = 0; id < KC_COUNT; id++) {
+        const kc_t *k = &KC[id];
+        int32_t x, y, x0 = 999, y0 = 999, x1 = -1, y1 = -1, w = k->w;
+        uint32_t i = 0;
+        for (y = 0; y < KC_H; y++)
+            for (x = 0; x < w; x++, i++)
+                if (((KC_DATA[k->off + (i >> 1)] >> ((i & 1u) ? 0 : 4)) & 15u) >= 6u) {
+                    if (x < x0) x0 = x;
+                    if (y < y0) y0 = y;
+                    if (x + 1 > x1) x1 = x + 1;
+                    if (y + 1 > y1) y1 = y + 1;
+                }
+        al_record("keycap label in its pill", (x0 + x1) - w, (y0 + y1) - KC_H, k->label, 0, 0, w, KC_H, x0, y0, x1, y1);
+        if (al_rep) fprintf(al_rep, "keycap %-8s w %2d  ink x %2d..%2d y %d..%d  across %+.1f up/down %+.1f\n", k->label, w, x0, x1, y0, y1,
+                            ((x0 + x1) - w) / 2.0, ((y0 + y1) - KC_H) / 2.0);
+    }
+}
+static void al_table(void)
+{
+    uint32_t i;
+    if (!al_rep) return;
+    fprintf(al_rep, "\n%-30s %8s %5s %5s %5s %6s %6s\n", "place", "measured", "1px+", "-0.5", "+0.5", "across", "up/dn");
+    for (i = 0; i < al_nst; i++) {
+        const alstat_t *a = &al_st[i];
+        if (!strcmp(a->tag, "self-test")) continue;
+        fprintf(al_rep, "%-30s %8u %5u %5u %5u %6.1f %6.1f\n", a->tag, a->n, a->nfail, a->half_lo, a->half_hi, a->wh2 / 2.0,
+                a->wv2 / 2.0);
+        if (a->ex_h[0]) fprintf(al_rep, "    across  worst %s\n", a->ex_h);
+        if (a->ex_v[0]) fprintf(al_rep, "    up/down worst %s\n", a->ex_v);
+    }
+    fprintf(al_rep, "\n%u measurements, %u places, %u off by 1 px or more; %u declared places drawn without their items\n",
+            al_count, al_nst, al_fail, al_lost);
+}
+
 int main(int argc, char **argv)
 {
     const char *out = argc > 1 ? argv[1] : "build/ui_new";
     char path[600];
     uint32_t p, s;
-    static const char *const SHOW[] = {"MONO", "GREEN", "PAPER", "CRYPT"};   /* (CRYPT: GHOULBOX's default) */
+    static const char *const SHOW[] = {"GREY", "MONO", "GREEN", "PAPER", "NIGHT", "CRYPT"};   /* (NIGHT: #50, to review;
+                                                                                             * CRYPT: GHOULBOX's default) */
     snprintf(path, sizeof path, "%s/report.txt", out);
     rep = fopen(path, "w");
     if (!rep) { fprintf(stderr, "cannot write %s\n", path); return 1; }
+    {
+        char ap[600];
+        snprintf(ap, sizeof ap, "%s/align.txt", out);
+        al_rep = fopen(ap, "w");
+        if (al_rep) fprintf(al_rep, "alignment: the ink of each centred text / icon / keycap against its box (gfx.c GFX_HOOK_ALIGN);"
+                            " offsets in px, + right / down\n\n");
+    }
     {
         char ap[600];
         snprintf(ap, sizeof ap, "%s/text_audit.tsv", out);
@@ -990,7 +1403,26 @@ int main(int argc, char **argv)
         cv_text(4, 31, &AF_S, "SPILL", T_TEXT);
         cv_blit(4, Y_LABEL);
         lint();
-        if (nfind < 4u || !nspill) { fprintf(stderr, "ui_render: the lint missed its self-test (%u)\n", nfind); return 1; }
+        nrules = 0;                                         /* a word on a divider (STYLE LINE) */
+        lcd_rule(0, 120, 240, 1);
+        cv_begin(40, 16, T_BG);
+        cv_text(2, 0, &AF_S, "RULE", T_TEXT);
+        cv_blit(8, 112);
+        lint();
+        nrules = 0;
+        {   /* the alignment check: a word 2 px right of its box's centre, one centred */
+            uint32_t f0 = al_fail;
+            cv_begin(60, 20, T_BG);
+            GFX_HOOK_ALIGN(0, 0, 60, 20, AL_HV, "self-test");
+            cv_text_in(4, 0 + CAP_IN(S, 20), 60, &AF_S, "OFF", T_TEXT, T_BG);
+            GFX_HOOK_ALIGN(0, 0, 60, 20, AL_HV, "self-test");
+            cv_text_in(0, 0 + CAP_IN(S, 20), 60, &AF_S, "MID", T_TEXT, T_BG);
+            if (al_fail - f0 != 1u) { fprintf(stderr, "ui_render: the alignment check missed its self-test (%u)\n", al_fail - f0); return 1; }
+            al_fail = f0;
+            al_count -= 2u;
+            npend = 0;
+        }
+        if (nfind < 5u || !nspill) { fprintf(stderr, "ui_render: the lint missed its self-test (%u)\n", nfind); return 1; }
         fprintf(rep, "(self-test: %u findings above are expected)\n\n", nfind);
         nfind = 0;
     }
@@ -1004,20 +1436,91 @@ int main(int argc, char **argv)
             cur_name = name;
             setup((int)s);
             pal(p);
-            if (p == UI_MONO_INDEX) aud = audf;
+            if (p == UI_GREY_INDEX) aud = audf;
             draw((int)s);
             lint();
-            if (p == UI_MONO_INDEX) { audit_scene(S_NAME[s]); aud = 0; mono_check(); }
-            for (k = 0; k < NELEM(SHOW); k++)
+            if (p == UI_GREY_INDEX) { audit_scene(S_NAME[s]); aud = 0; }
+            mono_check();
+            for (k = 0; k < sizeof SHOW / sizeof SHOW[0]; k++)
                 if (!strcmp(UI_PALETTES[p].name, SHOW[k])) write_ppm(out, SHOW[k], S_NAME[s]);
         }
-    {   /* every FM6 chart (the lint above, fmp_check, runs on each), in MONO: gray */
+    {   /* STYLE LINE (gfx.c ST_*): every screen in every palette, linted (GREY: gray, MONO: neutral); GREY MONO NIGHT
+         * PAPER as OUTDIR/ppm/<STYLE>_<PALETTE>_<screen>.ppm (ui_render.py: sheet_<STYLE>_<PALETTE>.png) */
+        static const char *const ST_N[2] = {"FLAT", "LINE"}, *const ST_PAL[] = {"GREY", "MONO", "NIGHT", "PAPER"};
+        uint32_t st, k, n0 = nfind, nruled = 0;
+        for (st = ST_LINE; st <= ST_LINE; st++)
+            for (p = 0; p < NPALETTES; p++) {
+                for (k = 0; k < sizeof ST_PAL / sizeof ST_PAL[0] && strcmp(UI_PALETTES[p].name, ST_PAL[k]); k++) ;
+                for (s = 0; s < S_COUNT; s++) {
+                    char name[64], tag[24];
+                    if (!FELUCCA_FM4 && (s == S_OP_ENV || (s >= S_ALG1 && s <= S_OP_LEVEL)))
+                        continue;
+                    snprintf(tag, sizeof tag, "%s_%s", ST_N[st], UI_PALETTES[p].name);
+                    snprintf(name, sizeof name, "%s/%s", tag, S_NAME[s]);
+                    cur_name = name;
+                    setup((int)s);
+                    pal(p);
+                    ui_style = (uint8_t)st; style_apply();
+                    draw((int)s);
+                    if (ux.style != st) { fprintf(stderr, "ui_render: %s drawn in style %u\n", name, ux.style); return 1; }
+                    nruled += nrules != 0u;
+                    lint();
+                    mono_check();
+                    if (k < sizeof ST_PAL / sizeof ST_PAL[0]) write_ppm(out, tag, S_NAME[s]);
+                }
+            }
+        ui_style = ST_FLAT; style_apply();
+        if (nruled < 100u) { fprintf(stderr, "ui_render: dividers on %u STYLE screens only\n", nruled); return 1; }
+        fprintf(rep, "STYLE LINE (every palette): %u lint findings\n", nfind - n0);
+    }
+    {   /* MENU > LARGE (ui.c large_kind): every screen in every palette in FLAT and LINE, linted (GREY: gray, MONO:
+         * neutral); GREY MONO in FLAT as OUTDIR/ppm/LARGE_<PALETTE>_<screen>.ppm (ui_render.py: sheet_LARGE_<PALETTE>.png),
+         * LINE GREY as LARGE-LINE_GREY; the tall cards' value faces counted (lg_hook) */
+        static const char *const ST_N[2] = {"LARGE", "LARGE-LINE"};
+        uint32_t st, n0 = nfind, ntall = 0;
+        large_on = 1;
+        for (st = ST_FLAT; st <= ST_LINE; st++)
+            for (p = 0; p < NPALETTES; p++)
+                for (s = 0; s < S_COUNT; s++) {
+                    char name[64], tag[24];
+                    if (!FELUCCA_FM4 && (s == S_OP_ENV || (s >= S_ALG1 && s <= S_OP_LEVEL)))
+                        continue;
+                    snprintf(tag, sizeof tag, "%s_%s", ST_N[st], UI_PALETTES[p].name);
+                    snprintf(name, sizeof name, "%s/%s", tag, S_NAME[s]);
+                    cur_name = name;
+                    setup((int)s);
+                    ui_prefs |= PREF_LARGE;
+                    pal(p);
+                    ui_style = (uint8_t)st; style_apply();
+                    draw((int)s);
+                    ntall += !ui.menu && !ui.confirm && !name_on() && large_kind() == LK_TALL;
+                    lint();
+                    mono_check();
+                    if ((p == UI_GREY_INDEX || (!st && p == UI_BW_INDEX)))
+                        write_ppm(out, tag, S_NAME[s]);
+                }
+        ui_style = ST_FLAT; style_apply();
+        sweep_columns();                                /* every value of every column, tall */
+        large_on = 0;
+        if (ntall < 100u) { fprintf(stderr, "ui_render: LARGE drew %u screens with tall cards only\n", ntall); return 1; }
+        fprintf(rep, "MENU > LARGE (FLAT and LINE, every palette, the page / value sweep): %u lint findings; %u screens with tall"
+                " cards\n", nfind - n0, ntall);
+        fprintf(rep, "  tall card values: %llu in L, %llu in M (a glyph not in L: \"%s\"), %llu in M (L too wide), %llu in S\n",
+                (unsigned long long)lg_n[0], (unsigned long long)lg_n[1], lg_miss, (unsigned long long)lg_n[2],
+                (unsigned long long)lg_n[3]);
+        fprintf(rep, "  too wide for L, e.g.:");
+        for (s = 0; s < lg_nwide; s++) fprintf(rep, " '%s'", lg_wide[s]);
+        fprintf(rep, "\n  in S, e.g.:");
+        for (s = 0; s < lg_nsmall; s++) fprintf(rep, " '%s'", lg_small[s]);
+        fprintf(rep, "\n");
+    }
+    {   /* every FM6 chart (the lint above, fmp_check, runs on each), in GREY: gray */
         uint32_t a, c0 = fmp_charts;
         for (a = 1; a <= 32u; a++) {
             char name[32];
             snprintf(name, sizeof name, "FM6 ALG %u", a);
             cur_name = name;
-            state(); pal(UI_MONO_INDEX); eng(ENGI_FM6); TSEL->p[P_E0] = (int16_t)a; go_title("EDIT 1");
+            state(); pal(UI_GREY_INDEX); eng(ENGI_FM6); TSEL->p[P_E0] = (int16_t)a; go_title("EDIT 1");
             draw(-1);
             lint();
             mono_check();
@@ -1026,6 +1529,7 @@ int main(int argc, char **argv)
     }
     sweep_columns();
     roll_frames(argc > 2 ? argv[2] : 0);
+    al_off = 1;                                     /* (the alignment check is not timed) */
     /* draw cost: a full redraw of a screen (all strips), and HOME frame by frame (the scope, every other frame) */
     {
         static const int COST[] = {S_HOME, S_PRESETS, S_STEP, S_ROLL_CHORDS, S_DRUM, S_MIXER, S_MENU, S_ABOUT_CREDITS, S_CONFIRM_PROJ};
@@ -1072,12 +1576,57 @@ int main(int argc, char **argv)
             }
         }
         roll_cost();
+        {   /* MENU > LARGE: the same full redraws, tall cards and the strip */
+            static const int LC[] = {S_HOME, S_EDIT_ANALOG, S_ENV, S_LFO, S_MIXER, S_FX, S_PATTERN};
+            fprintf(rep, "  MENU > LARGE:\n");
+            large_on = 1;
+            for (k = 0; k < sizeof LC / sizeof LC[0]; k++) {
+                clock_t c0;
+                uint64_t px, nt;
+                setup(LC[k]); pal(1);
+                draw(LC[k]);
+                px_visited = n_text = 0;
+                c0 = clock();
+                for (i = 0; i < N; i++) draw(LC[k]);
+                px = px_visited / N; nt = n_text / N;
+                fprintf(rep, "  %-16s %15.1f %13llu %15llu\n", S_NAME[LC[k]], (double)(clock() - c0) / CLOCKS_PER_SEC / N * 1e6,
+                        (unsigned long long)nt, (unsigned long long)px);
+            }
+            {
+                clock_t c0;
+                setup(S_HOME); pal(1); draw(S_HOME);
+                px_visited = n_text = 0;
+                c0 = clock();
+                for (i = 0; i < N * 4; i++) { ui_draw(); nscr = npend = 0; }
+                fprintf(rep, "  LARGE HOME, a frame without force (lazy strips): %.1f us, %llu texts\n",
+                        (double)(clock() - c0) / CLOCKS_PER_SEC / (N * 4) * 1e6, (unsigned long long)(n_text / (N * 4)));
+                setup(S_ENV); pal(1); draw(S_ENV);
+                px_visited = n_text = 0;
+                c0 = clock();
+                for (i = 0; i < N * 4; i++) { ui_draw(); nscr = npend = 0; }
+                fprintf(rep, "  LARGE ENV, a frame without force (lazy strips): %.1f us, %llu texts\n",
+                        (double)(clock() - c0) / CLOCKS_PER_SEC / (N * 4) * 1e6, (unsigned long long)(n_text / (N * 4)));
+            }
+            large_on = 0;
+        }
     }
+    al_off = 0;
+    al_keycaps();
+    align_sweeps();
+    al_table();
+    if (al_rep) fclose(al_rep);
+    fprintf(rep, "\nalignment: %u measurements of %u places, %u off by 1 px or more (OUTDIR/align.txt)\n", al_count, al_nst - 1u, al_fail);
     if (audf) fclose(audf);
-    fprintf(rep, "\n%u lint findings, %u ellipsised free texts, %u MONO pixels off gray; %u column values swept; "
-            "%u FM6 charts linted\n", nfind, nfree, mono_bad, nsweep, fmp_charts);
+    fprintf(rep, "\n%u lint findings, %u inks on their own colour, %u ellipsised free texts, %u GREY / MONO pixels off gray / "
+            "neutral; %u column values swept; %u FM6 charts linted; %u cards linted with MOTION's icon\n", nfind, nink, nfree, mono_bad,
+            nsweep, fmp_charts, nmotion);
+    if (!nmotion) { fprintf(stderr, "ui_render: the MOTION sweep marked no card\n"); nfind++; }
     fclose(rep);
     printf("ui_render: %u screens x %u palettes + the page/value sweep; %u lint findings, %u ellipsised free texts (%u distinct), "
-           "%u MONO pixels off gray; report %s\n", (unsigned)(S_COUNT - (FELUCCA_FM4 ? 0 : 1 + S_OP_LEVEL - S_ALG1 + 1)), (unsigned)NPALETTES, nfind, nfree, nfree_seen, mono_bad, path);
-    return nfind || mono_bad ? 1 : 0;
+           "%u inks on their own colour, %u GREY / MONO pixels off gray / neutral; report %s\n",
+           (unsigned)(S_COUNT - (FELUCCA_FM4 ? 0 : 1 + S_OP_LEVEL - S_ALG1 + 1)), (unsigned)NPALETTES, nfind, nfree, nfree_seen, nink,
+           mono_bad, path);
+    printf("ui_render: alignment: %u measurements of %u places, %u off by 1 px or more%s\n", al_count, al_nst - 1u, al_fail,
+           al_fail ? " (see align.txt)" : "");
+    return nfind || nink || mono_bad || al_fail ? 1 : 0;
 }

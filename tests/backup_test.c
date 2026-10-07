@@ -175,8 +175,8 @@ int main(void)
 
     reset();
     trk[0].step[0] = (step_t){{60}, 1, ST_NOTE, 0, 96, 0, 0};
-    bad += check("LIST captures the runtime: 12 objects (the FM6 bank: id 8), runtime 3584 B (FUN8) with its CRC",
-                 list(0, &len, &crc) == 0 && rep[2] == 12u && len == sizeof(project_store_t) && len == 3584u &&
+    bad += check("LIST captures the runtime: 13 objects (id 8 empty, id 9 the FM6 patches), runtime 3584 B (FUN8)",
+                 list(0, &len, &crc) == 0 && rep[2] == 13u && len == sizeof(project_store_t) && len == 3584u &&
                  crc == st_crc32(ED_BK_RAW, len));
     bad += check("an empty project slot lists as length 0", list(2, &len, &crc) == 0 && len == 0);
     bad += check("GET of the runtime copy", get(0, 0, 64) == 0);
@@ -222,7 +222,14 @@ int main(void)
     bad += check("settings of an older backup restore with LEDS DIM",
                  put_all(1, &ps, sizeof ps, st_crc32(&ps, sizeof ps)) == 0 && settings_leds == LEDS_DIM);
     before = erases;
-    ps.zoom = LEDS_TAG + 2u;
+    ps.zoom = LEDS_TAG | LEDS_DIM_LO;                    /* LEDS DIM LO, OFF (appended) */
+    bad += check("settings with LEDS DIM LO restore",
+                 put_all(1, &ps, sizeof ps, st_crc32(&ps, sizeof ps)) == 0 && settings_leds == LEDS_DIM_LO);
+    ps.zoom = LEDS_TAG | LEDS_OFF;
+    bad += check("settings with LEDS OFF restore",
+                 put_all(1, &ps, sizeof ps, st_crc32(&ps, sizeof ps)) == 0 && settings_leds == LEDS_OFF);
+    before = erases;
+    ps.zoom = LEDS_TAG + 4u;
     bad += check("settings with an unknown LEDS value are refused, nothing written",
                  put_all(1, &ps, sizeof ps, st_crc32(&ps, sizeof ps)) == 2u && erases == before);
     ps.zoom = 0;
@@ -286,23 +293,62 @@ int main(void)
                  proj_import(&proj_scratch, &proj_slot[3], sizeof st) && proj_scratch.t[0].step[0].n == 4u &&
                  proj_scratch.t[0].step[0].note[0] == 127u && proj_scratch.t[0].p[P_E0] ==
                  clamp(3, param_desc_of(trk[0].engine, P_E0)->min, param_desc_of(trk[0].engine, P_E0)->max));
-    {   /* the FM6 patch bank (id 8): restored to flash and RAM, a damaged one refused, listed with its length */
-        static fm6_bank_t bk, got;
+    {   /* 1.0.3: the FM6 patch bank (id 8) is retired; an older archive's bank moves into its user presets (ids 6, 7
+         * restored first), the user presets' patches are id 9 */
+        static up_bank_t ub;
+        static fm6_bank_t bk;
+        static upf_t got;
+        uint8_t pk[FM6_PACKED];
+        static const int16_t SL[5] = {FM6_NFACTORY + 2, 1, FM6_NFACTORY + 4, FM6_NFACTORY + 2, FM6_NFACTORY + 2};
+        memset(&ub, 0, sizeof ub);
+        ub.magic = UP_BANK_MAGIC; ub.rsize = sizeof(up_rec_t); ub.nslot = UP_PER_BANK;
+        for (uint32_t k = 0; k < 5u; k++) {             /* slots 1..5: B3, F2, B5 (empty), B3 on DRUM, B3 */
+            up_rec_t *r = &ub.r[k];
+            uint32_t e = k == 3u ? ENGI_DRUM : ENGI_FM6;
+            r->used = UP_USED; r->ver = UP_VER; r->engine = (uint8_t)e; r->np = P_COUNT;
+            r->name[0] = (char)('A' + k);
+            for (uint32_t i = 0; i < P_COUNT; i++) up_set_value(r, i, param_desc_of(e, i)->def);
+            up_set_value(r, P_E7, SL[k]);                 /* (the raw stored value: B slots as 1.0.2 wrote them) */
+        }
+        ub.r[4].name[1] = 'X';
+        up_set_value(&ub.r[4], P_E0, 3);                 /* (another sound than slot 1's) */
         memset(&bk, 0, sizeof bk);
         bk.magic = FM6_BANK_MAGIC; bk.ver = 1; bk.nslot = FM6_BANK_N; bk.used = 1u << 2;
         memcpy(bk.v[2], FM6_FACTORY[5], FM6_PACKED);
-        fm6_slot[0] = 3; fm6_slot[1] = FM6_NFACTORY + 2u; fm6_slot[2] = 0xFFu; fm6_slot[3] = FM6_NFACTORY + 9u;
-        bad += check("the FM6 bank (id 8) restores into flash and RAM",
-                     put_all(8, &bk, sizeof bk, st_crc32(&bk, sizeof bk)) == 0 && fm6_bank_used(2) && !fm6_bank_used(3) &&
-                     !memcmp(fm6_bank.v[2], FM6_FACTORY[5], FM6_PACKED) &&
-                     st_load(OBJ_FM6BANK, &got, sizeof got) == (int)sizeof got && !memcmp(&got, &bk, sizeof bk));
-        bad += check("an FM6 bank restore reloads only the tracks on a bank slot (a factory patch stays)",
-                     fm6_slot[0] == 3u && fm6_slot[1] == 0xFFu && fm6_slot[2] == 0xFFu && fm6_slot[3] == 0xFFu);
-        bad += check("the FM6 bank lists as id 8 with its length", list(8, &len, &crc) == 0 && len == sizeof bk &&
-                     crc == st_crc32(&bk, sizeof bk));
+        memcpy(bk.v[2] + 118, "BANK B3   ", 10);
+        upf_empty();
+        bad += check("the user presets of an old archive (id 6) restore", put_all(6, &ub, sizeof ub, st_crc32(&ub, sizeof ub)) == 0);
+        bad += check("an old archive's FM6 bank (id 8) is taken (0)", put_all(8, &bk, sizeof bk, st_crc32(&bk, sizeof bk)) == 0);
+        bad += check("  .. its B3 patch is now the B3 presets' own (slots 1 and 5)",
+                     !upf_get(0, pk) && !memcmp(pk + 118, "BANK B3   ", 10) && !upf_get(4, pk) && !memcmp(pk + 118, "BANK B3", 7));
+        bad += check("  .. an F slot, an empty B slot and a DRUM sound get none (factory / init / no patch, as before)",
+                     upf_get(1, pk) && upf_get(2, pk) && upf_get(3, pk));
+        bad += check("  .. written to flash (the user presets' FM6 patches)",
+                     st_load(OBJ_UPFM6, &got, sizeof got) == (int)sizeof got && !memcmp(&got, &upf, sizeof got));
+        up_load(0);
+        bad += check("  .. and the B3 preset loads it, SLOT OWN", TSEL->eng_req == ENGI_FM6 &&
+                     !memcmp(fm6_patch[song.sel] + FP_NAME, "BANK B3", 7) && TSEL->p[P_E7] == FM6_OWN);
+        up_load(1);
+        bad += check("  .. the F2 preset loads the factory patch, SLOT F2", TSEL->p[P_E7] == 1 &&
+                     !memcmp(fm6_patch[song.sel] + FP_NAME, FM6_FACTORY[1] + 118, 10));
+        bad += check("a restore of id 8 twice moves nothing more (idempotent)",
+                     put_all(8, &bk, sizeof bk, st_crc32(&bk, sizeof bk)) == 0 && !memcmp(&got, &upf, sizeof got));
+        bad += check("an empty id 8 (a 1.0.3 archive) is taken and ignored", put_all(8, 0, 0, st_crc32(0, 0)) == 0 &&
+                     !memcmp(&got, &upf, sizeof got));
         bk.v[3][0] = 200;
-        bad += check("an FM6 bank with a byte above 127 is refused (2), the bank kept",
-                     put_all(8, &bk, sizeof bk, st_crc32(&bk, sizeof bk)) == 2u && fm6_bank_used(2));
+        bad += check("an FM6 bank with a byte above 127 is refused (2)", put_all(8, &bk, sizeof bk, st_crc32(&bk, sizeof bk)) == 2u);
+        bad += check("id 8 lists empty, id 9 with the patches' length", list(8, &len, &crc) == 0 && len == 0 &&
+                     list(9, &len, &crc) == 0 && len == sizeof(upf_t) && crc == st_crc32(&upf, sizeof upf));
+        memcpy(&got, &upf, sizeof got);
+        upf_empty();
+        bad += check("id 9 restores the user presets' FM6 patches (flash and RAM)",
+                     put_all(9, &got, sizeof got, st_crc32(&got, sizeof got)) == 0 && !memcmp(&got, &upf, sizeof got) &&
+                     !upf_get(0, pk) && !memcmp(pk + 118, "BANK B3", 7));
+        got.magic ^= 1;
+        bad += check("an id 9 of another layout is refused (2), the patches kept",
+                     put_all(9, &got, sizeof got, st_crc32(&got, sizeof got)) == 2u && !upf_get(0, pk));
+        bad += check("an id 9 of the wrong size is refused at begin (1)", put_begin(9, sizeof got - 4u, 0) == 1u);
+        bad += check("an id 10 is refused (1)", put_begin(10, 0, 0) == 1u);
     }
     memcpy(&st, &proj_slot[2], sizeof st);
     erase_error = 1;

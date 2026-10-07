@@ -20,7 +20,7 @@ static const char *const N_ALLOC[] = {"ROT", "REUSE"};
 static const char *const N_ORDER[] = {"NOTE", "PLAY"};
 static const char *const N_CLOCK[] = {"INT", "USB", "TRS"};
 static const char *const N_MIDI_INPUT[] = {"USB", "TRS"};
-static const char *const N_ROUTE[] = {"CH1-4", "SEL"};   /* MIDI IN (seq.c midi_track): channels 1..4 -> parts 1..4 / all -> the selected */
+static const char *const N_ROUTE[] = {"CH1-4", "SEL"};   /* MIDI IN (seq.c): 1..4 -> parts, 5..16 ignored / all -> selected */
 static const char *const N_NOTE[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 static const char *const N_DASH[] = {"--"};
 static const char *const N_RTYPE[] = {"ROOM", "SPRING", "HALL"};   /* G_RTYPE: the reverb bus's model (fx.c) */
@@ -134,8 +134,8 @@ static const param_desc_t GP[G_COUNT] = {
     [G_INITSND] = PE("INIT", N_GO, 0),
     /* the reverb's model on the REVERB page: the id of the old GM drum channel (G_DRCH, inert since 1.0) */
     [G_RTYPE] = PE("TYPE", N_RTYPE, 0),
-    /* inert: they set the GM drum part (level, reverb send), which is gone (drums are the SAMPLE engine's
-     * PERC set on any part). On no page; kept so the ids and G_COUNT, which the project format and the
+    /* inert: they set the GM drum part (level, reverb send), which is gone (drums are the DRUM engine
+     * on any part). On no page; kept so the ids and G_COUNT, which the project format and the
      * editor protocol depend on, do not move */
     [G_TAPE] = PD("TAPE", F_PCT, 0, 127, 0),       /* GHOULBOX: the mix through a worn cassette (tape.c) */
     [G_CRSH] = PD("CRSH", F_PCT, 0, 127, 0),       /* .. and a cheap sampler's bits and rate */
@@ -159,7 +159,8 @@ static const param_desc_t *param_desc_of(uint32_t e, uint32_t id)
 }
 
 /* a retired F_ENUM value kept as an alias, so stored values stay valid: SAMPLE SET and GRAIN SRC 1, once
- * TRANH, play PIANO (tools/gen_samples.py SMP_SET_ORIG). It shows the original's name; knobs step over it
+ * TRANH, and 4, once PERC (a SAMPLE sound of it loads as DRUM: core.h drum_from_perc), play PIANO
+ * (tools/gen_samples.py SMP_SET_ORIG). It shows the original's name; knobs step over it
  * and the editor's SET lands on the original. -> the value v stands for */
 static int32_t enum_orig(const param_desc_t *d, int32_t v)
 {
@@ -173,6 +174,33 @@ static int32_t enum_step(const param_desc_t *d, int32_t from, int32_t v)
     while (v != from && enum_orig(d, v) != v)
         v = v + dir > d->max || v + dir < d->min ? from : v + dir;
     return v;
+}
+
+/* #48: the note divisions in the order of their length, longest first (triplets between their neighbours), on the
+ * knobs and the gauges; the stored values (N_DIV, N_SLDIV indices: projects, presets, the editor protocol) stay.
+ * -> the shown order of d's values (index: position, entry: value), 0 = the values' own order */
+static const uint8_t DIV_ORDER[10] = {9, 8, 7, 6, 0, 1, 4, 2, 5, 3};   /* 4BAR 2BAR 1/1 1/2 1/4 1/8 8T 1/16 16T 1/32 */
+static const uint8_t SLDIV_ORDER[6] = {0, 3, 1, 4, 2, 5};              /* 1/8 8T 1/16 16T 1/32 32T */
+static const uint8_t *enum_order(const param_desc_t *d)
+{
+    return d->names == N_DIV ? DIV_ORDER : d->names == N_SLDIV ? SLDIV_ORDER : 0;
+}
+static int32_t enum_rank(const param_desc_t *d, int32_t v)   /* v's place in the shown order (+ min): the gauges */
+{
+    const uint8_t *o = enum_order(d);
+    int32_t r;
+    for (r = 0; o && r < d->max - d->min; r++)
+        if (o[r] == v - d->min)
+            break;
+    return o ? r + d->min : v;
+}
+/* a knob turned `steps` (signed) from v: clamped, over the shown order, past aliases (enum_step) */
+static int32_t param_turn(const param_desc_t *d, int32_t v, int32_t steps)
+{
+    const uint8_t *o = enum_order(d);
+    if (o)
+        return o[clamp(enum_rank(d, v) - d->min + steps, 0, d->max - d->min)] + d->min;
+    return enum_step(d, v, clamp(v + steps, d->min, d->max));
 }
 
 static uint8_t fmt_named;        /* the last param_format was a name (F_ENUM, even "4"): ui_draw.c's digits do not roll it */

@@ -112,13 +112,15 @@ static int preferences(void)
     uint32_t n = request(ED_INFO, a, 0);
     bad += check("INFO explicitly tags display capabilities after SONG without changing command 33",
         ED_SONG == 33 && ED_UI_STATE == 34 && ED_FAV_SET == 38 &&
-        host_wire[n - 16] == CHAIN_ROWS && host_wire[n - 15] == 0x55 &&
-        host_wire[n - 14] == 1 && host_wire[n - 13] == 9 &&
-        host_wire[n - 12] == 0x4d && host_wire[n - 11] == 1 &&
-        host_wire[n - 10] == MOTION_MAX && host_wire[n - 9] == 1 &&
-        host_wire[n - 8] == 0x42 && host_wire[n - 7] == 1 && host_wire[n - 6] == 3 &&
-        host_wire[n - 5] == 0x46 && host_wire[n - 4] == 1 && host_wire[n - 3] == FM6_NFACTORY &&
-        host_wire[n - 2] == FM6_BANK_N);
+        host_wire[n - 22] == CHAIN_ROWS && host_wire[n - 21] == 0x55 &&
+        host_wire[n - 20] == 1 && host_wire[n - 19] == 9 &&
+        host_wire[n - 18] == 0x4d && host_wire[n - 17] == 1 &&
+        host_wire[n - 16] == MOTION_MAX && host_wire[n - 15] == 1 &&
+        host_wire[n - 14] == 0x42 && host_wire[n - 13] == 1 && host_wire[n - 12] == 3 &&
+        host_wire[n - 11] == 0x46 && host_wire[n - 10] == 1 && host_wire[n - 9] == FM6_NFACTORY &&
+        host_wire[n - 8] == 0 &&                         /* (no bank since 1.0.3) */
+        host_wire[n - 7] == 0x53 && host_wire[n - 6] == 1 && host_wire[n - 5] == 3 &&
+        host_wire[n - 4] == 0x50 && host_wire[n - 3] == 1 && host_wire[n - 2] == 3);   /* FM6 v2: no bank, preset patches */
     request(ED_UI_SET, a, 2);
     bad += check("UI_SET updates the actual palette and reports RAM-only saving",
         host_wire[5] == 3 && settings.palette == 7 && T_BG == UI_PALETTES[7].bg);
@@ -337,65 +339,122 @@ static int malformed_saves(void)
     return bad;
 }
 
-/* FM6 patches (cmds 68..71): a track's own patch, the bank (RAM here), the factory patches, malformed frames */
+/* FM6 patches (cmds 68..71): a track's own patch, the retired bank ("no bank"), the factory patches, the user presets'
+ * patches (target 3), malformed frames */
 static int fm6_patches(void)
 {
     int bad = 0;
     uint8_t a[2 + FM6_PACKED], pk[FM6_PACKED];
     uint32_t n, i;
     reset();
-    fm6_bank_check(-1);
+    upf_empty();
     a[0] = ED_FM6_FACTORY; a[1] = 3;
     n = request(ED_FM6_GET, a, 2);
     bad += check("FM6_GET factory 4: the packed record", n == 5u + 3u + FM6_PACKED + 1u && host_wire[7] == 0 &&
                  !memcmp(host_wire + 8, FM6_FACTORY[3], FM6_PACKED));
     memcpy(pk, FM6_FACTORY[3], FM6_PACKED);
     memcpy(pk + 118, "MY PATCH  ", 10);
+    trk[2].eng_req = ENGI_FM6;
+    trk[2].p[P_E7] = 3;
     a[0] = ED_FM6_TRACK; a[1] = 2; memcpy(a + 2, pk, FM6_PACKED);
     n = request(ED_FM6_PUT, a, sizeof a);
-    bad += check("FM6_PUT track 3: rc 0, the track's patch", n == 9u && host_wire[7] == 0 &&
-                 !memcmp(fm6_patch[2] + FP_NAME, "MY PATCH  ", 10));
+    bad += check("FM6_PUT track 3: rc 0, the track's patch, SLOT OWN (not F4: the name differs)", n == 9u &&
+                 host_wire[7] == 0 && !memcmp(fm6_patch[2] + FP_NAME, "MY PATCH  ", 10) &&
+                 trk[2].p[P_E7] == FM6_OWN && fm6_slot[2] == FM6_OWN);
+    fm6_poll();
+    bad += check("  .. the main loop keeps it", !memcmp(fm6_patch[2] + FP_NAME, "MY PATCH  ", 10));
     a[1] = 2;
     n = request(ED_FM6_GET, a, 2);
     bad += check("FM6_GET track 3: as sent", host_wire[7] == 0 && !memcmp(host_wire + 8, pk, FM6_PACKED));
-    a[0] = ED_FM6_BANK; a[1] = 4;
-    n = request(ED_FM6_GET, a, 2);
-    bad += check("FM6_GET of an empty bank slot: rc 2, no record", n == 9u && host_wire[7] == 2);
-    a[0] = ED_FM6_BANK; a[1] = 4; memcpy(a + 2, pk, FM6_PACKED);
-    a[2 + 14] = 120;                                      /* OP6 output level 120: stored as 99 */
-    n = request(ED_FM6_PUT, a, sizeof a);
-    a[0] = ED_FM6_BANK; a[1] = 4;
-    request(ED_FM6_GET, a, 2);
-    bad += check("FM6_PUT bank B5, then GET: stored in range (a level of 120 -> 99)", host_wire[7] == 0 &&
-                 host_wire[8 + 14] == 99 && !memcmp(host_wire + 8 + 118, "MY PATCH  ", 10) && fm6_bank_used(4));
+    a[0] = ED_FM6_TRACK; a[1] = 2; memcpy(a + 2, FM6_FACTORY[5], FM6_PACKED);
+    request(ED_FM6_PUT, a, sizeof a);
+    bad += check("FM6_PUT of a factory patch unchanged: SLOT shows it (F6)", trk[2].p[P_E7] == 5 && fm6_slot[2] == 5u);
+    trk[2].p[P_E7] = FM6_OWN;                            /* (back to MY PATCH for the SLOT trip below) */
+    a[0] = ED_FM6_TRACK; a[1] = 2; memcpy(a + 2, pk, FM6_PACKED);
+    request(ED_FM6_PUT, a, sizeof a);
+    trk[2].p[P_E7] = 1;
+    fm6_poll();
+    bad += check("SLOT OWN -> F2 loads the factory patch", !memcmp(fm6_patch[2] + FP_NAME, FM6_FACTORY[1] + 118, 10));
+    trk[2].p[P_E7] = 6;
+    fm6_poll();
+    trk[2].p[P_E7] = FM6_OWN;
+    fm6_poll();
+    bad += check("  .. and back to OWN brings the own patch back", !memcmp(fm6_patch[2] + FP_NAME, "MY PATCH  ", 10) &&
+                 fm6_slot[2] == FM6_OWN);
+    trk[2].p[P_E7] = 20;                                 /* (a 1.0.2 B slot that escaped a clamp) */
+    fm6_poll();
+    bad += check("a SLOT past OWN is OWN: the patch stays, nothing reloads", trk[2].p[P_E7] == FM6_OWN &&
+                 !memcmp(fm6_patch[2] + FP_NAME, "MY PATCH  ", 10));
+    for (i = 0; i < 3u; i++) {                           /* the bank: GET, PUT, ERASE answer "no bank" (3) */
+        a[0] = ED_FM6_BANK; a[1] = 4; memcpy(a + 2, pk, FM6_PACKED);
+        if (i < 2u)
+            request(i ? ED_FM6_PUT : ED_FM6_GET, a, i ? sizeof a : 2u);
+        else {
+            a[0] = 4;
+            request(ED_FM6_ERASE, a, 1);
+        }
+        bad += check(i == 0u ? "FM6_GET of the bank: rc 3, no bank" : i == 1u ? "FM6_PUT to the bank: rc 3, no bank" :
+                               "FM6_ERASE: rc 3, no bank", host_wire[i == 2u ? 6 : 7] == 3u);
+    }
     n = request(ED_FM6_LIST, a, 0);
-    {   /* factory 8, bank 27, then used + name per slot */
-        uint32_t p = 7, k, ok = host_wire[5] == FM6_NFACTORY && host_wire[6] == FM6_BANK_N, named = 0;
-        for (k = 0; k < FM6_NFACTORY + FM6_BANK_N && p < n; k++) {
-            uint32_t used = host_wire[p++];
-            if (k == FM6_NFACTORY + 4u) named = used && !memcmp(host_wire + p, "MY PATCH", 9);
-            if (k < FM6_NFACTORY) ok &= used == 1u;
+    {   /* factory 8, bank 0, then used + name per factory slot */
+        uint32_t p = 7, k, ok = host_wire[5] == FM6_NFACTORY && host_wire[6] == 0;
+        for (k = 0; k < FM6_NFACTORY && p < n; k++) {
+            ok &= host_wire[p++] == 1u;
             while (host_wire[p]) p++;
             p++;
         }
-        bad += check("FM6_LIST: 8 factory names, the bank's used slots by name", ok && named && k == FM6_NSLOT);
+        bad += check("FM6_LIST: 8 factory names, nbank 0", ok && k == FM6_NFACTORY && p == n - 1u);
     }
-    trk[1].eng_req = ENGI_FM6;
-    trk[1].p[P_E7] = FM6_NFACTORY + 4;
-    fm6_poll();
-    bad += check("PTCH B5 loads the bank patch into the track", !memcmp(fm6_patch[1] + FP_NAME, "MY PATCH  ", 10));
-    a[0] = 4;
-    n = request(ED_FM6_ERASE, a, 1);
-    bad += check("FM6_ERASE B5: empty; PTCH B5 plays the init voice", host_wire[6] == 0 && !fm6_bank_used(4) &&
-                 (fm6_poll(), !memcmp(fm6_patch[1] + FP_NAME, "INIT VOICE", 10)));
+    /* target 3: an FM6 user preset's patch */
+    song.sel = 2;
+    up_store(5, "MINE");                                 /* track 3 (MY PATCH, OWN) -> slot 6 */
+    a[0] = ED_FM6_USER; a[1] = 5;
+    request(ED_FM6_GET, a, 2);
+    bad += check("UP_STORE of an FM6 track: FM6_GET user 6 gives its patch", host_wire[7] == 0 &&
+                 !memcmp(host_wire + 8 + 118, "MY PATCH  ", 10));
+    memcpy(a + 2, pk, FM6_PACKED);
+    memcpy(a + 2 + 118, "EDITOR    ", 10);
+    a[2 + 14] = 120;                                     /* OP6 output level 120: stored as 99 */
+    request(ED_FM6_PUT, a, sizeof a);
+    i = host_wire[7];
+    request(ED_FM6_GET, a, 2);
+    bad += check("FM6_PUT user 6, then GET: stored in range (a level of 120 -> 99)", i == 0u && host_wire[7] == 0 &&
+                 host_wire[8 + 14] == 99 && !memcmp(host_wire + 8 + 118, "EDITOR    ", 10));
+    fm6_load_slot(2, 0);
+    up_load(5);
+    bad += check("  .. UP_LOAD 6 plays it, SLOT OWN", !memcmp(fm6_patch[2] + FP_NAME, "EDITOR    ", 10) &&
+                 trk[2].p[P_E7] == FM6_OWN);
+    up_rename(5, "RENAMED");
+    a[0] = ED_FM6_USER; a[1] = 5;
+    request(ED_FM6_GET, a, 2);
+    bad += check("  .. a rename keeps it", host_wire[7] == 0 && !memcmp(host_wire + 8 + 118, "EDITOR    ", 10));
+    trk[0].eng_req = ENGI_DRUM;
+    song.sel = 0;
+    up_store(6, "KIT");
+    a[0] = ED_FM6_USER; a[1] = 6; memcpy(a + 2, pk, FM6_PACKED);
+    request(ED_FM6_GET, a, 2);
+    i = host_wire[7];
+    request(ED_FM6_PUT, a, sizeof a);
+    bad += check("a DRUM user preset has no patch: GET rc 2, PUT rc 1", i == 2u && host_wire[7] == 1u);
+    a[1] = 9;                                            /* an empty slot */
+    request(ED_FM6_PUT, a, sizeof a);
+    i = host_wire[7];
+    a[1] = UP_SLOTS;
+    request(ED_FM6_GET, a, 2);
+    bad += check("an empty user slot: PUT rc 1; past the slots: GET rc 1", i == 1u && host_wire[7] == 1u);
+    up_put(5, 0);
+    a[1] = 5;
+    request(ED_FM6_GET, a, 2);
+    bad += check("an erased preset's patch is gone (GET rc 2)", host_wire[7] == 2u);
     a[0] = ED_FM6_TRACK; a[1] = 4;
     request(ED_FM6_PUT, a, sizeof a);
     i = host_wire[7];
     request(ED_FM6_PUT, a, 20);
     bad += check("FM6_PUT: a fifth track or a short record: rc 1", i == 1u && host_wire[7] == 1u);
-    a[0] = ED_FM6_BANK; a[1] = FM6_BANK_N;
+    a[0] = 4; a[1] = 0;
     request(ED_FM6_GET, a, 2);
-    bad += check("FM6_GET past the bank: rc 1", host_wire[7] == 1u);
+    bad += check("FM6_GET of an unknown target: rc 1", host_wire[7] == 1u);
     return bad;
 }
 
@@ -439,10 +498,173 @@ static int user_preset_roundtrip(void)
     return bad;
 }
 
+/* the frames of cmd in host_wire: how many, and the args of the last (into *args) */
+static uint32_t wire_frames(uint32_t cmd, const uint8_t **args)
+{
+    uint32_t i, k = 0;
+    for (i = 0; i + 5u < host_wire_n; i++)
+        if (host_wire[i] == 0xF0 && host_wire[i + 1] == ED_HDR0 && host_wire[i + 4] == cmd) {
+            k++;
+            if (args) *args = host_wire + i + 5;
+        }
+    return k;
+}
+static uint32_t sync_pass(void)                          /* one main-loop pass of the pushes */
+{
+    host_wire_n = 0;
+    fm1_ms += 30u;
+    ed_sync();
+    host_drain();
+    return host_wire_n;
+}
+
+/* #65: WATCH while watching keeps what is not pushed yet; the editor's own sound load is not echoed as RELOAD */
+static int live_sync(void)
+{
+    int bad = 0;
+    uint8_t a[4] = {1, 0, 0, 0};
+    uint32_t i, other = 0;
+    const uint8_t *x = 0;
+    reset();
+    usb.resets = 0;
+    request(ED_WATCH, a, 1);
+    bad += check("WATCH 1 starts watching", host_wire[5] == 1 && ed_w.on && !sync_pass());
+    TSEL->p[P_LEVEL] = 77;                               /* a device change, not pushed yet */
+    request(ED_WATCH, a, 1);
+    bad += check("WATCH 1 while watching keeps a pending change: CHANGED still goes out",
+                 sync_pass() && wire_frames(ED_CHANGED, &x) == 1u && x[1] == P_LEVEL && ed_rv(x + 2) == 77);
+    TSEL->p[P_LEVEL] = 66;
+    a[0] = 0; request(ED_WATCH, a, 1);
+    a[0] = 1; request(ED_WATCH, a, 1);
+    bad += check("WATCH 0 then WATCH 1 starts from the values as they are (no push)", !sync_pass());
+    TSEL->p[P_LEVEL] = 55; trk[1].p[P_PAN] = 3;
+    a[0] = 3; request(ED_WATCH, a, 1);
+    sync_pass();
+    bad += check("WATCH 3 while watching: CHANGED kept, TRACK_CHANGED from the mix as it is",
+                 host_wire_n && wire_frames(ED_CHANGED, 0) == 1u && !wire_frames(ED_TRACK_CHANGED, 0) && ed_w.v4);
+    usb.resets++;
+    TSEL->p[P_LEVEL] = 44;
+    request(ED_WATCH, a, 1);
+    bad += check("WATCH after a USB reset starts over", !sync_pass());
+
+    /* PRESET */
+    TSEL->p[P_LEVEL] = 33;                               /* pending; a sound load keeps P_LEVEL */
+    a[0] = 0; a[1] = 2;
+    request(ED_PRESET, a, 2);
+    sync_pass();
+    bad += check("the editor's own PRESET: no RELOAD, no CHANGED for what it loaded, a pending CHANGED stays",
+                 TSEL->preset == 2 && !wire_frames(ED_RELOAD, 0) && wire_frames(ED_CHANGED, &x) == 1u &&
+                 x[1] == P_LEVEL && !sync_pass());
+    for (i = 0; i < 3u; i++) {                           /* any preset of any engine */
+        a[0] = (uint8_t)(i ? 12u : 4u); a[1] = (uint8_t)i;
+        request(ED_PRESET, a, 2);
+        other += sync_pass() != 0;
+    }
+    bad += check("PRESET of other engines: no push at all", !other && ed_w.eng == ed_eng(TSEL));
+    a[0] = 1; a[1] = G_ENGSEL; a[2] = (8192 + 5) & 127; a[3] = (8192 + 5) >> 7;
+    request(ED_SET, a, 4);
+    bad += check("SET of G_ENGSEL: no RELOAD", ed_eng(TSEL) == 5u && !sync_pass());
+    sync_reload = 1;                                     /* a load on the device, not pushed yet */
+    a[0] = 0; a[1] = 1;
+    request(ED_PRESET, a, 2);
+    sync_pass();
+    bad += check("a RELOAD due before the editor's PRESET still goes out", wire_frames(ED_RELOAD, 0) == 1u);
+    a[0] = 0; request(ED_WATCH, a, 1);
+    sync_reload = 0;
+    a[0] = 0; a[1] = 3;
+    request(ED_PRESET, a, 2);
+    a[0] = 1; request(ED_WATCH, a, 1);
+    bad += check("not watching: PRESET as before, WATCH then starts from it", !sync_pass() && TSEL->preset == 3);
+    return bad;
+}
+
+/* #64: SysEx through the USB packet path (ep1_take) at full speed: a 256-byte BACKUP_PUT piece (293 pack7 bytes, 101
+ * event packets, 7 USB packets) arrives whole; one request at a time always works, a frame sent before the reply
+ * to the one before is dropped whole (no reply; never a partial frame) */
+static uint32_t usb_frame(const uint8_t *f, uint32_t n, uint8_t *usbp)   /* F0..F7 -> USB-MIDI event packets */
+{
+    uint32_t i = 0, o = 0;
+    while (i < n) {
+        uint32_t k = n - i >= 3u ? 3u : n - i, cin = k == 3u && i + 3u < n ? 4u : k == 3u ? 7u : 4u + k;
+        usbp[o++] = (uint8_t)cin;
+        usbp[o++] = f[i];
+        usbp[o++] = k > 1u ? f[i + 1] : 0;
+        usbp[o++] = k > 2u ? f[i + 2] : 0;
+        i += k;
+    }
+    return o;
+}
+static uint32_t usb_feed(const uint8_t *p, uint32_t n)   /* whole 64-byte USB packets, as the host sends them */
+{
+    uint32_t o, refused = 0;
+    for (o = 0; o < n; o += 64u)
+        while (!ep1_take(p + o, n - o > 64u ? 64u : n - o))
+            refused++;                                  /* NAK: the host sends it again */
+    return refused;
+}
+static uint32_t put_frame(uint8_t *f, uint32_t op, uint32_t off, uint32_t count)
+{
+    static const uint8_t zero[256];
+    uint32_t n = 0, i;
+    f[n++] = 0xF0; f[n++] = ED_HDR0; f[n++] = ED_HDR1; f[n++] = ED_HDR2; f[n++] = ED_BACKUP_PUT;
+    f[n++] = (uint8_t)op; f[n++] = 2;
+    if (op == 0u) {
+        for (i = 0; i < 5u; i++) f[n++] = (uint8_t)((sizeof(project_store_t) >> (7u * i)) & (i == 4u ? 15u : 127u));
+        for (i = 0; i < 5u; i++) f[n++] = 0;
+    } else if (op == 1u) {
+        for (i = 0; i < 5u; i++) f[n++] = (uint8_t)((off >> (7u * i)) & (i == 4u ? 15u : 127u));
+        n += pack7(zero, count, f + n);
+    }
+    f[n++] = 0xF7;
+    return n;
+}
+static int usb_burst(void)
+{
+    static uint8_t f[700], u[1000], u2[2000];
+    uint32_t off, n, k, ok = 1, max = 0;
+    const uint8_t *x = 0;
+    int bad = 0;
+    reset();
+    usb.rx_pend = 0;
+    n = put_frame(f, 0, 0, 0);
+    usb_feed(u, usb_frame(f, n, u)); host_wire_n = 0; ed_service(); host_drain();
+    bad += check("BACKUP_PUT begin through ep1_take", wire_frames(ED_BACKUP_PUT, &x) == 1u && !x[2]);
+    for (off = 0; off < sizeof(project_store_t); off += 256u) {
+        uint32_t c = sizeof(project_store_t) - off > 256u ? 256u : sizeof(project_store_t) - off;
+        n = put_frame(f, 1, off, c);
+        if (n > max) max = n;
+        k = usb_frame(f, n, u);
+        usb_feed(u, k);
+        host_wire_n = 0; ed_service(); host_drain();
+        ok &= wire_frames(ED_BACKUP_PUT, &x) == 1u && !x[2] && sx_ready == 0;
+    }
+    bad += check("256-byte pieces in 64-byte USB packets at full speed: every piece taken (rc 0)",
+                 ok && ed_bk_pos == sizeof(project_store_t) && max == 4u + 1u + 7u + 293u + 1u && max <= sizeof sx_frame);
+    n = put_frame(f, 3, 0, 0);
+    usb_feed(u, usb_frame(f, n, u)); host_wire_n = 0; ed_service(); host_drain();
+    bad += check("abort through ep1_take", wire_frames(ED_BACKUP_PUT, &x) == 1u && !x[2] && !ed_bk_put);
+
+    /* two frames back to back, before the reply: the second is dropped whole, the first answered intact */
+    n = put_frame(f, 0, 0, 0);
+    usb_feed(u, usb_frame(f, n, u)); host_wire_n = 0; ed_service(); host_drain();
+    k = usb_frame(f, put_frame(f, 1, 0, 256), u2);
+    k += usb_frame(f, put_frame(f, 1, 256, 256), u2 + k);
+    usb_feed(u2, k);
+    host_wire_n = 0; ed_service(); ed_service(); host_drain();
+    bad += check("pipelined: the first piece is taken, the second (sent before its reply) dropped whole",
+                 wire_frames(ED_BACKUP_PUT, &x) == 1u && !x[2] && ed_bk_pos == 256u && !sx_ready);
+    n = put_frame(f, 1, 512, 256);
+    usb_feed(u, usb_frame(f, n, u)); host_wire_n = 0; ed_service(); host_drain();
+    bad += check("... so the next piece is refused (rc 1, offset), as a host that waits never sees",
+                 wire_frames(ED_BACKUP_PUT, &x) == 1u && x[2] == 1u && ed_bk_pos == 256u);
+    request(ED_BACKUP_PUT, (const uint8_t[]){3, 2}, 2);
+    return bad;
+}
+
 int main(void)
 {
     int bad = preferences() + framing() + uart_recovery() + steps() + samples() + song_protocol() + malformed_saves() +
-              fm6_patches() + user_preset_roundtrip();
+              fm6_patches() + user_preset_roundtrip() + live_sync() + usb_burst();
     printf("%s\n", bad ? "EDITOR TEST FAILED" : "editor test passed");
     return bad != 0;
 }

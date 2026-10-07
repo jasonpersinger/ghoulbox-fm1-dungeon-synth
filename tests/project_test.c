@@ -7,14 +7,16 @@
  * added since at their defaults (SLICER OFF,
  * every matrix slot OFF), steps, globals, selection, the engine bytes (0..7 kept: the engines added since
  * were appended); damaged ones are refused. Track 4 of a project written before 1.0 (formats 2 and 3,
- * `parts` 0) was the GM drum part: it becomes the legacy SAMPLE part 4 (PROJ_DEF_KEEP: project_load
- * gives it the PERC preset), its steps and parameters kept, the drum level / reverb send (ids 25 / 26, now
- * G_TAPE / G_CRSH, then 0) as its LEVEL / REV; global id 24 (the drum part's MIDI channel then, REVERB TYPE now) loads as ROOM
+ * `parts` 0) was the GM drum part: it becomes a DRUM part 4 (PROJ_DEF_KEEP: project_load gives it DRUM's kit;
+ * SAMPLE PERC until 1.0.2), its steps (its lanes' notes as hits) and parameters kept, the drum level / reverb send (ids
+ * 25 / 26: G_DRLVL / G_DRREV in Felucca, G_TAPE / G_CRSH in GHOULBOX, then 0) as its LEVEL / REV; global id 24 (the
+ * drum part's MIDI channel then, REVERB TYPE now) loads as ROOM
  * from every format before FUN7. A FUN4 written while the drums were PHYS's MODEL DRUM (`phys` 1) loads such
  * a track as the DRUM engine with the same sound (its E values moved), other PHYS tracks as they were; one
  * of before 1.0 (`phys` 0) its DUST as MODAL bowed. The steps of a DRUM track of before FUN5 (DRUM, or
  * PHYS DRUM become DRUM) get their lanes' notes as hits, the other notes (a low tom, a crash) kept, the
- * step accent as the hits' accents; other tracks' steps stay as they were (no hits).
+ * step accent as the hits' accents; other tracks' steps stay as they were (no hits). A SAMPLE track of the retired
+ * PERC set (SET 4) loads as DRUM with its default kit, in any format (proj_perc).
  * Run by tests/run_tests.sh (needs build/gen from one firmware build). */
 #define main hostsim_main
 #include "hostsim.c"
@@ -60,6 +62,23 @@ static int steps_same(const step_t *n, const step8_t *o)
     return 1;
 }
 
+/* .. as a DRUM track of before the grid gets them (proj_grid: its lanes' notes as hits) */
+static int steps_grid_same(const step_t *n, const step8_t *o)
+{
+    uint32_t k;
+    for (k = 0; k < NSTEP; k++) {
+        step_t s;
+        memset(&s, 0, sizeof s);
+        memcpy(s.note, o[k].note, 4);
+        s.n = o[k].n; s.time = o[k].time; s.flags = o[k].flags; s.vel = o[k].vel;
+        step_to_grid(&s);
+        if (memcmp(n[k].note, s.note, 4) || n[k].n != s.n || n[k].time != s.time || n[k].flags != s.flags ||
+            n[k].vel != s.vel || n[k].hit != s.hit || n[k].acc != s.acc)
+            return 0;
+    }
+    return 1;
+}
+
 /* today's project q as format 4 stored it (8-byte steps; the hits dropped) */
 static void to_v4(project_v4_t *v, const project_t *q)
 {
@@ -92,9 +111,8 @@ static void to_v4(project_v4_t *v, const project_t *q)
 static int track_ok(const proj_trk_t *n, const proj_trk_v2_t *o, uint32_t t, int drum, int16_t lvl, int16_t rev)
 {
     uint32_t k;
-    int ok = (drum ? n->engine == 4u && n->preset == PROJ_DEF_KEEP
-                   : n->engine == o->engine && n->preset == o->preset) &&
-             steps_same(n->step, o->step);
+    int ok = (drum ? n->engine == ENGI_DRUM && n->preset == PROJ_DEF_KEEP && steps_grid_same(n->step, o->step)
+                   : n->engine == o->engine && n->preset == o->preset && steps_same(n->step, o->step));
     for (k = 0; k <= P_DETUNE; k++)
         ok &= n->p[k] == (drum && k == P_LEVEL ? lvl : drum && k == P_REV ? rev : oldv(t, k));
     ok &= n->p[P_SLCR] == 0 && n->p[P_SLPAT] == TP[P_SLPAT].def && n->p[P_SLRATE] == TP[P_SLRATE].def &&
@@ -186,10 +204,10 @@ int main(void)
     bad += check("FUN2 -> FUN6: engine bytes kept (WHEEL 7, ANALOG 0, TRIO 6)",
                  q.t[0].engine == 7 && q.t[1].engine == 0 && q.t[2].engine == 6 &&
                  str_eq(ENGINES[7]->name, "WHEEL") && str_eq(ENGINES[6]->name, "TRIO") && NENGINES > 8);
-    bad += check("FUN2 -> FUN6: the drum track -> part 4, SAMPLE (PERC on load), steps kept",
-                 q.parts == NPART && q.t[3].engine == 4 && str_eq(ENGINES[4]->name, "SAMPLE") &&
-                 TRK_DEF[3][0] == ENGI_DRUM && str_eq(SMP_PRESET_TABLE[SMP_PERC_PRESET].name, "PERC") &&
-                 q.t[3].preset == PROJ_DEF_KEEP && steps_same(q.t[3].step, v2.t[3].step));
+    bad += check("FUN2 -> FUN6: the drum track -> part 4, DRUM (its kit on load), steps kept (lanes as hits)",
+                 q.parts == NPART && q.t[3].engine == ENGI_DRUM && str_eq(ENGINES[ENGI_DRUM]->name, "DRUM") &&
+                 TRK_DEF[3][0] == ENGI_DRUM && q.t[3].preset == PROJ_DEF_KEEP &&
+                 steps_grid_same(q.t[3].step, v2.t[3].step));
 
     /* format 3 (1.0, four parts), as written before the modulation matrix */
     memset(&v3, 0, sizeof v3);
@@ -221,11 +239,11 @@ int main(void)
     v3.g[G_CRSH] = 20;
     v3.sum = proj_hash(&v3, sizeof v3 - 4u);
     memcpy(&buf, &v3, sizeof v3);
-    ok = proj_import(&q2, &buf, (int)sizeof v3) && proj_ok(&q2) && q2.parts == NPART && q2.t[3].engine == 4 &&
+    ok = proj_import(&q2, &buf, (int)sizeof v3) && proj_ok(&q2) && q2.parts == NPART && q2.t[3].engine == ENGI_DRUM &&
          q2.t[3].preset == PROJ_DEF_KEEP && q2.t[3].p[P_LEVEL] == 90 && q2.t[3].p[P_REV] == 20 &&
          q2.t[3].p[P_PAN] == oldv3(0, P_PAN) && q2.t[3].p[P_SLEN] == oldv3(0, P_SLEN) &&
          q2.t[3].p[P_SLCR] == oldv3(0, P_SLCR) && q2.t[3].p[P_M1SRC] == 0 &&
-         steps_same(q2.t[3].step, v3.t[0].step) && !memcmp(&q2.t[0], &q.t[0], sizeof q.t[0]) &&
+         steps_grid_same(q2.t[3].step, v3.t[0].step) && !memcmp(&q2.t[0], &q.t[0], sizeof q.t[0]) &&
          q2.g[G_TAPE] == 0 && q2.g[G_CRSH] == 0;
     bad += check("FUN3 before 1.0: the drum track -> part 4 (LEVEL / REV from ids 25 / 26); TAPE / CRSH then off", ok);
 
@@ -588,6 +606,55 @@ int main(void)
 #undef FM4_OK
     }
 #endif
+    {   /* SAMPLE tracks of SET 4 (PERC, the GM kit, retired after 1.0.2) in FUN8 / FUN4 projects load as DRUM with its
+         * default kit: the E values the kit's, the rest of the sound, the steps and the preset byte's meaning kept; their
+         * motion on the EDIT values goes, the rest stays; another SAMPLE set stays SAMPLE. Idempotent */
+        project_t a, c, d;
+        static project_store_t st;
+        static project_v4_t w4;
+        static const int16_t KIT[8] = DRUM_KIT_E;
+        uint32_t i;
+        memset(&a, 0, sizeof a);
+        a.magic = PROJ_MAGIC; a.size = sizeof a; a.parts = NPART; a.phys = PROJ_PHYS;
+        chain_defaults(&a.chain);
+        for (t = 0; t < NTRK; t++) {
+            for (i = 0; i < P_COUNT; i++)
+                a.t[t].p[i] = param_desc_of(ENGI_SAMPLE, i)->def;
+            a.t[t].engine = ENGI_SAMPLE;
+            memcpy(a.fm6[t], FM6_INIT, FM6_PACKED);
+        }
+        a.t[2].p[P_E0] = SMP_SET_PERC;                  /* track 3: a saved PERC sound (SET 4, no loop) */
+        a.t[2].p[P_E3] = 0;
+        a.t[2].p[P_LEVEL] = 77; a.t[2].p[P_REV] = 41; a.t[2].p[P_PAN] = -9;
+        a.t[2].preset = 4;
+        a.t[2].step[0] = (step_t){{36, 42, 0, 0}, 2, ST_NOTE, SF_ACCENT, 100, 0, 0};
+        a.t[2].step[4] = (step_t){{38, 49, 0, 0}, 2, ST_NOTE, 0, 90, 0, 0};
+        a.t[0].p[P_E0] = 2;                             /* track 1: FLUTE stays */
+        a.motion.count = 3;
+        a.motion.event[0] = (motion_event_t){2u << 6 | 3u, P_E4, 20};          /* track 3: CUT: goes */
+        a.motion.event[1] = (motion_event_t){2u << 6 | 5u, P_REV, 60};         /* track 3: a send: stays */
+        a.motion.event[2] = (motion_event_t){0u << 6 | 3u, P_E4, 70};          /* track 1: stays */
+        a.sum = proj_sum(&a);
+#define PERC_OK(c) ((c).t[2].engine == ENGI_DRUM && (c).t[2].preset == 0u && !memcmp(&(c).t[2].p[P_E0], KIT, sizeof KIT) && \
+                    !memcmp((c).t[2].p, a.t[2].p, P_E0 * sizeof(int16_t)) && \
+                    !memcmp((c).t[2].step, a.t[2].step, sizeof a.t[2].step) && \
+                    (c).t[0].engine == ENGI_SAMPLE && (c).t[0].p[P_E0] == 2 && (c).t[1].engine == ENGI_SAMPLE)
+        ok = proj_pack(&st, &a) && proj_import(&c, &st, sizeof st);
+        bad += check("FUN8 with a SAMPLE PERC track: DRUM's kit, the rest of the sound and the steps kept", ok && PERC_OK(c) &&
+                     str_eq(ENGINES[ENGI_DRUM]->presets[0].name, "DRUM KIT") &&
+                     !memcmp(ENGINES[ENGI_DRUM]->presets[0].e, (int8_t[8])DRUM_KIT_E, 8));
+        bad += check("  its motion on CUT goes; a send's and the other track's stay",
+                     c.motion.count == 2u && c.motion.event[0].param == P_REV && c.motion.event[1].place == 3u &&
+                     motion_valid(&c.motion) && proj_ok(&c));
+        bad += check("  imported again: as it is (DRUM now)", proj_import(&d, &c, sizeof c) && !memcmp(&d, &c, sizeof d));
+        memset(&a.motion, 0, sizeof a.motion);
+        a.sum = proj_sum(&a);
+        to_v4(&w4, &a);
+        memcpy(&buf, &w4, sizeof w4);
+        ok = proj_import(&c, &buf, (int)sizeof w4) && PERC_OK(c);
+        bad += check("FUN4 with a SAMPLE PERC track: DRUM's kit, the same", ok);
+#undef PERC_OK
+    }
     printf("%s\n", bad ? "PROJECT FORMAT TEST FAILED" : "project format test passed");
     return bad != 0;
 }

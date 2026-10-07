@@ -2,7 +2,7 @@
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* FELUCCA user interface.
  * Flat: SURF cards and panels on the palette's background, no rules, one type family (Inter Tight, three sizes), tracks
- * named by circled numerals. Four columns <-> KNOB 1..4. Rendering is lazy:
+ * named by their numbers 1..4 on a cushion (icons.c trk_icon). Four columns <-> KNOB 1..4. Rendering is lazy:
  * every element remembers what it last drew and is redrawn only on change. */
 static int project_save(uint32_t slot);
 static void panel_setup(void);
@@ -35,6 +35,25 @@ static uint32_t user_of(const track_t *t)    /* user preset slot its sound came 
 }
 static uint32_t up_gen;                      /* bumped on every user bank change (redraws) */
 #include "favorites.c"
+/* MENU's two-valued settings (ui_menu.c MENU_FLAGS), a bit each in a byte no engine uses (as ui_layer.c layer_seen):
+ * saved with the settings; 0 in older ones = every setting's default (append-only: a new setting takes a new bit,
+ * its default is 0) */
+#define ui_prefs (favorites.factory[15][30])
+#define PREF_LATCH 1u                          /* MENU > FX LATCH ON (#40) */
+#define PREF_ANIM_OFF 2u                       /* MENU > ANIM OFF (#46): values snap (no rolling digits, no glide) */
+#define PREF_ACCEL 4u                          /* MENU > KNOB ACCEL ON (#52): fast turns of wide values x2..x4 */
+#define PREF_USB_FIXED 8u                      /* MENU > USB LEVEL FIXED: USB audio at the full level, MASTER after */
+#define PREF_BPM_LOCK 16u                      /* MENU > BPM LOCK ON (#58): SELECT sets the tempo only with GLO held */
+#define PREF_LARGE 32u                         /* MENU > LARGE ON (#15, Discussion #80): big knob labels and values
+                                                * (ui_draw.c large_kind); clear in every older setting = OFF */
+#define PREF_SERIAL_OFF 64u                    /* MENU > USB SERIAL OFF (#67): no serial console, the device enumerates as
+                                                * audio + MIDI only (usb.c usb_cdc_switch); clear in every older setting = ON */
+#define fx_latch ui_prefs
+/* MENU > STYLE (ui_menu.c): ST_FLAT ST_LINE (gfx.c) in another byte no engine uses, saved with the settings;
+ * 0 in older ones = FLAT; 2, the retired PIXEL (1.0.1), reads as LINE; anything else unknown as FLAT (settings_persist.c). gfx.c draws from its copy, ux.style
+ * (ui_draw.c style_apply) */
+#define ui_style (favorites.factory[15][29])
+static void draw_rules(uint32_t y, uint32_t h);       /* (ui_draw.c) */
 
 static uint8_t sync_reload;                  /* engine / preset / project / user preset loaded: editor RELOAD push */
 
@@ -54,6 +73,11 @@ static uint8_t sync_reload;                  /* engine / preset / project / user
 #define H_GRAPH 122
 #define Y_FOOT 202
 #define H_FOOT 38
+/* MENU > LARGE (large_kind below): on the value pages the cards are tall (28..132) and the panel a strip
+ * (136..198); elsewhere (lists, rolls, layers) the layout above, its card labels in M */
+#define LG_CARD_H 104
+#define LG_Y_GRAPH 136
+#define LG_H_GRAPH 62
 
 static struct {
     uint8_t home;
@@ -85,6 +109,7 @@ static struct {
     uint32_t ly_t0;              /* the layer button's press time | 1, LY_* bits (ui_layer.c layer_gesture) */
     uint8_t ly;                  /* the layer whose button is down (LAYER_*), 0 = none */
     uint8_t layer;               /* the layer whose map is shown (LAYER_*), 0 = none */
+    uint8_t lock;                /* #83: the layer locked open by a double tap (LAYER_*), 0 = none (ui_layer.c) */
     uint16_t pg_down;            /* page buttons down (panel ids) that act when let go */
     uint32_t layer_sig;          /* drawn-state cache of the map */
     char msg[24];
@@ -111,10 +136,52 @@ enum { CF_NONE, CF_CLEAR_SEQ, CF_CLEAR_TRK, CF_OVR_PROJ, CF_OVR_USER, CF_LOAD_PA
 static const page_t *page_over;   /* a quick layer's own four knobs (ui_layer.c), while it edits or draws them */
 static const page_t *cur_page(void) { return page_over ? page_over : &PAGES[ui.page]; }
 
+/* MENU > LARGE (#15, Discussion #80: what KNOB 1..4 do, in bigger type). Per page type:
+ *   LK_TALL  HOME and the value pages (EDIT ENV LFO MOD FX SLICER SCL CHORD ARP VOICE PATTERN STEP's knobs, MIXER,
+ *            GLOBAL, SYSTEM, TOOLS, MOTION): tall cards (a K1..K4 keycap, the icon, the label in M, the value in L,
+ *            in M or S when L is too wide or lacks a glyph, the unit under it, the gauge), the panel a strip: HOME's
+ *            scope, ENV's ADSR, LFO's wave, PATTERN's 64 steps, MIXER's four tracks (name, state, meter) small; the
+ *            page's title and number in L on the others (their charts cannot be read that small);
+ *   LK_LABEL the list and graph pages (PRESETS, USER, PROJECT, PATTERNS, SONG, the piano roll and the drum grid,
+ *            CHANCE, SLICES) and the quick layers' maps: the layout as it is, the card labels in M;
+ *   LK_OFF   LARGE off; the menu, the dialogs and NAME keep their own layout in every case. */
+enum { LK_OFF, LK_LABEL, LK_TALL };
+static uint32_t large_kind(void)
+{
+    uint32_t g;
+    if (!(ui_prefs & PREF_LARGE))
+        return LK_OFF;
+    if (ui.layer)
+        return LK_LABEL;
+    if (ui.home)
+        return LK_TALL;
+    g = cur_page()->graph;
+    return g == GR_BROWSE || g == GR_SLOTS || g == GR_USER || g == GR_PATS || g == GR_SONG || g == GR_ROLL ||
+           g == GR_CHANCE || g == GR_SLICES ? LK_LABEL : LK_TALL;
+}
+/* the geometry of the page shown: the cards' height, the panel's top and height */
+static uint32_t card_h(void) { return large_kind() == LK_TALL ? LG_CARD_H : CARD_H; }
+static uint32_t graph_y(void) { return large_kind() == LK_TALL ? LG_Y_GRAPH : Y_GRAPH; }
+static uint32_t graph_h(void) { return large_kind() == LK_TALL ? LG_H_GRAPH : H_GRAPH; }
+static int large_face_has(const char *s)                /* every glyph of s in the sparse L face */
+{
+    for (; *s; s++)
+        if (glyph_at(&AF_L, fold(&AF_L, (uint8_t)*s)) < 0)
+            return 0;
+    return 1;
+}
+static int32_t ink_w(const aafont_t *f, const char *s)
+{
+    int32_t b[4];
+    text_ink(f, s, b);
+    return b[2] > b[0] ? b[2] - b[0] : 0;
+}
+
 /* the quick layers (ui_layer.c): a button held, the keys and KNOB 1..4 are its shortcuts, its map over the page */
 enum { LAYER_NONE, LAYER_FX, LAYER_GLO, LAYER_SCL, LAYER_EDIT, LAYER_N };
 static void draw_layer(void);
 static const char *layer_head(void);
+static int layer_locked(void);
 static uint32_t layer_leds(void);
 static uint32_t layer_btn(void);
 
@@ -375,8 +442,8 @@ static struct {
     uint8_t keep;                /* the track is as the last load left it (undo.after): a next load keeps the copy */
     uint8_t what;                /* UNDO_SOUND | UNDO_PAT: what the loads since the copy changed (undo_swap) */
     uint8_t eng, preset, user, patn;
-    uint8_t fm6_slot;            /* the track's FM6 patch and its PTCH slot (eng_fm6.c): an edited or a project's */
-    uint8_t fm6[FP_SIZE + 1u];   /* patch is the track's own, not PTCH's factory one */
+    uint8_t fm6_slot;            /* the track's FM6 patch and its SLOT (eng_fm6.c): an edited or a project's */
+    uint8_t fm6[FP_SIZE + 1u];   /* patch is the track's own, not a factory one */
     int16_t p[P_COUNT];
     step_t step[NSTEP];
     motion_store_t motion_backup; /* one track only, swaps with the shared event pool on undo */
@@ -514,12 +581,13 @@ static void undo_swap(void)
     }
     fm1_irq_on();
     if (undo.what & UNDO_SOUND) {                 /* FM6: the track's patch as it was (edited, a project's, a
-                                                   * converted DIGITAL sound), not its PTCH's factory one */
+                                                   * converted DIGITAL sound), not a factory one */
         uint32_t tr = trk_index(t);
         uint8_t v[FP_SIZE + 1u], sl = fm6_slot[tr];
         memcpy(v, fm6_patch[tr], FP_SIZE);
         fm6_set_patch(tr, undo.fm6);
         fm6_slot[tr] = undo.fm6_slot;             /* (fm6_poll: the patch stays) */
+        fm6_own_ok &= (uint8_t)~(1u << tr);
         memcpy(undo.fm6, v, FP_SIZE);
         undo.fm6_slot = sl;
     }
@@ -579,7 +647,7 @@ static void track_defaults_steps(track_t *t)
 /* SEQ > PATTERNS: the factory patterns (PATTERNS[], "01".."13"), then the used user presets that hold
  * one ("U07"): list index n. Loading one replaces the track's steps 1..16 (the rest cleared) and LEN;
  * a user preset's pattern brings its stored LEN (at most 16), DIV, SWING and GATE too. The notes are
- * loaded as they are: the patterns are written for the register of their kind of sound, PERC and
+ * loaded as they are: the patterns are written for the register of their kind of sound, DRUM and
  * SLICE patterns are drum and slice numbers, and SCL TRANS / OCT transpose what plays */
 static uint32_t pat_count(void) { return NPATTERNS + up_pat_count(); }
 
@@ -645,7 +713,8 @@ static int param_kept(uint32_t i)
 }
 
 /* a retired preset kept as an alias, so stored preset numbers stay valid: SAMPLE 1, once TRANH, is PIANO
- * (tools/gen_samples.py SMP_SET_ORIG). It loads as the original; browsing skips it. -> the preset k stands for */
+ * (tools/gen_samples.py SMP_SET_ORIG). It loads as the original; browsing skips it. -> the preset k stands for.
+ * (SAMPLE 4, once PERC, is past SMP_NPRESETS: apply_preset_to loads it as DRUM) */
 static uint32_t preset_orig(const engine_t *e, uint32_t k)
 {
     return e->presets == SMP_PRESET_TABLE && k < SMP_NSETS ? SMP_SET_ORIG[k] : k;
@@ -672,12 +741,12 @@ static void fm4_apply(track_t *t, int16_t *p)
     uint8_t v[FP_SIZE + 1u];
     uint32_t pr = fm4_convert(p, v), tr = trk_index(t), f;
     fm6_set_patch(tr, v);
-    fm6_slot[tr] = (uint8_t)p[P_E7];                  /* (fm6_poll: the patch stays the converted one) */
     f = motion_guard();                               /* the audio ISR sees the old sound or the new one */
     memcpy(t->p, p, sizeof t->p);
     t->eng_req = ENGI_FM6;
     t->preset = (uint8_t)pr;
     motion_unguard(f);
+    fm6_adopt(tr);                                    /* SLOT OWN: the converted patch is the track's own */
 }
 static void fm4_track(track_t *t)                     /* t holds a DIGITAL sound (engine 1): convert it */
 {
@@ -706,6 +775,7 @@ static void fm4_load_preset(track_t *t, uint32_t k)
 }
 #endif
 
+static void set_engine_of(track_t *t, uint32_t ei);
 /* preset pi of the engine the track asked for: the sound only (not the steps, not param_kept) */
 static void apply_preset_to(track_t *t, uint32_t pi)
 {
@@ -717,6 +787,10 @@ static void apply_preset_to(track_t *t, uint32_t pi)
         return;
     }
 #endif
+    if (t->eng_req % NENGINES == ENGI_SAMPLE && pi == SMP_SET_PERC) {   /* SAMPLE preset 4 was PERC (retired, a stored */
+        set_engine_of(t, ENGI_DRUM);                  /* number: the editor's PRESET, a favourite): DRUM's kit */
+        return;                                       /* (core.h drum_from_perc) */
+    }
     load_begin(t, UNDO_SOUND);
     panic_req |= (uint8_t)(1u << trk_index(t));       /* MONO/POLY may change: release what sounds */
     t->user = 0;
@@ -745,7 +819,7 @@ static void apply_preset_to(track_t *t, uint32_t pi)
         for (i = 0; i < 4u; i++)
             t->p[P_DIST + i] = (int16_t)(pr->fx[i] ? pr->fx[i] - 1 : FX_DEF[i]);
     }
-    fm6_track_loaded(t);                              /* FM6: the preset's patch (its PTCH) */
+    fm6_track_loaded(t);                              /* FM6: the preset's patch (its SLOT) */
     load_end(t);
 }
 

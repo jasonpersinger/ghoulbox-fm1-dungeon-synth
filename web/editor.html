@@ -206,15 +206,14 @@
       <p class="bar"><label><span data-t="track"></span> <select id="fm6trk"></select></label>
         <button id="fm6read" data-t="fm6ReadBtn"></button> <button id="fm6send" data-t="fm6SendBtn"></button>
         <label><input type="checkbox" id="fm6live"> <span data-t="fm6Live"></span></label></p>
-      <p class="bar"><label><span data-t="slot"></span> <select id="fm6slot"></select></label>
-        <button id="fm6load" data-t="load"></button> <button id="fm6store" data-t="fm6StoreBtn"></button>
-        <button id="fm6erase" data-t="erase"></button></p>
       <p class="bar"><button id="fm6import" data-t="fm6Import" data-ic="symbol_upload"></button>
         <input type="file" id="fm6file" accept=".syx,.SYX,.bin,application/octet-stream" hidden>
         <button id="fm6export" data-t="fm6Export" data-ic="symbol_download"></button>
-        <button id="fm6bankexp" data-t="fm6BankExport" data-ic="symbol_download"></button>
         <button id="fm6init" data-t="fm6Init"></button></p>
       <div id="fm6imported"></div>
+      <p class="bar"><label><span data-t="fm6Factories"></span> <select id="fm6slot"></select></label>
+        <button id="fm6load" data-t="load"></button></p>
+      <p class="dim" id="fm6keep" data-t="fm6Keep"></p>
     </div>
     <div class="group">
       <h2 data-t="fm6Voice" data-ic="ui_knob"></h2>
@@ -443,7 +442,13 @@ const parse = {
       if (trailer[8] === 0x42 && trailer[9] === 1) o.backupCaps = trailer[10] & 3;
     }
     o.fm6 = null;                                 /* FM6 patches (cmds 68..71): the factory and bank slot counts */
-    for (const p of [8, 11]) if (o.motionMax && trailer[p] === 0x46 && trailer[p + 1] === 1) o.fm6 = { factory: trailer[p + 2], bank: trailer[p + 3] };
+    o.syncCaps = 0;                               /* live sync: bit 0 WATCH while on keeps pending pushes, bit 1 no RELOAD */
+    for (const p of [8, 11]) if (o.motionMax && trailer[p] === 0x46 && trailer[p + 1] === 1) {   /* for the editor's */
+      o.fm6 = { factory: trailer[p + 2], bank: trailer[p + 3], caps: 0 };                         /* PRESET / G_ENGSEL */
+      if (trailer[p + 4] === 0x53 && trailer[p + 5] === 1) o.syncCaps = trailer[p + 6] & 3;
+      /* FM6 v2 (1.0.3): bit 0 no bank (SLOT F1..F8, 8 = OWN), bit 1 the user presets carry their patch (target 3) */
+      if (trailer[p + 7] === 0x50 && trailer[p + 8] === 1) o.fm6.caps = trailer[p + 9] & 3;
+    }
     return o;
   },
   [CMD.UI_STATE](a) {
@@ -566,7 +571,8 @@ const parse = {
   /* v4: a parameter of any track (the selection stays), and its push for a track that is not selected */
   [CMD.TRACK_PARAM](a) { const r = new Reader(a); return { track: r.b(), id: r.b(), value: r.v() }; },
   [CMD.TRACK_CHANGED](a) { return parse[CMD.TRACK_PARAM](a); },
-  /* FM6 patches: target 0 a track, 1 a bank slot, 2 a factory patch; packed: the 128-byte record */
+  /* FM6 patches: target 0 a track, 1 the bank (retired in 1.0.3: rc 3), 2 a factory patch, 3 a user preset's patch
+     (INFO fm6.caps bit 1); packed: the 128-byte record */
   [CMD.FM6_GET](a) { return { target: a[0], index: a[1], rc: a[2], packed: a[2] ? null : a.slice(3, 3 + 128) }; },
   [CMD.FM6_PUT](a) { return { target: a[0], index: a[1], rc: a[2] }; },
   [CMD.FM6_LIST](a) {
@@ -1120,18 +1126,21 @@ function libraryFile(kind, patches, ctx) {
       const o = { name: c.name, engine: c.engine, engineName: c.engineName || (ctx.engines || [])[c.engine] || "",
         params: c.p, pattern: c.pattern, tags: c.tags, created: c.created, modified: c.modified };
       if (c.grid) o.grid = c.grid;
-      if (c.fm6) { o.fm6 = c.fm6; o.fm4 = c.fm4; }   /* a DIGITAL sound converted: its FM6 patch, the DIGITAL values */
+      if (c.fm6) { o.fm6 = c.fm6; if (c.fm4) o.fm4 = c.fm4; }   /* an FM6 sound's own patch (a DIGITAL sound converted: and
+                                                         the DIGITAL values) */
       if (Number.isInteger(x.slot)) o.slot = x.slot;
       return o;
     }),
   };
 }
 /* -> {patches, skipped, keys (the file's, for a library that has none yet)}; throws on a file it cannot read.
-   A DIGITAL patch (the engine retired in 1.0) where ctx has no DIGITAL imports as FM6 (fromDigital) */
+   A DIGITAL patch (the engine retired in 1.0) where ctx has no DIGITAL imports as FM6 (fromDigital); a SAMPLE PERC
+   one (the set retired after 1.0.2) as DRUM's kit (fromPerc) */
 function readLibraryFile(obj, ctx) {
   if (!obj || typeof obj !== "object") throw new Error("not JSON");
   const noFm4 = !(ctx.engines || []).includes("DIGITAL");
-  const fm4 = (pt, nm, pe0) => (nm === "DIGITAL" && noFm4 ? fromDigital(pt, ctx.engines, pe0) : pt);
+  const perc = (pt, pe0) => (pt && fromPerc(pt, ctx.engines, pe0)) || pt;
+  const fm4 = (pt, nm, pe0) => (nm === "DIGITAL" && noFm4 ? fromDigital(pt, ctx.engines, pe0) : perc(pt, pe0));
   const engIndex = (name, idx, fileEngines) => {
     const nm = name || (fileEngines || [])[idx];
     if (ctx.engines && ctx.engines.length) {
@@ -1165,8 +1174,9 @@ function readLibraryFile(obj, ctx) {
     const e = digital ? 1 : engIndex(x.engineName, x.engine | 0, obj.engines);
     if (e < 0) { skipped++; continue; }
     const p = remapParams(x.params, fileKeys, ctx.keys, ctx.pe0);
-    const pt = digital ? fromDigital({ ...x, engine: e, p }, ctx.engines, ctx.keys && ctx.pe0 ? ctx.pe0 : obj.pE0 ?? p.length - 8)
-      : cleanPatch({ ...x, engine: e, engineName: (ctx.engines || [])[e] || x.engineName || (obj.engines || [])[x.engine], p });
+    const pe0 = ctx.keys && ctx.pe0 ? ctx.pe0 : obj.pE0 ?? p.length - 8;
+    const pt = digital ? fromDigital({ ...x, engine: e, p }, ctx.engines, pe0)
+      : perc(cleanPatch({ ...x, engine: e, engineName: (ctx.engines || [])[e] || x.engineName || (obj.engines || [])[x.engine], p }), pe0);
     if (!pt) { skipped++; continue; }
     out.push(cleanPatch(pt));
   }
@@ -1175,6 +1185,7 @@ function readLibraryFile(obj, ctx) {
 
 /* device side; rq(r, opt) -> reply args (Link.request), info from INFO */
 const FLASH_OPT = { timeout: 2500, retries: 0 };
+const presetPatches = (info) => !!(info && info.fm6 && info.fm6.caps & 2);   /* user presets carry FM6 patches (1.0.3) */
 const bank = {
   async list(rq) {
     const first = parse[CMD.UP_LIST](await rq(req.upList(0, UP.LIST_MAX)));
@@ -1186,9 +1197,21 @@ const bank = {
     }
     return { total: first.total, slots };
   },
-  async get(rq, info, slot) { return parse[CMD.UP_GET](await rq(req.upGet(slot)), info); },
-  /* -> rc (0 ok) */
-  async put(rq, slot, pt) { return parse[CMD.UP_PUT](await rq(req.upPut(slot, pt), FLASH_OPT)).rc; },
+  /* an FM6 sound's own patch comes with it (fm6: packed) where the firmware keeps one (INFO fm6.caps bit 1) */
+  async get(rq, info, slot) {
+    const u = parse[CMD.UP_GET](await rq(req.upGet(slot)), info);
+    if (u.used && presetPatches(info) && info.engines[u.engine] === "FM6") {
+      const g = parse[CMD.FM6_GET](await rq(req.fm6Get(FM6.TARGET.USER, slot)));
+      if (!g.rc) u.fm6 = g.packed;
+    }
+    return u;
+  },
+  /* -> rc (0 ok); with info, an FM6 sound's patch (pt.fm6) goes with it */
+  async put(rq, slot, pt, info) {
+    const rc = parse[CMD.UP_PUT](await rq(req.upPut(slot, pt), FLASH_OPT)).rc;
+    if (rc || !pt.fm6 || !presetPatches(info) || info.engines[pt.engine] !== "FM6") return rc;
+    return parse[CMD.FM6_PUT](await rq(req.fm6Put(FM6.TARGET.USER, slot, pt.fm6), FLASH_OPT)).rc;
+  },
   async store(rq, slot, name) { return parse[CMD.UP_STORE](await rq(req.upStore(slot, name), FLASH_OPT)).rc; },
   async load(rq, slot) { return parse[CMD.UP_LOAD](await rq(req.upLoad(slot), { timeout: 1000 })).rc; },
   async erase(rq, slot) { return parse[CMD.UP_ERASE](await rq(req.upErase(slot), FLASH_OPT)).rc; },
@@ -1200,8 +1223,14 @@ async function capturePatch(rq, info, name) {
   const steps = [];
   for (let i = 0; i < UP.PAT && i < info.nstep; i++) steps.push(parse[CMD.STEP_GET](await rq(req.stepGet(i))));
   const drum = info.engines[dump.engine] === "DRUM";   /* (a DRUM track that strikes a lane: its grid) */
+  let fm6 = null;                                      /* an FM6 track: its own patch (the selected track's) */
+  if (info.fm6 && info.engines[dump.engine] === "FM6") {
+    const sel = info.ntrk ? parse[CMD.TRACK](await rq(req.track())).sel : 0;
+    const g = parse[CMD.FM6_GET](await rq(req.fm6Get(FM6.TARGET.TRACK, sel)));
+    if (!g.rc) fm6 = g.packed;
+  }
   return { patch: cleanPatch({ name, engine: dump.engine, engineName: info.engines[dump.engine], p: dump.p, pattern: patternFromSteps(steps),
-    grid: drum ? gridFromSteps(steps) : null }), dump, steps };
+    grid: drum ? gridFromSteps(steps) : null, fm6 }), dump, steps };
 }
 
 /* the track's own parameters, which no sound load changes (ui.c param_kept): LEVEL, the ARP and ARP 2 pages,
@@ -1274,7 +1303,7 @@ const mixer = {
    voice: 155 bytes, 6 x 21 operator bytes (the sixth operator first, as the format has them), then 19 voice bytes
    and a 10-character name. packed: the 128-byte record of a 32-voice bank (every byte 7-bit). SysEx files: a
    single voice (F0 43 0n 00 01 1B, 155 bytes, checksum, F7: 163 bytes) or 32 packed voices (F0 43 0n 09 20 00,
-   4096 bytes, checksum, F7: 4104 bytes); raw 155 / 4096-byte files are read too. */
+   4096 bytes, checksum, F7: 4104 bytes); parseSysex also reads the variants real files have (see there). */
 const FM6 = (() => {
   /* per operator byte: name, highest value; then the voice bytes */
   const OP = [["R1", 99], ["R2", 99], ["R3", 99], ["R4", 99], ["L1", 99], ["L2", 99], ["L3", 99], ["L4", 99],
@@ -1332,34 +1361,57 @@ const FM6 = (() => {
     return v;
   }
   const checksum = (a) => (128 - (a.reduce((s, x) => s + x, 0) & 127)) & 127;
-  /* every voice in a file's bytes: [{name, v}], and how many messages had a wrong checksum (still read) */
+  /* every voice in a file's bytes, tolerant of what real files have:
+     - SysEx F0 43 0n 00 xx xx (one voice, 155 bytes) and F0 43 0n 09 xx xx (32 packed voices, 4096 bytes): the byte
+       count is not checked (some tools write 09 10 00, i.e. 0x1000 as two plain bytes); the payload is taken right
+       after the 6-byte header whatever follows it: a checksum or not, F7 or not, a stray byte, the next F0;
+       a message cut short (EOF, or a byte >= 0x80 inside it) keeps its whole voices (the name may be cut: blanks);
+     - several messages in one file, junk before / between / after them;
+     - the format's other blocks (manufacturer 43h: supplements, performances, 4-operator voices, universal "LM  ..." blocks) and other
+       makers' messages are skipped and counted;
+     - raw data without SysEx: 4096 x n bytes (banks), 155 (one voice) or 128 bytes (one packed voice).
+     -> {voices: [{name, v}], badSum: messages with a wrong checksum (still read), short: messages cut short,
+         skipped: other messages, kinds: what the skipped ones were ("fm4" 4-operator voices, "other43" the format's other
+         blocks, "universal", "maker:XX" another manufacturer id), sysex: F0 seen} */
   function parseSysex(bytes) {
-    const d = Uint8Array.from(bytes), voices = [];
-    let badSum = 0;
-    if (d.length === SIZE && d[0] !== 0xF0) return { voices: [{ v: sanitize(d), name: name(sanitize(d)) }], badSum };
-    if (d.length === 4096 && d[0] !== 0xF0) {
-      for (let k = 0; k < 32; k++) { const v = unpack(d.subarray(k * 128, k * 128 + 128)); voices.push({ v, name: name(v) }); }
-      return { voices, badSum };
+    const d = Uint8Array.from(bytes), voices = [], kinds = [];
+    let badSum = 0, short = 0, skipped = 0;
+    const add = (v) => voices.push({ v, name: name(v) });
+    const kind = (k) => { skipped++; if (!kinds.includes(k)) kinds.push(k); };
+    const sysex = d.includes(0xF0);
+    if (d[0] !== 0xF0 && !sysex) {
+      if (d.length && d.length % 4096 === 0) {
+        for (let o = 0; o < d.length; o += 128) add(unpack(d.subarray(o, o + 128)));
+      } else if (d.length === SIZE) add(sanitize(d));
+      else if (d.length === PACKED) add(unpack(d));
+      return { voices, badSum, short, skipped, kinds, sysex };
     }
     for (let i = 0; i < d.length; i++) {
       if (d[i] !== 0xF0) continue;
-      let e = i + 1;
-      while (e < d.length && d[e] !== 0xF7) e++;
-      const m = d.subarray(i, e + 1);
-      i = e;
-      if (m.length < 8 || m[1] !== 0x43 || (m[2] & 0xF0) !== 0) continue;
-      if (m[3] === 0 && m[4] === 0x01 && m[5] === 0x1B && m.length === 163) {
-        const data = m.subarray(6, 6 + SIZE);
-        if (checksum(data) !== m[161]) badSum++;
-        const v = sanitize(data);
-        voices.push({ v, name: name(v) });
-      } else if (m[3] === 9 && m[4] === 0x20 && m[5] === 0 && m.length === 4104) {
-        const data = m.subarray(6, 6 + 4096);
-        if (checksum(data) !== m[4102]) badSum++;
-        for (let k = 0; k < 32; k++) { const v = unpack(data.subarray(k * 128, k * 128 + 128)); voices.push({ v, name: name(v) }); }
+      const id = d[i + 1], st = d[i + 2], f = d[i + 3];
+      if (id === 0x43 && st !== undefined && (st & 0xF0) === 0 && (f === 0 || f === 9) && i + 6 <= d.length) {
+        const want = f === 0 ? SIZE : 4096, s = i + 6;
+        let e = s;
+        while (e < d.length && e < s + want && d[e] < 0x80) e++;
+        const data = d.subarray(s, e);
+        if (data.length < want) short++;
+        else if (e < d.length && d[e] < 0x80 && checksum(data) !== d[e]) badSum++;
+        if (f === 0) {
+          if (data.length >= NAME) { const v = new Uint8Array(SIZE); v.set(data); add(sanitize(v)); }
+        } else {
+          for (let o = 0; o + 118 <= data.length; o += 128) {    /* whole voices, and one cut in its name (at 118) */
+            const pk = new Uint8Array(128); pk.set(data.subarray(o, o + 128)); add(unpack(pk));
+          }
+        }
+        i = e - 1;                      /* on to the next F0 (the checksum, F7, junk are passed over) */
+        continue;
       }
+      if (id === 0x43) kind(f === 3 || f === 4 ? "fm4" : "other43");
+      else if (id === 0x7E || id === 0x7F) kind("universal");
+      else if (id !== undefined && id < 0x80) kind("maker:" + (id === 0 ? [0, d[i + 2], d[i + 3]] : [id])
+        .map((x) => (x ?? 0).toString(16).toUpperCase().padStart(2, "0")).join(" "));
     }
-    return { voices, badSum };
+    return { voices, badSum, short, skipped, kinds, sysex };
   }
   function singleSysex(v, ch = 0) {
     const data = Array.from(sanitize(v));
@@ -1406,7 +1458,7 @@ const FM6 = (() => {
   const factory = (k) => unpack(FACTORY_PK[k]);
   return { OP, VOICE, OPI, VI, NAME, SIZE, PACKED, max, at, sanitize, unpack, pack, name, setName, checksum, parseSysex,
     singleSysex, bankSysex, ALG, carriers, feedbackOp, freqText, INIT_PK, FACTORY_PK, init, factory,
-    TARGET: { TRACK: 0, BANK: 1, FACTORY: 2 } };
+    TARGET: { TRACK: 0, BANK: 1, FACTORY: 2, USER: 3 } };
 })();
 
 /* ----------------------------------------------------------------- DIGITAL --- */
@@ -1576,6 +1628,22 @@ function fromDigital(pt, engines, pe0) {
   return { ...pt, engine: fm6, engineName: "FM6", p: r.p, params: undefined, fm6: FM6.pack(r.voice), fm4: src };
 }
 const reservedFm4 = (engines, e) => e === 1 && (engines || [])[1] === "-";   /* a device's slot of a DIGITAL sound */
+/* SAMPLE SET 4 was PERC, the GM drum kit (retired after 1.0.2; src/core.h drum_from_perc): a sound of it is the DRUM
+   engine with its default kit (eng_drum.c DRUM_PRESETS[0], the same GM key map); the rest of its values stay. engines:
+   the names ("SAMPLE", "DRUM"; none: the firmware's indices 4, 10), pe0: P_E0 in its p. -> the DRUM patch, or null when
+   pt is no such sound or there is no DRUM. The device converts its own (projects, user presets) the same way */
+const PERC_SET = 4, DRUM_KIT_E = [0, 64, 70, 64, 64, 100, 0, 0];
+function fromPerc(pt, engines, pe0) {
+  const names = engines && engines.length ? engines : null;
+  const name = pt.engineName || (names || [])[pt.engine];
+  const p = pt.p || pt.params, drum = names ? names.indexOf("DRUM") : 10;
+  if ((name ? name !== "SAMPLE" : pt.engine !== 4) || !Array.isArray(p) || drum < 0) return null;
+  const e0 = pe0 ?? p.length - 8;
+  if (p[e0] !== PERC_SET) return null;
+  const q = p.slice();
+  DRUM_KIT_E.forEach((v, i) => { q[e0 + i] = v; });
+  return { ...pt, engine: drum, engineName: "DRUM", p: q, params: undefined };
+}
 /* an engine's name to show: the reserved engine 1 holds DIGITAL sounds that play as FM6 */
 const engineLabel = (engines, e) => (e === 1 && (engines || [])[1] === "-" ? "FM6" : (engines || [])[e] ?? String(e));
 
@@ -1643,7 +1711,7 @@ function makeMockDevice(opt = {}) {
         P("ARP 8BIT", [2, 0, 96, 0, 0, 0, 2, 110], [0, 60, 80, 40], 0, 13), P("WAVE LEAD", [0, 4, 92, 0, 0, 18, 0, 110], [0, 70, 90, 30], 1, 3),
         P("STEP LEAD", [4, 0, 40, 34, 0, 16, 0, 127], [0, 64, 127, 55], 1, 4),
         /* GHOULBOX presets (tools/ghoulbox_presets.py) */ P("TOWER LEAD", [0, 1, 64, 0, 0, 30, 0, 70], [5, 70, 110, 60], 1, 4), P("CASIO CHOIR", [0, 4, 92, 0, 0, 20, 0, 80], [60, 90, 115, 90], 0, 5), P("RECORDER", [2, 1, 64, 0, 0, 24, 0, 60], [12, 70, 115, 50], 1, 4) /* GHOULBOX end */] },
-    { name: "SAMPLE", titles: ["SET", "TONE"], edit: [E("SET", ["PIANO", "PIANO", "FLUTE", "SAX", "PERC", "USR1", "USR2", "USR3"], 0), D("TUNE", F.SEMI, -24, 24, 0), D("BITS", F.INT, 0, 127, 0),
+    { name: "SAMPLE", titles: ["SET", "TONE"], edit: [E("SET", ["PIANO", "PIANO", "FLUTE", "SAX", "PIANO", "USR1", "USR2", "USR3"], 0), D("TUNE", F.SEMI, -24, 24, 0), D("BITS", F.INT, 0, 127, 0),
         E("LOOP", NONOFF, 1), D("CUT", F.INT, 0, 127, 127), NONE, D("DRV", F.PCT, 0, 127, 0), NONE],
       presets: [P("PIANO", [0, 0, 0, 1, 127, 0, 0, 0], [0, 127, 127, 70]), P("PIANO", [0, 0, 0, 1, 127, 0, 0, 0], [0, 127, 127, 70]),
         P("FLUTE", [2, 0, 0, 1, 127, 0, 0, 0], [12, 80, 120, 60]), P("SAX", [3, 0, 0, 1, 127, 0, 0, 0], [12, 80, 120, 60])] },
@@ -1666,7 +1734,7 @@ function makeMockDevice(opt = {}) {
         P("GOSPEL", [6, 0, 0, 0, 1, 60, 40, 2], [0, 64, 127, 45], 0, 6), P("SOFT FLUTE", [1, 0, -2, 0, 0, 10, 0, 1], [0, 64, 127, 55], 0, 5),
         P("ROCK DRIVE", [7, 0, 0, 0, 0, 70, 100, 2], [0, 64, 127, 40], 0, 4),
         /* GHOULBOX presets (tools/ghoulbox_presets.py) */ P("CRYPT ORGAN", [12, 2, 0, -3, 0, 5, 15, 1], [20, 64, 127, 70], 0, 5), P("CATHEDRAL", [15, 3, 0, -2, 0, 0, 10, 0], [30, 64, 127, 90], 0, 5), P("HARMONIUM", [10, 0, 1, -4, 0, 10, 25, 1], [15, 64, 127, 50], 0, 6), P("TOWER FLUTE", [0, 0, -3, -6, 0, 0, 30, 1], [25, 64, 127, 60], 1, 4) /* GHOULBOX end */] },
-    { name: "GRAIN", titles: ["GRAN", "SPRY"], edit: [E("SRC", ["PIANO", "PIANO", "FLUTE", "SAX", "PERC", "USR1", "USR2", "USR3"], 0),
+    { name: "GRAIN", titles: ["GRAN", "SPRY"], edit: [E("SRC", ["PIANO", "PIANO", "FLUTE", "SAX", "PIANO", "USR1", "USR2", "USR3"], 0),
         D("POS", F.PCT, 0, 127, 32), D("SIZE", F.PCT, 0, 127, 80), D("DENS", F.PCT, 0, 127, 80),
         D("PTCH", F.SEMI, -24, 24, 0), D("SPRD", F.PCT, 0, 127, 30), D("RAND", F.PCT, 0, 127, 10), D("TONE", F.PCT, 0, 127, 127)],
       presets: [P("CLOUD PAD", [2, 50, 92, 88, 0, 40, 14, 100], [70, 90, 120, 90], 0, 5), P("GLITCH", [3, 64, 24, 112, 0, 100, 90, 127], [0, 70, 100, 30], 0, 4),
@@ -1692,7 +1760,7 @@ function makeMockDevice(opt = {}) {
         /* GHOULBOX presets (tools/ghoulbox_presets.py) */ P("CAVE WIND", [0, 40, 50, 90, 0, 0, 90, 0], [110, 90, 120, 120], 0, 5), P("TORCH", [1, 30, 100, 60, 0, 60, 30, 0], [20, 90, 127, 80], 0, 5) /* GHOULBOX end */] },
     { name: "FM6", titles: ["OPS", "PATCH"], edit: [D("ALG", F.INT, 0, 32, 0), D("FB", F.INT, -7, 7, 0), D("MLVL", F.BIPCT, -64, 63, 0),
         D("MRAT", F.INT, -16, 16, 0), D("MEG", F.BIPCT, -64, 63, 0), D("VMOD", F.INT, -7, 7, 0), D("DTUN", F.PCT, 0, 127, 0),
-        D("PTCH", F.INT, 0, FM6.FACTORY_PK.length + 27 - 1, 0)],
+        D("SLOT", F.INT, 0, FM6.FACTORY_PK.length, 0)],   /* F1..F8, then OWN (eng_fm6.c, 1.0.3) */
       presets: [P("TINE EP", [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 127, 0], 0, 6), P("BELL", [0, 0, 0, 0, 0, 0, 0, 1], [0, 0, 127, 0], 0, 7),
         P("FM BASS", [0, 0, 0, 0, 0, 0, 0, 2], [0, 0, 127, 0], 1, 2), P("BRASS", [0, 0, 0, 0, 0, 0, 0, 3], [0, 0, 127, 0], 0, 4),
         P("PAD", [0, 0, 0, 0, 0, 0, 30, 4], [0, 0, 127, 0], 0, 5), P("MARIMBA", [0, 0, 0, 0, 0, 0, 0, 5], [0, 0, 127, 0], 0, 3),
@@ -1708,7 +1776,7 @@ function makeMockDevice(opt = {}) {
       presets: [
         /* GHOULBOX presets (tools/ghoulbox_presets.py) */ P("HURDY GURDY", [2, 90, 50, 80, 70, 2, 70, 40], [8, 64, 127, 40], 1, 4), P("DRONE WHEEL", [2, 110, 80, 60, 0, 0, 90, 60], [40, 64, 127, 90], 1, 5), P("DANCE GURDY", [2, 80, 40, 100, 110, 3, 60, 25], [4, 64, 127, 30], 1, 3), P("TROMPETTE", [2, 70, 30, 90, 95, 1, 65, 35], [6, 64, 127, 50], 1, 4), P("VIELLE", [2, 0, 0, 85, 0, 0, 80, 30], [20, 64, 120, 60], 1, 4) /* GHOULBOX end */] },
   ];
-  const FM6_E = ENG.findIndex((e) => e.name === "FM6"), FM6_BANK = 27;
+  const FM6_E = ENG.findIndex((e) => e.name === "FM6"), FM6_OWN = FM6.FACTORY_PK.length, DRUM_E = ENG.findIndex((e) => e.name === "DRUM");
   /* factory PATTERNS[] (engines.c; the device loads them from SEQ > PATTERNS, presets only suggest one): absolute
      notes, 0 rest; flags 1 accent, 2 slide, 4 tie (holds the previous note) */
   const T_ = 4;
@@ -1724,7 +1792,7 @@ function makeMockDevice(opt = {}) {
     [[60, 61, 62, 67, 64, 65, 60, 69, 68, 70, 62, 67, 72, 72, 74, 64], [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]],
     [[60, 60, 61, 61, 62, 0, 63, 63, 64, 65, 65, 0, 66, 66, 66, 67], [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]],
     [[60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]],
-    [[36, 42, 42, 42, 38, 42, 36, 42, 36, 42, 42, 36, 38, 42, 46, 42], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]],   /* 12 BEAT (SAMPLE PERC) */
+    [[36, 42, 42, 42, 38, 42, 36, 42, 36, 42, 42, 36, 38, 42, 46, 42], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]],   /* 12 BEAT (DRUM) */
     [[48, 51, 55, 60, 63, 67, 72, 75, 48, 51, 55, 60, 63, 67, 72, 75], [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]],   /* 13 ARP */
   ];
   for (let op = 0; op < 4; op++) TP.push(D("ATK", F.TIME, 0, 127, 0), D("DEC", F.TIME, 0, 127, 0), D("SUS", F.PCT, 0, 127, 127), D("REL", F.TIME, 0, 127, 0), D("LVL", F.PCT, 0, 127, 127));
@@ -1744,11 +1812,10 @@ function makeMockDevice(opt = {}) {
     g: GP.map((d) => d.def),
     slots: [null, null, null, null], songRows: [], chainPlaying: false, chainRow: 0, chainRemaining: 0,
     smp: [0, 1, 2].map(() => ({ flash: new Uint8Array(SMP.SLOT_SIZE).fill(0xFF), zones: 0, name: "", len: 0, next: SMP.DATA_OFF })),
-    bank: new Array(opt.slots || 32).fill(null),     /* user presets: {engine, name, p, pattern, grid} */
-    fm6bank: new Array(FM6_BANK).fill(null),           /* the FM6 patch bank: packed records */
+    bank: new Array(opt.slots || 32).fill(null),     /* user presets: {engine, name, p, pattern, grid, fm6 (FM6: its patch)} */
     uiCaps: opt.legacy || opt.v3 || opt.v5 ? 0 : opt.uiCaps ?? 9,
     palette: 0, font: 0, monitor: 0, filter: 0, bankSig: 0,
-    palettes: ["MONO", "GREEN", "AMBER", "ICE", "VIOLET", "ROSE", "PAPER", "HI-CON"],
+    palettes: ["GREY", "GREEN", "AMBER", "ICE", "VIOLET", "ROSE", "PAPER", "HI-CON", "NIGHT", "MONO"],
     favorites: Array.from({ length: ENG.length + 1 }, () => []),
     watch: false, v4: false, lastReq: 0,
   };
@@ -1775,6 +1842,7 @@ function makeMockDevice(opt = {}) {
   const loadPattern = (k) => loadPat16(PATTERNS[k][0].map((n, i) => [n, PATTERNS[k][1][i]]));
   function applyPreset(pi) {
     const e = ENG[st.engine];
+    if (e.name === "SAMPLE" && pi === PERC_SET) { setEngine(DRUM_E); return; }   /* once PERC: DRUM's kit (ui.c apply_preset_to) */
     pi = aliasOf(e.presets.map((x) => x.name), pi % e.presets.length);
     const pr = e.presets[pi];
     st.preset = pi;
@@ -1785,12 +1853,26 @@ function makeMockDevice(opt = {}) {
     for (let i = P_SLCR + 4; i < P_E0; i++) if (!trackOwn(i, P_E0)) st.p[i] = TP[i].def;   /* a factory preset turns the
                                                      matrix off; the SLICER, the chord keys, the steps and the other track
                                                      settings stay (ui.c apply_preset_to) */
-    if (st.engine === FM6_E) fm6Slot(st.tracks[st.sel], st.p[P_E0 + 7]);   /* eng_fm6.c fm6_track_loaded */
+    if (st.engine === FM6_E) {                    /* eng_fm6.c fm6_track_loaded */
+      const t = st.tracks[st.sel];
+      t.own = null;
+      if (st.p[P_E0 + 7] < FM6_OWN) { t.fm6 = FM6.FACTORY_PK[st.p[P_E0 + 7]].slice(); t.slot = st.p[P_E0 + 7]; } else fm6Adopt(t);
+    }
   }
-  /* PTCH s -> the track's patch: F1..F8 factory, then the bank (empty: the init voice) */
+  /* SLOT s turned (eng_fm6.c fm6_poll): F1..F8 that factory patch (from OWN the own patch kept aside), OWN the own
+     patch back */
   function fm6Slot(t, s) {
-    const nf = FM6.FACTORY_PK.length;
-    t.fm6 = (s < nf ? FM6.FACTORY_PK[s] : st.fm6bank[s - nf] || FM6.INIT_PK).slice();
+    if (s === t.slot) return;
+    if (s >= FM6_OWN) { if (t.own) t.fm6 = t.own; t.own = null; t.slot = FM6_OWN; return; }
+    if (t.slot === FM6_OWN && !t.own) t.own = t.fm6.slice();
+    t.fm6 = FM6.FACTORY_PK[s].slice(); t.slot = s;
+  }
+  /* t's patch was put in as its own (eng_fm6.c fm6_adopt): SLOT = the factory patch it equals, else OWN */
+  function fm6Adopt(t) {
+    t.own = null;
+    if (t.engine !== FM6_E) return;
+    const k = FM6.FACTORY_PK.findIndex((pk) => pk.every((x, i) => x === t.fm6[i]));
+    t.p[P_E0 + 7] = t.slot = k < 0 ? FM6_OWN : k;
   }
   function setEngine(ei) {
     if (ei % ENG.length === 1) { fm4Load(0); return; }   /* DIGITAL (retired): its first preset, as FM6 (ui.c set_engine_of) */
@@ -1803,15 +1885,18 @@ function makeMockDevice(opt = {}) {
     const r = FM4.convert(p, P_E0);
     st.engine = FM6_E; st.preset = r.preset; st.p = r.p;
     st.tracks[st.sel].fm6 = FM6.pack(r.voice);
+    fm6Adopt(st.tracks[st.sel]);                  /* (the converted patch is the track's own: SLOT OWN) */
   }
   function fm4Load(k) {                           /* a DIGITAL preset number (ui.c fm4_load_preset) */
     const p = st.p.map((x, i) => (i < P_E0 && !trackOwn(i, P_E0) ? TP[i].def : x));
     fm4Apply(FM4.presetValues(p, k, P_E0));
   }
-  const snapshot = (name) => {                   /* (upreset.c up_store: a DRUM track that strikes a lane: its grid) */
+  const snapshot = (name) => {                   /* (upreset.c up_store: a DRUM track that strikes a lane: its grid; an FM6
+                                                     track: its patch, up_fm6.c) */
     const grid = isDrum() ? gridFromSteps(st.step) : null;
-    return patternUsed(grid) ? { engine: st.engine, name, p: st.p.slice(), pattern: null, grid }
-      : { engine: st.engine, name, p: st.p.slice(), pattern: patternFromSteps(st.step), grid: null };
+    const fm6 = st.engine === FM6_E ? st.tracks[st.sel].fm6.slice() : null;
+    return patternUsed(grid) ? { engine: st.engine, name, p: st.p.slice(), pattern: null, grid, fm6 }
+      : { engine: st.engine, name, p: st.p.slice(), pattern: patternFromSteps(st.step), grid: null, fm6 };
   };
   const stepOut = (x, b) => { b(x.n); x.notes.forEach(b); b(x.time); b(x.flags); b(x.vel); hitsEnc(x.hit, x.acc).forEach(b); if (!opt.legacy && !opt.v3 && !opt.v5) b(x.chance ?? 100); };
   function stepIn(x, a) {                         /* editor.c ed_step_put: n, 4 notes, time, flags, vel [, hits (3)] */
@@ -1890,8 +1975,9 @@ function makeMockDevice(opt = {}) {
           if (slot >= NB || engine >= ENG.length || !name.length || name.length > UP.NAME_MAX || /[^\x20-\x7E]/.test(name)) rc = 1;
           else {
             const saved = st.engine;                /* values clamped to the ranges of that engine */
-            st.engine = engine;
-            st.bank[slot] = { engine, name, p: p.map((x, i) => { const d = desc(0, i); return clamp(x, d.min, d.max); }), pattern, grid };
+            const pc = fromPerc({ engine, p }, ENG.map((x) => x.name), P_E0);   /* SAMPLE PERC: DRUM (upreset.c up_migrate) */
+            st.engine = pc ? pc.engine : engine;
+            st.bank[slot] = { engine: st.engine, name, p: (pc ? pc.p : p).map((x, i) => { const d = desc(0, i); return clamp(x, d.min, d.max); }), pattern, grid };
             st.engine = saved;
           }
         } catch (e) { rc = 1; }
@@ -1902,7 +1988,7 @@ function makeMockDevice(opt = {}) {
         if (a.length < 2) return null;
         const name = new Reader(a.slice(1)).s();
         const rc = a[0] >= NB || name.length > UP.NAME_MAX ? 1 : 0;
-        if (!rc) st.bank[a[0]] = snapshot(name || `${ENG[st.engine].name} ${String(a[0] + 1).padStart(2, "0")}`);
+        if (!rc) st.bank[a[0]] = snapshot(name || `${ENG[st.engine].name} ${String(a[0] + 1).padStart(2, "0")}`);   /* (FM6: its patch) */
         b(a[0]); b(rc);
         break;
       }
@@ -1914,6 +2000,11 @@ function makeMockDevice(opt = {}) {
           const p = u.p.map((x, i) => (trackOwn(i, P_E0) ? own[i] : x));
           if (u.engine === 1) fm4Apply(p);          /* a DIGITAL record (kept as it is): FM6 */
           else { st.engine = u.engine; st.preset = 0; st.p = p; }
+          if (u.engine === FM6_E) {                 /* its own patch (up_fm6.c upf_track_load); none: SLOT's factory / init */
+            const t = st.tracks[st.sel], s = p[P_E0 + 7];
+            t.fm6 = (u.fm6 || (s < FM6_OWN ? FM6.FACTORY_PK[s] : FM6.INIT_PK)).slice();
+            fm6Adopt(t);
+          }
         }
         b(a[0]); b(u ? 0 : 1);
         break;
@@ -1974,7 +2065,8 @@ function makeMockDevice(opt = {}) {
         if (!opt.legacy) b(NTRK);
         if (!opt.legacy && !opt.v3 && !opt.v5) {
           b(16);
-          if (st.uiCaps) { b(0x55); b(1); b(st.uiCaps); b(0x4d); b(1); b(64); b(1); if (!opt.noFm6) { b(0x46); b(1); b(FM6.FACTORY_PK.length); b(FM6_BANK); } }
+          if (st.uiCaps) { b(0x55); b(1); b(st.uiCaps); b(0x4d); b(1); b(64); b(1); if (!opt.noFm6) { b(0x46); b(1); b(FM6.FACTORY_PK.length); b(0); }
+            if (syncCaps()) { b(0x53); b(1); b(syncCaps()); if (!opt.noFm6) { b(0x50); b(1); b(3); } } }   /* (FM6 v2: no bank, preset patches) */
         }
         break;
       case CMD.GET: case CMD.SET: {
@@ -2045,33 +2137,31 @@ function makeMockDevice(opt = {}) {
       }
       case CMD.FM6_GET: case CMD.FM6_PUT: case CMD.FM6_LIST: case CMD.FM6_ERASE: {   /* editor_fm6.c */
         if (opt.noFm6 || !st.uiCaps) return null;
-        const nf = FM6.FACTORY_PK.length;
-        if (cmd === CMD.FM6_LIST) {
+        const nf = FM6.FACTORY_PK.length, fm6User = (k) => k < NB && st.bank[k] && st.bank[k].engine === FM6_E;
+        if (cmd === CMD.FM6_LIST) {                 /* the factory patches; no bank (1.0.3) */
           if (a.length) return null;
-          b(nf); b(FM6_BANK);
-          for (let i = 0; i < nf + FM6_BANK; i++) {
-            const pk = i < nf ? FM6.FACTORY_PK[i] : st.fm6bank[i - nf];
-            b(pk ? 1 : 0); s(pk ? FM6.name(FM6.unpack(pk)) : "");
-          }
+          b(nf); b(0);
+          for (let i = 0; i < nf; i++) { b(1); s(FM6.name(FM6.unpack(FM6.FACTORY_PK[i]))); }
         } else if (cmd === CMD.FM6_ERASE) {
-          const rc = a.length !== 1 || a[0] >= FM6_BANK ? 1 : 0;
-          if (!rc) st.fm6bank[a[0]] = null;
-          b(a[0] ?? 127); b(rc);
+          b(a[0] ?? 127); b(a.length !== 1 ? 1 : 3);   /* (3: no bank) */
         } else if (cmd === CMD.FM6_GET) {
-          let rc = a.length !== 2 || a[0] > 2 ? 1 : 0, pk = null;
-          if (!rc) pk = a[0] === 0 ? (a[1] < NTRK ? st.tracks[a[1]].fm6 : null) : a[0] === 1 ? (a[1] < FM6_BANK ? st.fm6bank[a[1]] : undefined)
-            : (a[1] < nf ? FM6.FACTORY_PK[a[1]] : null);
-          if (!rc) rc = pk === undefined || (pk === null && a[0] !== 1) ? 1 : pk === null ? 2 : 0;
+          let rc = a.length !== 2 || a[0] > 3 ? 1 : 0, pk = null;
+          if (!rc) {
+            if (a[0] === 0 && a[1] < NTRK) pk = st.tracks[a[1]].fm6;
+            else if (a[0] === 1) rc = 3;
+            else if (a[0] === 2 && a[1] < nf) pk = FM6.FACTORY_PK[a[1]];
+            else if (a[0] === 3 && a[1] < NB) { pk = fm6User(a[1]) ? st.bank[a[1]].fm6 : null; rc = pk ? 0 : 2; }
+            else rc = 1;
+          }
           b(a[0] ?? 127); b(a[1] ?? 127); b(rc);
           if (!rc) pk.forEach(b);
         } else {
           let rc = a.length !== 2 + 128 ? 1 : 0;
           const pk = rc ? null : FM6.pack(FM6.unpack(a.slice(2)));   /* (every value into its range) */
-          if (!rc && a[0] === 0 && a[1] < NTRK) st.tracks[a[1]].fm6 = pk;
-          else if (!rc && a[0] === 1 && a[1] < FM6_BANK) {
-            st.fm6bank[a[1]] = pk;
-            st.tracks.forEach((t) => { if (t.engine === FM6_E && t.p[P_E0 + 7] === nf + a[1]) t.fm6 = pk.slice(); });
-          } else rc = 1;
+          if (!rc && a[0] === 0 && a[1] < NTRK) { st.tracks[a[1]].fm6 = pk; fm6Adopt(st.tracks[a[1]]); }
+          else if (!rc && a[0] === 1) rc = 3;
+          else if (!rc && a[0] === 3 && fm6User(a[1])) st.bank[a[1]].fm6 = pk;
+          else rc = 1;
           b(a[0] ?? 127); b(a[1] ?? 127); b(rc);
         }
         break;
@@ -2113,8 +2203,13 @@ function makeMockDevice(opt = {}) {
         if (a[0] === 1) { st.chainPlaying = false; st.slots[k] = project(); }
         else if (a[0] === 0 && st.slots[k]) {
           st.chainPlaying = false; Object.assign(st, JSON.parse(JSON.stringify(st.slots[k])));
-          /* Removed factory presets keep their saved sound; only the display index is normalized. */
-          st.tracks.forEach((t) => { if (t.preset >= ENG[t.engine].presets.length) t.preset = 0; });
+          /* SAMPLE PERC tracks: DRUM's kit (project.c proj_perc). Removed factory presets keep their saved sound; only
+             the display index is normalized. */
+          st.tracks.forEach((t) => {
+            const pc = fromPerc({ engine: t.engine, p: t.p }, ENG.map((x) => x.name), P_E0);
+            if (pc) { t.engine = pc.engine; t.p = pc.p; t.preset = 0; }
+            if (t.preset >= ENG[t.engine].presets.length) t.preset = 0;
+          });
         }
         b(a[0]); b(k); b(st.slots[k] ? 1 : 0);
         break;
@@ -2194,7 +2289,7 @@ function makeMockDevice(opt = {}) {
         const r = handle(f.cmd, f.a);
         if (r && input.onmidimessage) input.onmidimessage({ data: Uint8Array.from(r) });
         const ra = r ? r.slice(5, -1) : [];
-        if (r && ((f.cmd === CMD.SET && f.a[0] === 1 && f.a[1] === G_ENGSEL) || f.cmd === CMD.PRESET
+        if (r && ((!syncCaps() && ((f.cmd === CMD.SET && f.a[0] === 1 && f.a[1] === G_ENGSEL) || f.cmd === CMD.PRESET))
           || (f.cmd === CMD.PROJECT && f.a[0] === 0 && ra[2]) || (f.cmd === CMD.UP_LOAD && !ra[1]))) reloadPush();
       }, f.cmd === CMD.SMP_ERASE ? 900 : f.cmd === CMD.SMP_BEGIN ? 120 : flash ? 150 : f.cmd === CMD.SMP_WRITE ? 25 + Math.random() * 10 : 4 + Math.random() * 12);
     },
@@ -2210,6 +2305,8 @@ function makeMockDevice(opt = {}) {
     setTimeout(() => { if (input.onmidimessage) input.onmidimessage({ data: fr }); }, 0);
     return true;
   }
+  /* INFO 53 01 caps (firmware after 1.0): no RELOAD echo of the editor's own PRESET / G_ENGSEL */
+  const syncCaps = () => (!opt.legacy && !opt.v3 && !opt.v5 && !opt.noFm6 && !opt.noSync && st.uiCaps ? 3 : 0);
   const reloadPush = () => push(CMD.RELOAD, opt.legacy ? [st.engine, st.preset] : [st.engine, st.preset, st.sel]);
   /* things done on the device itself */
   const sim = {
@@ -2264,7 +2361,7 @@ function makeMockDevice(opt = {}) {
   return {
     state: st, sim,
     tables: { TP, GP, ENG, PATTERNS, P_COUNT, G_COUNT, NSTEP, P_E0, G_ENGSEL, P_SLCR, NTRK,
-      FM6: { bank: FM6_BANK, init: FM6.INIT_PK, factory: FM6.FACTORY_PK } },   /* test_web.mjs: == the firmware */
+      FM6: { bank: 0, own: FM6_OWN, init: FM6.INIT_PK, factory: FM6.FACTORY_PK } },   /* test_web.mjs: == the firmware */
     stop: () => timers.forEach(clearInterval),
     access: { sysexEnabled: true, inputs: new Map([[input.id, input]]), outputs: new Map([[output.id, output]]), onstatechange: null },
   };
@@ -2296,6 +2393,19 @@ async function readDevicePreferences(rq, info, names, previous = null) {
 /* an enum value or a preset named like an earlier one is an alias kept for stored numbers (SAMPLE / GRAIN 1,
    once TRANH: PIANO): the device loads the earlier one, the lists hide it. -> the first index with names[i] */
 function aliasOf(names, i) { const k = names ? names.indexOf(names[i]) : -1; return k >= 0 && k < i ? k : i; }
+
+/* #48: note divisions (1/4, 8T, 2BAR, ...) are listed by length, longest first, as the device's knobs step them
+   (src/params.c enum_order); the values stay. Any other list: in value order. -> d's values in the order shown */
+function divLength(n) {
+  const m = /^(\d+)\/(\d+)$/.exec(n) || /^(\d+)(T|BAR)$/.exec(n);
+  return !m ? null : m[2] === "BAR" ? +m[1] : m[2] === "T" ? 2 / 3 / +m[1] : +m[1] / +m[2];
+}
+function enumShown(d) {
+  const vals = [];
+  for (let v = d.min; v <= d.max; v++) vals.push(v);
+  const len = d.fmt === F.ENUM && d.names ? d.names.map(divLength) : [null];
+  return len.includes(null) ? vals : vals.sort((a, b) => len[b - d.min] - len[a - d.min] || a - b);
+}
 
 /* the order the device shows its engines in (src/engines.c ENGINE_ORDER): the lists here follow it, the protocol keeps
    the engine numbers. engineOrder(names): the indices of names in that order, "-" (a reserved number) left out; a name
@@ -2376,15 +2486,24 @@ function setLabel(e, txt) { e.replaceChildren(...(e.dataset.ic ? [icon(e.dataset
 
 const TEXT = {
   ja: {
-    tabFm6: "6-OP FM", fm6Help: "FM6 エンジンの音色（6 オペレーター）をまるごと編集します。本体のノブはこの音色の上にかかるマクロです。トラックへ送るとすぐ鳴り、プロジェクトに保存されます。バンク（B1〜B27）に保存すると PTCH で呼び出せます。",
+    tabFm6: "6-OP FM", fm6Help: "FM6 エンジンの音色（6 オペレーター）をまるごと編集します。本体のノブはこの音色の上にかかるマクロです。SysEx を読み込み、音色を選んで編集し、トラックへ送るとすぐ鳴ります。トラックの音色はひとつで、読み込んだものがそのトラックの音色になります（SLOT は OWN）。",
     fm6Source: "音色の出し入れ", fm6ReadBtn: "トラックから読む", fm6SendBtn: "トラックへ送る", fm6Live: "編集しながら送る",
-    fm6StoreBtn: "バンクに保存", fm6Import: "SysEx を読み込む", fm6Export: "SysEx に書き出し", fm6BankExport: "バンクを SysEx に書き出し",
+    fm6Import: "SysEx を読み込む", fm6Export: "SysEx に書き出し",
     fm6Init: "初期音色", fm6Voice: "ボイス", fm6Ops: "オペレーター", fm6Carriers: "キャリア", fm6Feedback: "フィードバック",
     fm6PitchEg: "ピッチ EG", fm6Freq: "周波数",
     fm6Legend: "R1〜R4 / L1〜L4: EG のレートとレベル、BP LD RD LC RC: キーボードレベルスケーリング、RS: レートスケーリング、AMS: LFO 音量変調、KVS: ベロシティ、OL: 出力レベル、MODE: 比率 / 固定、FC FF: 周波数（粗・細）、DET: デチューン（7 が中央）。● はキャリア。",
     fm6Pick: "読み込んだファイルの音色（押すと編集へ）:", fm6Picked: "編集中:", fm6Sent: "トラックへ送りました:", fm6Read: "トラックから読みました",
-    fm6Loaded: "読み込みました", fm6Factory: "F1〜F8 はファクトリー音色です。B1〜B27 を選んでください。", fm6BadSum: "チェックサム不一致あり",
-    fm6Exported: "バンクを書き出しました",
+    fm6Loaded: "読み込みました", fm6BadSum: "チェックサム不一致あり",
+    fm6Keep: "残すには、トラックへ送ってから本体でユーザープリセット（SAVE）かプロジェクトに保存してください。",
+    fm6Short: "途中で切れたデータあり", fm6Skipped: "音色以外の {x} 件は無視",
+    fm6NoVoice: "6 オペレーター FM の音色が見つかりません（32 音色バンクか 1 音色の SysEx が必要です）",
+    fm6NotSysex: "SysEx ファイルではありません（6 オペレーター FM の 32 音色バンクか 1 音色の SysEx が必要です）",
+    fm6Is4op: "4 オペレーター FM の音色データです。FM6 は 6 オペレーターの音色だけ読み込めます",
+    fm6OtherBlocks: "6 オペレーターのファイル形式ですが、音色ではないデータ（パフォーマンスや補助データなど）だけでした",
+    fm6OtherMaker: "別のメーカーの SysEx です", fm6Universal: "音色ではない汎用 SysEx です",
+    fm6Factories: "ファクトリー音色",
+    fm6NeedDevice: "FM-1 を接続すると 6-OP FM の音色を編集してトラックへ送れます。",
+    fm6NoFw: "このファームウェアには 6-OP FM（FM6）がありません。Felucca 1.0 以降に更新すると使えます。",
     motion: "モーション", motionOn: "再生", motionClear: "モーションを消去", motionConfirm: "選択トラックのモーションを消しますか？", chance: "確率 %", motionStep: "ステップ", motionParam: "パラメーター", motionValue: "値",
     backupTitle: "全体バックアップ", backupExport: "バックアップ保存", backupImport: "バックアップ復元", backupHelp: "現在の曲・A〜D・音色バンク・ユーザーサンプル・設定を、このパソコンへ保存。", backupOld: "全体バックアップには対応版への更新が必要です。", backupConfirm: "全体バックアップを復元しますか？ 現在の曲、保存データとサンプルを置き換えます。USBを抜かないでください。", backupWorking: "バックアップ処理中 ", backupDone: "バックアップを保存しました", backupRestored: "全体バックアップを復元しました",
     deviceDisplay: "本体の画面",
@@ -2470,15 +2589,24 @@ const TEXT = {
     smpSlots: "サンプルスロット", userBank: "ユーザープリセット", none: "なし",
   },
   en: {
-    tabFm6: "6-OP FM", fm6Help: "Edit the whole patch of the FM6 engine (six operators). The device's knobs are macros on top of it. Sending it to a track plays it at once and a project keeps it; stored in the bank (B1..B27) it is a PTCH value.",
+    tabFm6: "6-OP FM", fm6Help: "Edit the whole patch of the FM6 engine (six operators). The device's knobs are macros on top of it. Import a SysEx file, pick a voice, edit it and send it to a track: it plays at once. A track has one patch: whatever you load becomes it (SLOT shows OWN).",
     fm6Source: "Patches in and out", fm6ReadBtn: "Read from track", fm6SendBtn: "Send to track", fm6Live: "Send while editing",
-    fm6StoreBtn: "Store in bank", fm6Import: "Import SysEx", fm6Export: "Export SysEx", fm6BankExport: "Export bank as SysEx",
+    fm6Import: "Import SysEx", fm6Export: "Export SysEx",
     fm6Init: "Init voice", fm6Voice: "Voice", fm6Ops: "Operators", fm6Carriers: "carriers", fm6Feedback: "feedback",
     fm6PitchEg: "Pitch EG", fm6Freq: "Frequency",
     fm6Legend: "R1..R4 / L1..L4: EG rates and levels; BP LD RD LC RC: keyboard level scaling; RS: rate scaling; AMS: LFO amplitude modulation; KVS: velocity; OL: output level; MODE: ratio / fixed; FC FF: coarse / fine frequency; DET: detune (7 = centre). ● = carrier.",
     fm6Pick: "Voices of the imported file (click to edit):", fm6Picked: "Editing:", fm6Sent: "Sent to track", fm6Read: "Read from track",
-    fm6Loaded: "Loaded", fm6Factory: "F1..F8 are the factory patches: pick B1..B27.", fm6BadSum: "a checksum did not match",
-    fm6Exported: "Bank exported",
+    fm6Loaded: "Loaded", fm6BadSum: "a checksum did not match",
+    fm6Keep: "To keep a voice, send it to a track, then save a user preset (SAVE) or a project on the device.",
+    fm6Short: "some data was cut short", fm6Skipped: "{x} non-voice blocks skipped",
+    fm6NoVoice: "No 6-operator FM voices found (expects a 32-voice bank or single-voice SysEx)",
+    fm6NotSysex: "Not a SysEx file (expects a 6-operator FM 32-voice bank or single-voice SysEx)",
+    fm6Is4op: "These are 4-operator FM voices: FM6 reads 6-operator voices only",
+    fm6OtherBlocks: "6-operator file format, but no voices (performance or supplement data only)",
+    fm6OtherMaker: "SysEx from another manufacturer", fm6Universal: "Universal SysEx, not voice data",
+    fm6Factories: "Factory patch",
+    fm6NeedDevice: "Connect the FM-1 to edit 6-OP FM voices and send them to a track.",
+    fm6NoFw: "This firmware has no 6-OP FM (FM6). Update to Felucca 1.0 or later to use it.",
     motion: "Motion", motionOn: "Play motion", motionClear: "Clear motion", motionConfirm: "Clear this track's motion?", chance: "Chance %", motionStep: "Step", motionParam: "Parameter", motionValue: "Value",
     backupTitle: "Complete backup", backupExport: "Save backup", backupImport: "Restore backup", backupHelp: "Save the current music, A–D, sound banks, user samples and settings to this computer.", backupOld: "Complete backups need firmware with archive support.", backupConfirm: "Restore this complete backup? Current music, saved data and samples will be replaced. Keep USB connected.", backupWorking: "Backing up / restoring ", backupDone: "Backup saved", backupRestored: "Complete backup restored",
     deviceDisplay: "Device display",
@@ -2605,32 +2733,34 @@ function showTab(name) {
   if (prev === "samples" && name !== "samples") samplesLeave();   /* no hidden recording or preview */
   renderPanels();
   if (name === "tracks" && prev !== "tracks" && hasTracks() && dev.dump) op(readMixer);
-  if (name === "fm6" && prev !== "fm6" && dev && dev.dump && dev.info.fm6) op(fm6Refresh);
+  if (name === "fm6" && prev !== "fm6" && dev && dev.dump && dev.info.fm6 && !fm6Listing) op(fm6Refresh);
 }
 function renderPanels() {
   /* the Tracks tab only with a four-track firmware */
   const tracksOk = !dev || hasTracks() || !dev.info;
-  const fm6Off = !!dev && !!dev.info && !dev.info.fm6;             /* the 6-OP FM tab: firmware with FM6 */
-  const want = (tab === "tracks" && dev && dev.info && !hasTracks()) || (tab === "fm6" && fm6Off) ? "sound" : tab;
+  const fm6Off = !!dev && !!dev.info && !dev.info.fm6;             /* the 6-OP FM tab: a hint without FM6 firmware */
+  const want = tab === "tracks" && dev && dev.info && !hasTracks() ? "sound" : tab;
   for (const b of $("tabs").querySelectorAll("button[data-tab]")) {
     const on = b.dataset.tab === want;
     b.setAttribute("aria-selected", on ? "true" : "false");
     b.tabIndex = on ? 0 : -1;
     if (b.dataset.tab === "tracks") b.hidden = !tracksOk;
-    if (b.dataset.tab === "fm6") b.hidden = fm6Off;
   }
   const ready = !!dev && !!dev.dump;
   let hint = "";
   for (const p of document.querySelectorAll(".panel")) {
     const mine = p.dataset.tab === want;
     let show = mine && (!("dev" in p.dataset) || ready);
-    if (mine && "dev" in p.dataset && !dev) hint = "needDevice";   /* (while connecting the status line says it) */
+    if (mine && "dev" in p.dataset && !dev) hint = want === "fm6" ? "fm6NeedDevice" : "needDevice";   /* (while connecting the status line says it) */
+    if (show && want === "fm6" && fm6Off) { show = false; hint = "fm6NoFw"; }
     if (show && want === "samples" && !dev.smp) { show = false; hint = "smpNone"; }
     p.hidden = !show;
   }
   $("hint").hidden = !hint;
   if (hint) $("hint").textContent = t(hint);
   $("trackbar").hidden = !(ready && hasTracks() && TRACK_TABS.has(want));
+  /* the FM6 slot names: listed once the tab shows with a device (also when it was already open at connect) */
+  if (ready && want === "fm6" && dev.info.fm6 && !fm6List && !fm6Asked) { fm6Asked = true; op(fm6Refresh); }
 }
 $("tabs").addEventListener("click", (e) => { const b = e.target.closest("button[data-tab]"); if (b) showTab(b.dataset.tab); });
 $("tabs").addEventListener("keydown", (e) => {          /* arrow keys move between the tabs */
@@ -2673,11 +2803,12 @@ const ctl = new Map(); /* key "s:id" -> {input, out, desc, scope, id, row} */
 const sets = new Map(); /* key -> {last: time of the user's last change, sent: the value last requested} */
 let needReload = false; /* a RELOAD push came: re-read DESC, DUMP and steps when free */
 let lastDump = 0;      /* Date.now() of the last DUMP */
-/* the device also pushes RELOAD after loads the editor asked for (SET of G_ENGSEL, PRESET, PROJECT load,
-   UP_LOAD); the editor re-reads after those anyway, so it skips that many RELOADs for a moment */
+/* the device also pushes RELOAD after loads the editor asked for (PROJECT load, UP_LOAD; before INFO 53 bit 1
+   also SET of G_ENGSEL and PRESET); the editor re-reads after those anyway, so it skips that many RELOADs for a
+   moment. sound: a PRESET / G_ENGSEL load (no RELOAD comes from newer firmware: none to skip) */
 const selfReload = { n: 0, until: 0 };
-function selfLoad() {
-  if (!dev || !dev.watch) return;
+function selfLoad(sound = false) {
+  if (!dev || !dev.watch || (sound && dev.info && dev.info.syncCaps & 2)) return;
   const now = Date.now();
   selfReload.n = now < selfReload.until ? selfReload.n + 1 : 1;
   selfReload.until = now + 1500;
@@ -2894,6 +3025,8 @@ function buildUI() {
   renderSamples();
   renderSysinfo();
   fm6List = null;
+  fm6Asked = false;
+  fm6Picked = -1;
   renderFm6();
 }
 
@@ -3005,7 +3138,7 @@ function paramRow(s, id) {
     input = el("select", { class: wave ? "wave" : null });
     /* the closed select shows a copy of the chosen option (icon span included), not its bare text */
     if (wave) input.append(el("button", {}, el("selectedcontent")));
-    for (let v = d.min; v <= d.max; v++) {
+    for (const v of enumShown(d)) {                 /* (note divisions longest first: #48) */
       const [txt] = fmtValue(d, v);
       const name = d.fmt === F.ENUM && d.names[v - d.min] == null ? String(v) : modDst(d, txt);
       const alias = d.fmt === F.ENUM && aliasOf(d.names, v - d.min) !== v - d.min;   /* shown when set, not offered */
@@ -3101,7 +3234,7 @@ async function choosePreset(e, p) {
   if (!dev) return;
   const releaseBusy = beginBusy();
   try {
-    selfLoad();
+    selfLoad(true);
     parse[CMD.PRESET](await rq(req.preset(e, p)));
     await afterSoundChange();
   } catch (err) { report(err); } finally { releaseBusy(); }
@@ -3120,7 +3253,7 @@ async function afterSoundChange(msg = "ready", d = dev) {
 $("init").addEventListener("click", async () => {
   if (!dev || !confirm(t("confirmInit"))) return;
   const releaseBusy = beginBusy();
-  try { selfLoad(); await rq(req.set(1, gEng(), dev.dump.engine)); await afterSoundChange(); }
+  try { selfLoad(true); await rq(req.set(1, gEng(), dev.dump.engine)); await afterSoundChange(); }
   catch (err) { report(err); } finally { releaseBusy(); }
 });
 
@@ -4297,7 +4430,7 @@ $("file").addEventListener("change", async () => {
   } catch (e) { if (e.message !== "closed") sayK("badfile", e.message); return; }
   const releaseBusy = beginBusy();
   try {
-    selfLoad();
+    selfLoad(true);
     await rq(req.preset(data.engine, data.preset));
     dev.dump = await getDump();
     await rereadEngineDesc();
@@ -4400,7 +4533,8 @@ async function libUpdate(p) {
 }
 /* the device's parameter layout becomes the library's; patches stored with another layout are mapped by key.
    A device without DIGITAL (engine 1 "-", retired in 1.0): the library's DIGITAL sounds become FM6 (fromDigital,
-   as readLibraryFile does), also when the layout itself is unchanged */
+   as readLibraryFile does), also when the layout itself is unchanged; so do its SAMPLE PERC sounds (the set retired
+   after 1.0.2): DRUM's kit (fromPerc) */
 async function libAdopt(d) {
   const keys = d.keys, engines = d.info.engines, changed = [];
   const relayout = (libMeta.keys && !sameKeys(libMeta.keys, keys)) || (libMeta.engines && !sameKeys(libMeta.engines, engines));
@@ -4408,9 +4542,11 @@ async function libAdopt(d) {
   for (const p of lib) {
     const name = p.engineName || (libMeta.engines || [])[p.engine];
     const digital = noFm4 && !p.fm6 && (name === "DIGITAL" || ((!name || name === "-") && p.engine === 1));
-    if (!relayout && !digital) continue;
+    const pe0 = () => (keys && p.p.length === keys.length ? d.info.pe0 : p.p.length - 8);   /* (E1..E8: the last 8) */
+    const perc = !digital && !!fromPerc({ ...p, engineName: name }, engines, p.p.length - 8);
+    if (!relayout && !digital && !perc) continue;
     if (relayout) p.p = remapParams(p.p, libMeta.keys, keys);
-    const pt = digital ? fromDigital(p, engines, keys && p.p.length === keys.length ? d.info.pe0 : p.p.length - 8) : null;
+    const pt = digital ? fromDigital(p, engines, pe0()) : perc ? fromPerc({ ...p, engineName: name }, engines, pe0()) : null;
     if (pt) Object.assign(p, cleanPatch(pt));
     else {
       const e = name ? engines.indexOf(name) : p.engine;
@@ -4562,7 +4698,7 @@ function libAudition(id) {
   libOp(async (d, rqf) => {
     if (!engineOk(p)) throw new Error(t("badEngine") + (p.engineName || p.engine));
     sayK("auditioning", p.name);
-    selfLoad();
+    selfLoad(true);
     await auditionPatch(rqf, dev.info, p, { gEng: gEng(), track: dev.sel ?? 0,
       progress: (i, n) => { if (i % 8 === 0) sayK("auditioning", `${p.name} ${i}/${n}`); } });
     await afterSoundChange("ready", d);
@@ -4585,7 +4721,7 @@ $("libsave").addEventListener("click", () => libOp(async (d, rqf) => {
 $("factlib").addEventListener("click", () => libOp(async (d, rqf) => {
   const e = dev.dump.engine, pi = $("preset").value === "" ? dev.dump.preset : +$("preset").value;
   const name = (dev.names[e] || [])[pi] || "PRESET";
-  selfLoad();
+  selfLoad(true);
   await rqf(req.preset(e, pi));
   const { patch } = await capturePatch(rqf, dev.info, name);
   patch.pattern = null;
@@ -4606,7 +4742,7 @@ function libPut(id, slot) {
     const keep4 = p.fm4 && dev.info.engines[1] === "-" && p.fm4.length === dev.info.pcount;   /* a converted DIGITAL sound:
                                                      its DIGITAL values as engine 1 (the device converts them on load) */
     checkRc(await bank.put(rqf, slot, keep4 ? { ...p, engine: 1, name: upName(p.name), p: fullParams({ ...p, p: p.fm4 }) }
-      : { ...p, name: upName(p.name), p: fullParams(p) }));
+      : { ...p, name: upName(p.name), p: fullParams(p) }, dev.info));
     await refreshSlot(slot, d);
     sayK("putDone", `${slotName(slot)} ${upName(p.name)}`);
   });
@@ -4709,7 +4845,8 @@ function bankGet(slot) {
   libOp(async (d, rqf) => {
     const u = await bank.get(rqf, dev.info, slot);
     if (!u.used) { sayK("emptySlot", slotName(slot)); return; }
-    const pt = { name: u.name, engine: u.engine, engineName: dev.info.engines[u.engine], p: u.p, pattern: u.pattern, grid: u.grid, tags: ["device"] };
+    const pt = { name: u.name, engine: u.engine, engineName: dev.info.engines[u.engine], p: u.p, pattern: u.pattern, grid: u.grid, tags: ["device"],
+      fm6: u.fm6 };
     await libAdd([reservedFm4(dev.info.engines, u.engine) ? fromDigital(pt, dev.info.engines, dev.info.pe0) : pt]);
     sayK("copiedLib", u.name);
   });
@@ -4737,7 +4874,7 @@ $("bkexport").addEventListener("click", () => libOp(async (d, rqf) => {
     if (!x.used) continue;
     sayK("readingBank", ` ${slotName(x.slot)}`);
     const u = await bank.get(rqf, dev.info, x.slot);
-    if (u.used) out.push({ name: u.name, engine: u.engine, p: u.p, pattern: u.pattern, grid: u.grid, slot: x.slot,
+    if (u.used) out.push({ name: u.name, engine: u.engine, p: u.p, pattern: u.pattern, grid: u.grid, slot: x.slot, fm6: u.fm6,
       engineName: reservedFm4(dev.info.engines, u.engine) ? "DIGITAL" : dev.info.engines[u.engine] });   /* (DIGITAL's values) */
   }
   download(`felucca-bank-${today()}.json`, libraryFile("bank", out, libCtx()));
@@ -4746,16 +4883,20 @@ $("bkexport").addEventListener("click", () => libOp(async (d, rqf) => {
 
 /* ------------------------------------------------------------------ FM6 --- */
 /* The 6-OP FM tab (firmware with FM6: INFO's fm6 tag): the whole patch of an FM6 track, which the device
-   only reaches through its macros. Read a track's patch or a slot, edit it, send it to a track (live while
-   editing), store it in the bank (B1..B27), import the generic 155-byte single-voice and 4096-byte 32-voice
-   SysEx files, export them. */
+   only reaches through its macros. Import the generic 155-byte single-voice and 4096-byte 32-voice SysEx files,
+   pick a voice, edit it, send it to a track (live while editing); read a track's patch or a factory one; export a
+   voice. The track keeps it (SLOT OWN); a user preset (SAVE) or a project on the device keeps it after that.
+   The patch bank of 1.0..1.0.2 (B1..B27) is not offered, whatever the firmware (retired in 1.0.3). */
 let fm6v = FM6.init();                 /* the patch being edited (155 bytes) */
 let fm6Imported = [];                  /* voices of the last imported file: [{name, v}] */
+let fm6Picked = -1;                    /* the imported voice last clicked (now in fm6v) */
 let fm6List = null;                    /* FM6_LIST of the device */
+let fm6Listing = false;                /* FM6_LIST on its way */
+let fm6Asked = false;                  /* FM6_LIST asked once for this connection (renderPanels) */
 let fm6Timer = null;
 const fm6Ok = () => !!dev && !!dev.info && !!dev.info.fm6;
 const fm6Track = () => +$("fm6trk").value || 0;
-const fm6SlotName = (i) => (i < dev.info.fm6.factory ? "F" : "B") + (i < dev.info.fm6.factory ? i + 1 : i - dev.info.fm6.factory + 1);
+const fm6SlotName = (i) => "F" + (i + 1);   /* the factory patches */
 const FM6_WAVES = ["TRI", "SAW-", "SAW+", "SQR", "SIN", "S&H"];
 const FM6_CURVES = ["-LIN", "-EXP", "+EXP", "+LIN"];
 function fm6Set(i, val) {
@@ -4802,28 +4943,30 @@ function renderFm6Ops() {
 }
 function renderFm6Imported() {
   const box = $("fm6imported");
-  if (!fm6Imported.length) { box.replaceChildren(); return; }
+  if (!fm6Imported.length || !fm6Ok()) { box.replaceChildren(); return; }
   box.replaceChildren(el("p", { class: "dim", text: t("fm6Pick") }),
     el("p", { class: "bar" }, ...fm6Imported.map((x, k) => el("button", { text: `${k + 1} ${x.name}`,
-      onclick: () => { fm6v = Uint8Array.from(x.v); renderFm6(); sayK("fm6Picked", ` ${x.name}`); } }))));
+      "aria-pressed": k === fm6Picked ? "true" : "false",
+      onclick: () => { fm6v = Uint8Array.from(x.v); fm6Picked = k; renderFm6(); sayK("fm6Picked", ` ${x.name}`); } }))));
 }
 function renderFm6() {
   if (!fm6Ok()) return;
   const ts = $("fm6trk"), keepT = ts.value, ss = $("fm6slot"), keepS = ss.value;
   ts.replaceChildren(...Array.from({ length: dev.info.ntrk || 1 }, (_, i) => el("option", { value: i, text: String(i + 1) })));
   ts.value = keepT || (dev.sel ?? 0);
-  const n = dev.info.fm6.factory + dev.info.fm6.bank;
-  ss.replaceChildren(...Array.from({ length: n }, (_, i) => {
-    const s = fm6List && fm6List.slots[i];
-    return el("option", { value: i, text: `${fm6SlotName(i)} ${s && s.used ? s.name : t("empty")}` });
+  const nf = dev.info.fm6.factory;      /* the factory patches only (names once FM6_LIST is in) */
+  ss.replaceChildren(...Array.from({ length: nf }, (_, i) => {
+    const x = fm6List && fm6List.slots[i];
+    return el("option", { value: i, text: `${fm6SlotName(i)} ${x && x.used ? x.name : ""}`.trim() });
   }));
-  if (keepS) ss.value = keepS;
+  ss.value = keepS !== "" && +keepS < nf ? keepS : "0";
   renderFm6Voice();
   renderFm6Ops();
   renderFm6Imported();
 }
 async function fm6Refresh(d = dev) {
-  fm6List = parse[CMD.FM6_LIST](await sessionRequest(d, req.fm6List()));
+  fm6Listing = true;
+  try { fm6List = parse[CMD.FM6_LIST](await sessionRequest(d, req.fm6List())); } finally { fm6Listing = false; }
   renderFm6();
 }
 async function fm6Send(quiet) {
@@ -4839,38 +4982,15 @@ $("fm6read").addEventListener("click", () => op(async () => {
   sayK("fm6Read", ` ${fm6Track() + 1}: ${FM6.name(fm6v)}`);
 }));
 $("fm6send").addEventListener("click", () => op(() => fm6Send(false)));
-$("fm6load").addEventListener("click", () => op(async () => {
-  const i = +$("fm6slot").value, nf = dev.info.fm6.factory;
-  const r = parse[CMD.FM6_GET](await sessionRequest(dev, i < nf ? req.fm6Get(FM6.TARGET.FACTORY, i) : req.fm6Get(FM6.TARGET.BANK, i - nf)));
-  if (r.rc === 2) { sayK("emptySlot", fm6SlotName(i)); return; }
+$("fm6load").addEventListener("click", () => op(async () => {   /* a factory patch into the editor */
+  const i = +$("fm6slot").value;
+  const r = parse[CMD.FM6_GET](await sessionRequest(dev, req.fm6Get(FM6.TARGET.FACTORY, i)));
   checkRc(r.rc);
   fm6v = FM6.unpack(r.packed);
+  fm6Picked = -1;
   renderFm6();
   sayK("fm6Loaded", ` ${fm6SlotName(i)}: ${FM6.name(fm6v)}`);
 }));
-$("fm6store").addEventListener("click", () => {
-  const i = +$("fm6slot").value, nf = dev ? dev.info.fm6.factory : 0;
-  if (!fm6Ok()) return;
-  if (i < nf) { sayK("fm6Factory"); return; }
-  const s = fm6List && fm6List.slots[i];
-  if (s && s.used && !confirm(t("confirmOverwrite").replace("{n}", fm6SlotName(i)).replace("{name}", s.name))) return;
-  op(async () => {
-    checkRc(parse[CMD.FM6_PUT](await sessionRequest(dev, req.fm6Put(FM6.TARGET.BANK, i - nf, FM6.pack(fm6v)))).rc);
-    await fm6Refresh();
-    sayK("storedSlot", fm6SlotName(i));
-  });
-});
-$("fm6erase").addEventListener("click", () => {
-  const i = +$("fm6slot").value, nf = dev ? dev.info.fm6.factory : 0;
-  if (!fm6Ok()) return;
-  const s = fm6List && fm6List.slots[i];
-  if (i < nf || !s || !s.used || !confirm(t("confirmEraseSlot").replace("{n}", fm6SlotName(i)).replace("{name}", s.name))) return;
-  op(async () => {
-    checkRc(parse[CMD.FM6_ERASE](await sessionRequest(dev, req.fm6Erase(i - nf))).rc);
-    await fm6Refresh();
-    sayK("erasedSlot", fm6SlotName(i));
-  });
-});
 $("fm6init").addEventListener("click", () => { fm6v = FM6.init(); renderFm6(); });
 $("fm6import").addEventListener("click", () => $("fm6file").click());
 $("fm6file").addEventListener("change", async (e) => {
@@ -4878,12 +4998,23 @@ $("fm6file").addEventListener("change", async (e) => {
   e.target.value = "";
   if (!f) return;
   const r = FM6.parseSysex(new Uint8Array(await f.arrayBuffer()));
-  if (!r.voices.length) { sayK("badfile", f.name); return; }
+  if (!r.voices.length) { const [k, x] = fm6Why(r); sayK(k, `${x}: ${f.name}`); return; }
   fm6Imported = r.voices;
+  fm6Picked = r.voices.length === 1 ? 0 : -1;
   if (r.voices.length === 1) fm6v = Uint8Array.from(r.voices[0].v);
   renderFm6();
-  sayK("imported", `${f.name}: ${r.voices.length}` + (r.badSum ? ` (${t("fm6BadSum")})` : ""));
+  const notes = [r.badSum && t("fm6BadSum"), r.short && t("fm6Short"), r.skipped && t("fm6Skipped").replace("{x}", r.skipped)].filter(Boolean);
+  sayK("imported", `${f.name}: ${r.voices.length}` + (notes.length ? ` (${notes.join(", ")})` : ""));
 });
+/* why a file had no 6-operator voice: [message key, what to add before the file name] */
+function fm6Why(r) {
+  const mk = r.kinds.find((k) => k.startsWith("maker:"));
+  if (r.kinds.includes("fm4")) return ["fm6Is4op", ""];
+  if (r.kinds.includes("other43")) return ["fm6OtherBlocks", ""];
+  if (mk) return ["fm6OtherMaker", ` (ID ${mk.slice(6)})`];
+  if (r.kinds.includes("universal")) return ["fm6Universal", ""];
+  return [r.sysex ? "fm6NoVoice" : "fm6NotSysex", ""];
+}
 function downloadBytes(name, bytes) {
   const a = el("a", { href: URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" })), download: name });
   document.body.append(a);
@@ -4892,15 +5023,6 @@ function downloadBytes(name, bytes) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 $("fm6export").addEventListener("click", () => downloadBytes(`${fileSlug(FM6.name(fm6v))}.syx`, FM6.singleSysex(fm6v)));
-$("fm6bankexp").addEventListener("click", () => op(async () => {
-  const out = [];
-  for (let k = 0; k < dev.info.fm6.bank; k++) {
-    const r = parse[CMD.FM6_GET](await sessionRequest(dev, req.fm6Get(FM6.TARGET.BANK, k)));
-    out.push(r.rc ? null : FM6.unpack(r.packed));
-  }
-  downloadBytes(`felucca-fm6-bank-${today()}.syx`, FM6.bankSysex(out));
-  sayK("fm6Exported");
-}));
 
 $("connect").addEventListener("click", () => {
   if (dev) { wantConnected = false; disconnect(); } else connect();

@@ -420,15 +420,42 @@ static void macros(void)
         printf("fm6: DTUN 0 / 127 (3 carriers): level swing over 50 ms windows %.3f / %.3f\n", v0, v1);
         check("DTUN: the carriers apart: they beat", v1 > v0 * 1.05);
     }
-    {   /* PTCH: the main loop loads the slot's patch; FUN8 keeps the track's own */
+    {   /* SLOT: the main loop loads a factory patch; OWN keeps (and brings back) the track's own */
+        uint8_t own[FP_SIZE + 1u];
         setup(base, 0);
+        memcpy(own, fm6_patch[0], sizeof own);
+        trk[0].p[P_E7] = FM6_OWN;
+        fm6_poll();
+        check("SLOT OWN: the track's patch stays (nothing reloads)", fm6_slot[0] == FM6_OWN &&
+              !memcmp(fm6_patch[0], own, FP_SIZE));
         trk[0].p[P_E7] = 4;
         fm6_poll();
-        check("PTCH F5 loads the fifth factory patch (main loop)", fm6_slot[0] == 4u &&
+        check("SLOT F5 loads the fifth factory patch (main loop)", fm6_slot[0] == 4u &&
               !memcmp(fm6_patch[0] + FP_NAME, "SOFT PAD  ", 10));
-        trk[0].p[P_E7] = FM6_NFACTORY + 3;
+        trk[0].p[P_E7] = FM6_OWN;
         fm6_poll();
-        check("PTCH B4 of an empty bank: the init voice", !memcmp(fm6_patch[0] + FP_NAME, "INIT VOICE", 10));
+        check("SLOT back to OWN: the own patch again", fm6_slot[0] == FM6_OWN && !memcmp(fm6_patch[0], own, FP_SIZE));
+        check("SLOT: F1..F8 and OWN, nothing past it", ENG_FM6.edit[7].max == FM6_OWN && FM6_OWN == FM6_NFACTORY &&
+              !strcmp(ENG_FM6.edit[7].names[FM6_OWN], "OWN") && !ENG_FM6.edit[7].names[FM6_OWN + 1]);
+        trk[0].p[P_E7] = FM6_OWN;
+        fm6_set_patch(0, own);
+        trk[0].p[P_E7] = 2;                          /* a load that says F3 with F3 unchanged: F3; edited: OWN */
+        {
+            uint8_t v[FP_SIZE + 1u];
+            fm6_unpack(FM6_FACTORY[2], v);
+            fm6_set_patch(0, v);
+            fm6_adopt(0);
+            check("fm6_adopt: a factory patch unchanged shows its slot", trk[0].p[P_E7] == 2 && fm6_slot[0] == 2u);
+            v[FP_ALG] ^= 1;
+            fm6_set_patch(0, v);
+            fm6_adopt(0);
+            check("fm6_adopt: edited, it is the track's own (OWN)", trk[0].p[P_E7] == FM6_OWN && fm6_slot[0] == FM6_OWN);
+            trk[0].p[P_E7] = FM6_NFACTORY + 3;       /* (a stored B4 of 1.0.2) */
+            fm6_unpack(FM6_FACTORY[6], v);
+            fm6_set_patch(0, v);
+            fm6_adopt(0);
+            check("fm6_adopt: an old B slot holding factory F7 shows F7", trk[0].p[P_E7] == 6);
+        }
     }
 }
 

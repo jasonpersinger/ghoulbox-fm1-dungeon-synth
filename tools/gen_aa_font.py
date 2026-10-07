@@ -43,18 +43,22 @@ PHASES, PHASES_L = 4, 2                # horizontal phases per glyph (aa_raster.
 # faces stored Huffman-coded (--huff): M and L. S, the most drawn and the least compressible (-15 %), stays
 # 2 px per byte, so the labels draw at full speed
 HUFF = [("M", "L")]
-# L draws only "FELUCCA", the UPDATE MODE countdown digit and the calibration's control names (panel.c
-# B_NAME / E_NAME): a sparse face of those glyphs, the space as its range and the rest as extras
+# L draws only "FELUCCA", the UPDATE MODE countdown digit, the calibration's control names (panel.c
+# B_NAME / E_NAME) and MENU > LARGE's card values and page titles (ui_draw.c draw_column_tall, ui_graph.c
+# graph_title: # . / J W too; a value with another character is set in M): a sparse face of those glyphs, the
+# space as its range and the rest as extras
 # (ui_test.c checks that every L string is covered)
-L_CHARS = " +-0123456789ABCDEFGHIKLMNOPQRSTUVXY"
+CRISP_DY = 1   # GHOULBOX: VT323's capitals sit 1 row lower in the line than Inter Tight's (S 4 / 3, M 5 / 4, L 8 / 7):
+               # drawn 1 row higher, the layout's fixed rows (made for Inter Tight) centre them again
+L_CHARS = " #+-./0123456789ABCDEFGHIJKLMNOPQRSTUVWXY"
 
 
 def preset(name):
-    if name == "ghoulbox":                     # GHOULBOX: VT323 (SIL OFL 1.1), crisp, one phase
-        v = str(FONTS.parent / "assets" / "fonts" / "VT323-Regular.ttf")
+    if name == "ghoulbox":                     # GHOULBOX: VT323 (SIL OFL 1.1), crisp, one phase, its capitals 1 row higher
+        v = str(FONTS.parent / "assets" / "fonts" / "VT323-Regular.ttf")   # than drawn (CRISP_DY): on Inter Tight's rows
         return [("S", v, 17, (32, 126), EXTRAS, 0.0, 1),   # (17: at 16 FreeType's hinting loses M's middle)
                 ("M", v, 20, (32, 126), EXTRAS, 0.0, 1),
-                ("L", v, 32, (32, 32), [ord(c) for c in L_CHARS[1:]], 0.0, 1)]
+                ("L", v, 36, (32, 32), [ord(c) for c in L_CHARS[1:]], 0.0, 1)]   # (36: capitals 21 rows, as Inter's L)
     if name == "inter-tight":
         v = str(FONTS.parent / "assets" / "fonts" / "InterTight[wght].ttf")   # SIL OFL 1.1, Google Fonts
         return [("S", v + "@400", 12, (32, 126), EXTRAS, 0.0, PHASES),
@@ -168,7 +172,8 @@ def huff_unpack(hc, data, n):
 def emit(face, tracking, gamma, kern_min, crisp=False):
     name, font, px, (first, last), extras, ftrack, phases = face
     chars = [chr(c) for c in range(first, last + 1)] + [chr(c) for c in extras]
-    r = ar.raster_font(font, px, chars, tracking if ftrack is None else ftrack, gamma, True, kern_min, phases, crisp=crisp)
+    r = ar.raster_font(font, px, chars, tracking if ftrack is None else ftrack, gamma, True, kern_min, phases, crisp=crisp,
+                       crisp_dy=CRISP_DY if crisp else 0)
     data, table, lines = bytearray(), [], []
     for ch in chars:
         adv16, ph = r["glyphs"][ch]
@@ -221,6 +226,10 @@ def emit(face, tracking, gamma, kern_min, crisp=False):
     lines.append(f"static const aafont_t AF_{name} = {{{r['h']}, {r['asc']}, {first}, {last}, {len(extras)}, {len(keys)}, "
                  f"AF_{name}_G, AF_{name}_DATA, {'AF_%s_KERN' % name if keys else '0'}, "
                  f"{'AF_%s_KD' % name if keys else '0'}, AF_{name}_EX, {psh}, {'AF_%s_HC' % name if hc else '0'}}};")
+    if "H" in chars:                                  # the capitals' band (gfx.c CAP_IN: centring text by it)
+        cap = table[chars.index("H") * phases]
+        lines.append(f"#define AF_{name}_CAP_Y {cap[3]}   /* the ink of H: rows {cap[3]} .. {cap[3] + cap[5] - 1} of the line */")
+        lines.append(f"#define AF_{name}_CAP_H {cap[5]}")
     cost = {"data": len(data) + len(hc), "glyph_table": 8 * len(table), "kern": 3 * len(keys), "extras": len(extras),
             "glyphs": len(chars), "phases": phases, "pairs": len(keys), "h": r["h"], "asc": r["asc"], "px": px,
             "font": os.path.basename(font.split("#")[0]), "adv_digit": r["glyphs"]["0"][0] / 16}

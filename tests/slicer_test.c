@@ -12,7 +12,7 @@
  * 4. OFF is transparent (the signal untouched), STUT repeats what the live step played.
  * 5. cost: instructions per sample of the mix, 4 SLICERs on against off (proc_pid_rusage).
  * Demos (WAV, 44.1 kHz) into DEMO_DIR: dry / gated / stuttered versions of a pad, the acid line, the
- * drums (track 4: SAMPLE PERC), and the song. */
+ * drums (track 4: DRUM), and the song. */
 #define main hostsim_main
 #include "hostsim.c"
 #undef main
@@ -182,7 +182,7 @@ static void song_setup(void)
     host_preset(t1, 0, 4);
     host_preset(t2, 1, 5);
     host_preset(t3, 3, 0);
-    host_legacy_sample_perc(td);                   /* saved SAMPLE PERC sound */
+    host_drums(td);                                /* DRUM KIT (SAMPLE PERC until 1.0.2) */
     for (i = 0; i < 16u; i++) {
         uint8_t n = ACID[i];
         put_step(t1, i, n ? 1u : 0u, &n, n ? ST_NOTE : ST_REST, ACIDF[i]);
