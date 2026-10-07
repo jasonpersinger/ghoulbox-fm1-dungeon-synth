@@ -102,11 +102,12 @@ static void graph_steps(const track_t *t, uint16_t c)
  * shorter DIM; a key held on the track: its row ACCENT). Rows in the track's scale (SCL ROOT / SCALE; CHR: the white
  * keys) are tinted LANE, a C row closes with a RAISE line; step lines GRID, every 4th RAISE. A note is a 9 x 3 bar in
  * its column (an accent: TEXT, the row's full height; the cursor step's notes: ACCENT), chords stacked, lane hits as
- * their notes; a TIE carries the bars of the note before through its column; a REST is empty; a slide is a TEXT
- * diagonal from the end of its bar into the next note. Notes outside the view: a 1 px mark on the edge. The cursor:
- * a TEXT column frame; the playhead: a 1 px ACCENT line. The view (proll.lo, the bottom row) fits the notes of the
- * page, else centres on the cursor's note, and follows in steps (a third of the way per frame); graph_signature()
- * holds it, so a page that does not change is not drawn again. */
+ * their notes (a RATCH step's bars in its 2..4 parts, 1 px apart); a TIE carries the bars of the note before through
+ * its column; a REST is empty; a slide is a TEXT diagonal from the end of its bar into the next note (not from a
+ * RATCH step: it never slides out). Notes outside
+ * the view: a 1 px mark on the edge. The cursor: a TEXT column frame; the playhead: a 1 px ACCENT line. The view
+ * (proll.lo, the bottom row) fits the notes of the page, else centres on the cursor's note, and follows in steps (a
+ * third of the way per frame); graph_signature() holds it, so a page that does not change is not drawn again. */
 #define PR_ROWS 21                                  /* semitones shown (1.75 octaves) */
 #define PR_RH 5                                     /* px per row */
 #define PR_Y0 9                                     /* the top row (canvas y) */
@@ -181,8 +182,20 @@ static void pr_follow(const track_t *t)
     proll.init = 1;
 }
 static int32_t pr_row_y(int32_t n) { return PR_Y0 + ((int32_t)proll.lo + PR_ROWS - 1 - n) * PR_RH; }
-/* the bars of step s in column x: a 1 px edge mark for a note out of view; first: row y of the step's first note */
-static void pr_bars(const step_t *st, int32_t x, int32_t w, uint16_t c, int acc_all, int32_t *first)
+/* a bar w px wide in `hits` equal parts, 1 px apart (a RATCH step; 1: the bar) */
+static void pr_split(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c, uint32_t hits)
+{
+    int32_t k, pw = (w - (int32_t)hits + 1) / (int32_t)hits;
+    if (hits < 2u) {
+        cv_rect(x, y, w, h, c);
+        return;
+    }
+    for (k = 0; k < (int32_t)hits; k++)
+        cv_rect(x + k * (pw + 1), y, pw, h, c);
+}
+/* the bars of step s in column x (in its RATCH parts, hits; a TIE's carried bars: 1): a 1 px edge mark for a note
+ * out of view; first: row y of the step's first note */
+static void pr_bars(const step_t *st, int32_t x, int32_t w, uint16_t c, int acc_all, int32_t *first, uint32_t hits)
 {
     uint32_t j;
     int32_t ybot = PR_Y0 + PR_ROWS * PR_RH;
@@ -196,13 +209,13 @@ static void pr_bars(const step_t *st, int32_t x, int32_t w, uint16_t c, int acc_
         if (*first < -1000)
             *first = y;
         if (y < PR_Y0)
-            cv_rect(x, PR_Y0, w, 1, c);
+            pr_split(x, PR_Y0, w, 1, c, hits);
         else if (y >= ybot)
-            cv_rect(x, ybot - 1, w, 1, c);
+            pr_split(x, ybot - 1, w, 1, c, hits);
         else if (acc)
-            cv_rect(x, y, w, PR_RH, c == T_ACCENT ? c : T_TEXT);
+            pr_split(x, y, w, PR_RH, c == T_ACCENT ? c : T_TEXT, hits);
         else
-            cv_rect(x, y + 1, w, PR_RH - 2, c);
+            pr_split(x, y + 1, w, PR_RH - 2, c, hits);
     }
 }
 static void graph_roll(const track_t *t, uint16_t c)
@@ -254,10 +267,11 @@ static void graph_roll(const track_t *t, uint16_t c)
         st = &seq_steps(t)[s];
         col = s == ui.cursor || si == ui.cursor ? T_ACCENT : c;
         if (s == si)
-            pr_bars(st, x + 2, 9, col, (st->flags & SF_ACCENT) != 0u, &y);
+            pr_bars(st, x + 2, 9, col, (st->flags & SF_ACCENT) != 0u, &y, step_ratchet(st));
         else                                          /* a TIE: the bars on through the gap before */
-            pr_bars(st, x - 1, 12, col, (st->flags & SF_ACCENT) != 0u, &y);
-        if ((st->flags & SF_SLIDE) && ns->time == ST_NOTE && ns->n && y >= PR_Y0 && y < ybot) {
+            pr_bars(st, x - 1, 12, col, (st->flags & SF_ACCENT) != 0u, &y, 1u);
+        if ((st->flags & SF_SLIDE) && step_ratchet(st) == 1u &&   /* (a ratcheted step never slides out) */
+            ns->time == ST_NOTE && ns->n && y >= PR_Y0 && y < ybot) {
             int32_t ny = clamp(pr_row_y(ns->note[0]), PR_Y0, ybot - PR_RH);
             cv_line(x + 10, y + 2, x + 14, ny + 2, T_TEXT);   /* the slide into the next note */
         }
@@ -265,7 +279,7 @@ static void graph_roll(const track_t *t, uint16_t c)
 }
 /* SEQ > STEP on a DRUM track: the grid, 8 lanes x the 16 steps of the page shown. Lanes by their two-letter
  * names (BD SD CP CH OH TM RS CB; CG CL CY on the other kits). A hit is a rounded square (accented: the
- * accent), an empty step a dot (brighter on the beats and on the selected lane); the selected lane is
+ * accent; a RATCH step's: its 2..4 parts as bars), an empty step a dot (brighter on the beats and on the selected lane); the selected lane is
  * underlaid RAISE, the cursor framed in TEXT; a TEXT bar over the step playing */
 static void graph_grid(const track_t *t, uint16_t c)
 {
@@ -285,7 +299,9 @@ static void graph_grid(const track_t *t, uint16_t c)
             const step_t *st = &seq_steps(t)[base + i];
             uint32_t b = 1u << l;
             int32_t x = 40 + (int32_t)i * 12;
-            if (step_lanes(st) & b)
+            if ((step_lanes(st) & b) && step_ratchet(st) > 1u)
+                pr_split(x, y + 2, 10, 10, (step_accents(st) & b) ? T_ACCENT : c, step_ratchet(st));
+            else if (step_lanes(st) & b)
                 cv_rrect(x, y + 2, 10, 10, 2, (step_accents(st) & b) ? T_ACCENT : c, row);
             else
                 cv_rect(x + 4, y + 6, 2, 2, i % 4u == 0u || sel ? T_MID : T_DIM);
@@ -313,6 +329,7 @@ static void graph_scale(const track_t *t, uint16_t c)
  * C4) over the keys from the C below its lowest note (two octaves, three for a wide one): its notes THEME, its
  * root's ACCENT, the others RAISE. OFF or a kit: what to do instead */
 static void panel_note(const char *a, const char *b, const char *c);
+static void panel_alert(uint32_t id, const char *a);
 static void graph_chord(const track_t *t, uint16_t c)
 {
     static const uint8_t BLACK[12] = {0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0};
@@ -525,8 +542,8 @@ static void graph_slices(void)
 {
     uint32_t a, b, len, n = slice_count(), j = slice_sel(), i, src, div, ma, mb;
     char t[20], u[12];
-    if (!slice_src(&src, &div) || !n) {
-        panel_note("NO SAMPLE", "SRC: BREAK OR USR1-3", 0);
+    if (!slice_src(&src, &div) || !n) {             /* (it plays a sine: eng_slice.c) */
+        panel_alert(ICON_X_NOFILE, "SAMPLE NOT FOUND");
         return;
     }
     slice_view(&a, &b, &len);
@@ -568,7 +585,7 @@ static void graph_slices(void)
     str_cpy(t + 4, u, sizeof t - 4);
     str_cpy(t + str_len(t), " S", sizeof t - str_len(t));
     cv_text(12, 104, &AF_S, t, T_MID);               /* (GHOULBOX: 2 px up, inside the window) */
-    cv_text_r(228, 104, &AF_S, src ? N_SLC_SRC[src] : "BREAK", src ? T_THEME : T_DIM, T_SURF);
+    cv_text_r(228, 104, &AF_S, N_SLC_SRC[src], src && src != SLC_SRC_PIANO ? T_THEME : T_DIM, T_SURF);
 }
 #endif
 
@@ -985,6 +1002,22 @@ static void panel_note(const char *a, const char *b, const char *c)
     cv_text_in(0, 30, 240, &AF_M, a, T_TEXT, T_SURF);
     if (b) note_line(60, b, T_MID);
     if (c) note_line(82, c, T_DIM);
+}
+/* the same title led by an icon (16 px, the accent's: the header message's, ui_draw.c draw_head) in the middle of
+ * the panel: the title's capitals centred up and down in it, the icon's ink on them; across, the pair centred by
+ * its ink */
+#define PA_GAP 6                                        /* icon ink -> title ink (setup_title's) */
+static void panel_alert(uint32_t id, const char *a)
+{
+    int32_t bi[4], bt[4], x, y = CAP_IN(M, (int32_t)graph_h());
+    icon_ink(16, id, bi);
+    text_ink(&AF_M, a, bt);
+    x = HALF_UP(240 - (bi[2] - bi[0] + PA_GAP + bt[2] - bt[0])) - bi[0];
+    GFX_HOOK_ALIGN(0, 0, 240, 0, AL_H | AL_N(2), "panel alert centred");
+    GFX_HOOK_ALIGN(0, y + AF_M_CAP_Y, 0, y + AF_M_CAP_Y + AF_M_CAP_H, AL_V | AL_PASS, "panel alert icon on its title's line");
+    cv_icon_in(x, y + AF_M_CAP_Y, 0, AF_M_CAP_H, 16, id, T_ACCENT, T_SURF);
+    GFX_HOOK_ALIGN(0, 0, 0, (int32_t)graph_h(), AL_V | AL_PASS, "panel alert title in the panel's middle");
+    cv_text_on(x + bi[2] + PA_GAP - bt[0], y, &AF_M, a, T_TEXT, T_SURF);
 }
 
 /* preset browser: the global list (every engine), the current one selected; tag DIM, name TEXT,

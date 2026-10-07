@@ -130,6 +130,7 @@ static int motion_set_event(track_t *t, uint32_t step, uint32_t id, int16_t valu
     if (k >= NTRK || step >= NSTEP || !motion_param(id)) return 1;
     d = param_desc_of(eng_idx(t->eng_req), id);
     if (value < d->min || value > d->max || value < -64 || value > 127) return 1;
+    value = (int16_t)param_fit(d, value);                    /* (a retired KIT: the kit it plays) */
     f = motion_guard();
     for (i = 0; i < motion.count; i++)
         if (motion.event[i].place == (k << 6 | step) && motion.event[i].param == id) break;
@@ -189,7 +190,7 @@ static __attribute__((noinline)) void motion_step(track_t *t, uint32_t step, con
         const motion_event_t *e = &m->event[i];
         if (e->place != (k << 6 | step)) continue;
         const param_desc_t *d = param_desc_of(eng_idx(t->eng_req), e->param);
-        t->p[e->param] = (int16_t)clamp(e->value, d->min, d->max);
+        t->p[e->param] = (int16_t)param_fit(d, e->value);
         motion_active[k][e->param / 32u] |= 1u << (e->param % 32u);
     }
 }

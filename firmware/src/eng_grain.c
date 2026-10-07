@@ -16,7 +16,8 @@
  * entry below, then up to 255 decodes skipped. A forward grain then decodes as it plays (one
  * decode per source sample); a reverse grain reads a 128-sample window that it refills from the
  * index as it moves down (about two decodes per source sample). A SRC change or a new upload into
- * the slot (smp_user_gen) rebuilds the index.
+ * the slot (smp_user_gen) rebuilds the index. A source with no data (an empty user slot, a set this build lacks)
+ * plays a plain sine voice instead (eng_sample.c smp_sine): no grains, clearly a fallback.
  *
  * Grains: a pool of GR_NG per part, shared by its voices (each voice may hold its share of the
  * pool: GR_NG / sounding voices, at least 2), at most GR_POLY voices. A grain: position, length
@@ -129,11 +130,14 @@ static inline int32_t gr_dec(const smp_zone_t *z, uint32_t pos, int32_t *pred, i
 }
 
 /* the zone of a note (as SAMPLE: the last zone that holds it; a built-in set falls back to its
- * first zone, a user slot stays silent), -1 = none */
+ * first zone, a user slot stays silent), -1 = none, GR_SINE = the source has no data (smp_sine) */
+#define GR_SINE (-2)
 static int32_t gr_find(uint32_t src, uint32_t note)
 {
     uint32_t i, nz = gr_nz(src);
     int32_t zl = src < SMP_NSETS ? 0 : -1;
+    if (smp_set_missing(src))
+        return GR_SINE;
     for (i = 0; i < nz && i < GR_MAXZ; i++) {
         const smp_zone_t *z = gr_zone(src, i);
         if (note >= z->lo && note <= z->hi)
@@ -352,6 +356,7 @@ static void grain_note_on(track_t *t, voice_t *v)
     uint32_t vi = (uint32_t)(v - t->v) % NVOICE, i;
     v->s[0] = gr_find((uint32_t)t->p[P_E0] % SMP_NALL, v->note);
     v->s[1] = 0;                                    /* the first grain at once */
+    v->ph[0] = 0;                                   /* (the sine's phase: no data) */
     if (!v->env) {                                  /* a fresh voice: no grains left from before */
         for (i = 0; i < GR_NG; i++)
             if (P->g[i].owner == vi + 1u)
@@ -388,6 +393,11 @@ static void grain_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const
     int32_t zl = v->s[0], acc[CTL], lp, y = v->s[2];
     if (n > CTL)
         n = CTL;
+    if (zl == GR_SINE) {                            /* no data: a plain sine at the note's pitch + PTCH, TONE */
+        lp = 4000 + ((clamp((p[P_E7] << 8) + m->cutoff, 0, 127 << 8) * 28767) >> 15);
+        smp_sine(out, n, m, p[P_E4] * 16, lp, &v->ph[0], &v->s[2]);
+        return;
+    }
     if (zl < 0 || zl >= P->nz || P->src != (uint32_t)p[P_E0] % SMP_NALL + 1u) {
         if (zl < 0)
             v->active = 0;                          /* a user slot key with no zone: silent */

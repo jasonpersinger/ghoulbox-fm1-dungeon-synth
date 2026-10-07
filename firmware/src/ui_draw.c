@@ -192,7 +192,13 @@ static void draw_head(void)
         GFX_HOOK_ALIGN(0, 0, 0, H_HEAD, AL_V, "header text on its middle");
     roll_text(ROLL_BPM, BPM_X, HEAD_MY, b, ui.bpm_t ? T_ACCENT : T_THEME);
     if (ui.msg_t || ui.layer) {                     /* a message, or the layer's name */
-        int32_t x = cv_free_hint(106, HEAD_SY, ui.msg_t ? ui.msg : layer_head(), T_TEXT, T_SURF, 236 - 106);   /* (may start with a keycap) */
+        const char *m = ui.msg_t ? ui.msg : layer_head();
+        int32_t x = 106;
+        if (m[0] == MSG_NOFILE[0]) {                /* a message led by an icon (ui.c MSG_NOFILE), the accent's */
+            x += cv_icon_mid(x, H_HEAD / 2, 16, ICON_X_NOFILE, T_ACCENT, T_SURF) + KH_GAP;
+            m++;
+        }
+        x = cv_free_hint(x, HEAD_SY, m, T_TEXT, T_SURF, 236 - x);   /* (may start with a keycap) */
         if (!ui.msg_t && layer_locked())            /* #83: locked open (a double tap): the lock after its name */
             cv_icon_mid(x + 6, H_HEAD / 2, 16, ICON_X_LOCK, T_THEME, T_SURF);
     } else {
@@ -626,9 +632,13 @@ static void draw_foot(void)
         x += cv_icon_in(x, 19 + AF_S_CAP_Y, 0, AF_S_CAP_H, 12, engine_icon(ename), T_MID, T_SURF) + 5;
     }
     x = cv_text_fit(x, 19, &AF_S, ename, T_THEME, T_SURF, 80);
-    {   /* the page title at the right, its icon before it (MIXER, PHRASES, SONG, CHANCE, MOTION) */
+    {   /* the page title at the right, its icon before it (MIXER, PHRASES, SONG, CHANCE, AUTOMATION) */
         uint32_t pi = ui.home ? ICON_NONE : page_icon(pg);
         int32_t tx = 232 - text_w(&AF_S, ti) - (pi != ICON_NONE ? 16 : 0);
+        if (!ui.home && pg->graph == GR_MOTION && tx - 12 - (x + 10) < text_w(&AF_S, pn)) {
+            str_cpy(ti + 4, ti + 10, sizeof ti - 4);    /* #93: "AUTOMATION 6/6" -> "AUTO 6/6" where the sound's name */
+            tx = 232 - text_w(&AF_S, ti) - (pi != ICON_NONE ? 16 : 0);   /* would be cut (MENU > LARGE) */
+        }
         cv_free_text(x + 10, 19, &AF_S, pn, T_TEXT, T_SURF, tx - 12 - (x + 10));
         if (pi != ICON_NONE) {
             GFX_HOOK_ALIGN(0, 19 + AF_S_CAP_Y, 0, 19 + AF_S_CAP_Y + AF_S_CAP_H, AL_V,
@@ -683,12 +693,17 @@ static void draw_columns(void)
         draw_column(3, "", "", "", T_THEME, -1, ICON_NONE);
         return;
     }
-    if (cur_page()->graph == GR_CHANCE) {
+    if (cur_page()->graph == GR_CHANCE) {              /* STEP CHANCE RATCH: the cursor step's, of all of it */
+        const step_t *cs = &TSEL->step[ui.cursor];
+        int rplays = cs->time == ST_NOTE && (cs->n || cs->hit);   /* RATCH does nothing on a REST, a TIE, empty: DIM */
         fmt_int(val, (int32_t)ui.cursor + 1);
         draw_column(0, "STEP", val, "", VAL(0u), -1, ICON_AUTO);
         fmt_int(val, (int32_t)step_chance(&TSEL->step[ui.cursor]));
         draw_column(1, "CHANCE", val, "%", VAL(1u), -1, ICON_PROB);   /* the die */
-        draw_column(2, "", "", "", T_THEME, -1, ICON_NONE);
+        val[0] = 'x';                                  /* x1 .. x4 */
+        val[1] = (char)('0' + step_ratchet(&TSEL->step[ui.cursor]));
+        val[2] = 0;
+        draw_column(2, "RATCH", val, "", rplays ? VAL(2u) : T_DIM, -1, ICON_X_REPEAT);
         draw_column(3, "", "", "", T_THEME, -1, ICON_NONE);
         return;
     }
@@ -918,7 +933,7 @@ static void confirm_text(char *a, char *b)
         str_cpy(a, "INITIALIZE SOUND?", 24);
         break;
     case CF_CLEAR_MOTION:
-        str_cpy(a, "CLEAR T1 MOTION?", 24); a[7] = (char)('1' + k % NTRK);
+        str_cpy(a, "CLEAR T1 AUTOMATION?", 24); a[7] = (char)('1' + k % NTRK);
         break;
     case CF_OVR_USER:
         str_cpy(a, "OVERWRITE ", 24);

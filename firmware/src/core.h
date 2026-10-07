@@ -21,7 +21,7 @@
                                   * by default; replaced by FM6, its sounds convert (fm4_convert.c) */
 #endif
 #ifndef GHOULBOX_VERSION
-#define GHOULBOX_VERSION "0.7"   /* GHOULBOX's own: the ABOUT screen; the editor's version string ends " GB" it */
+#define GHOULBOX_VERSION "1.0"   /* GHOULBOX's own: the ABOUT screen; the editor's version string ends " GB" it */
 #endif
 #define NENGINES 15u             /* SLICE 13 (reserved without FELUCCA_SLICE: never offered), GURDY 14 (GHOULBOX):
                                   * every engine keeps its number in every build */
@@ -222,12 +222,14 @@ typedef struct {                 /* an engine (engines.c ENGINES[]; the eng_*.c 
 enum { ST_NOTE, ST_TIE, ST_REST };
 #define SF_ACCENT 1u
 #define SF_SLIDE 2u
+#define SF_RATCH_SH 3u                   /* RATCH: the hits of a NOTE step - 1 (0..3: x1..x4, seq.c seq_ratchet); */
+#define SF_RATCH (3u << SF_RATCH_SH)     /* bits 3..4, so a user preset's pattern (flag 4 = tie) carries it too */
 #define NLANE 8                  /* drum lanes of a step (the DRUM engine's: eng_drum.c DRUM_LANE_NOTE) */
 typedef struct {                 /* acid-style step: up to 4 notes (POLY), time, accent, slide; drum hits */
     uint8_t note[4];
     uint8_t n;                   /* notes in use, 0 = empty */
     uint8_t time;                /* ST_NOTE / ST_TIE / ST_REST */
-    uint8_t flags;               /* SF_ACCENT | SF_SLIDE */
+    uint8_t flags;               /* SF_ACCENT | SF_SLIDE | SF_RATCH */
     uint8_t vel;
     uint8_t hit;                 /* bit l: lane l hits (its GM note, on any engine): the DRUM grid */
     uint8_t acc;                 /* bit l: that hit is accented (velocity 127) */
@@ -241,6 +243,13 @@ typedef struct {                 /* a step as formats 1..4 (projects to FUN4) st
 /* Probability keeps zero-initialized and legacy patterns at 100%. */
 static uint32_t step_chance(const step_t *s) { return !s->probability ? 100u : s->probability <= 100u ? s->probability : 0u; }
 static void step_set_chance(step_t *s, uint32_t chance) { s->probability = (uint8_t)(chance >= 100u ? 0u : chance ? chance : 101u); }
+/* RATCH: a NOTE step plays its notes and hits this many times (1..4), in equal parts of the step; every older
+ * pattern holds 0 there, x1 */
+static uint32_t step_ratchet(const step_t *s) { return ((s->flags & SF_RATCH) >> SF_RATCH_SH) + 1u; }
+static void step_set_ratchet(step_t *s, uint32_t hits)
+{
+    s->flags = (uint8_t)((s->flags & ~SF_RATCH) | ((hits < 1u ? 0u : hits > 4u ? 3u : hits - 1u) << SF_RATCH_SH));
+}
 #define MOTION_MAX 64u
 /* Four tracks x64 steps fit one byte. Values retain their signed parameter range. */
 typedef struct { uint8_t place, param; int16_t value; } motion_event_t;
@@ -282,6 +291,7 @@ typedef struct track {
     uint8_t seq_n;
     uint8_t seq_hold;            /* last step slides: keep the notes until the next step */
     uint8_t slide_glide;         /* next legato note glides (slide) */
+    uint8_t rat_left;            /* RATCH: repeats of the playing step still to come (seq.c seq_ratchet) */
     uint32_t seq_off;
     uint8_t seq_active;          /* any step programmed */
     uint8_t rskip_idx;           /* live recording put notes into the step about to play: */

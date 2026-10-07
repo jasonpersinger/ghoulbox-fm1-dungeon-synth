@@ -160,11 +160,23 @@ static const param_desc_t *param_desc_of(uint32_t e, uint32_t id)
 
 /* a retired F_ENUM value kept as an alias, so stored values stay valid: SAMPLE SET and GRAIN SRC 1, once
  * TRANH, and 4, once PERC (a SAMPLE sound of it loads as DRUM: core.h drum_from_perc), play PIANO
- * (tools/gen_samples.py SMP_SET_ORIG). It shows the original's name; knobs step over it
- * and the editor's SET lands on the original. -> the value v stands for */
+ * (tools/gen_samples.py SMP_SET_ORIG); DRUM KIT 1..3, once HAND CYM H+CYM, play 66 10 77 (eng_drum.c DK_PLAYS).
+ * It shows the original's name; knobs step over it and the editor's SET lands on the original. -> the value v
+ * stands for */
 static int32_t enum_orig(const param_desc_t *d, int32_t v)
 {
+    if (d->names == N_DRUM_KIT)
+        return v >= 0 && v < DK_COUNT ? (int32_t)DK_PLAYS[v] : v;
     return d->names == SMP_ALL_NAMES && v >= 0 && v < SMP_NSETS ? SMP_SET_ORIG[v] : v;
+}
+
+/* a stored value as the parameter takes it (projects, user presets, motion): inside d's range, and a retired
+ * DRUM KIT (1..3) as the kit it plays, so KIT never holds one again. (SAMPLE / GRAIN's aliases keep their
+ * number: they are what the sound was saved with, and play the original anyway) */
+static int32_t param_fit(const param_desc_t *d, int32_t v)
+{
+    v = clamp(v, d->min, d->max);
+    return d->names == N_DRUM_KIT ? enum_orig(d, v) : v;
 }
 
 /* a knob moved an F_ENUM from `from` to v: past any alias in that direction (back to `from` at the end) */
@@ -364,7 +376,7 @@ static const page_t PAGES[] = {
     {"MIXER", FAM_TRK, SC_TRK, GR_TRK, {0, 1, 2, 3}},   /* GLO button; LEVEL PAN REV MUTE */
     {"SONG", FAM_SEQ, SC_GLOBAL, GR_SONG, {0xFF, 0xFF, 0xFF, 0xFF}},
     {"CHANCE", FAM_SEQ, SC_STEP, GR_CHANCE, {0xFF, 0xFF, 0xFF, 0xFF}},
-    {"MOTION", FAM_SEQ, SC_TRACK, GR_MOTION, {0xFF, 0xFF, 0xFF, 0xFF}},
+    {"AUTOMATION", FAM_SEQ, SC_TRACK, GR_MOTION, {0xFF, 0xFF, 0xFF, 0xFF}},
 };
 #define NPAGES (sizeof(PAGES) / sizeof(PAGES[0]))
 static uint8_t mod_ui_slot;      /* the MOD page: the matrix slot (0..3) KNOB 2..4 edit */

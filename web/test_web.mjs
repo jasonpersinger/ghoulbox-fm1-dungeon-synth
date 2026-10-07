@@ -38,7 +38,9 @@ const E = vm.runInNewContext(proto + `
 ;({ frame, unframe, parse, req, Link, parseWav, resample, normalize, takeSample, autoTrim, zoomView, rootFromName, buildSlot, makeMockDevice, CMD, SMP,
    UP, bank, capturePatch, auditionPatch, startWatch, libraryFile, readLibraryFile, paramKeys, patternFromSteps, stepsFromPattern, upName,
    mixer, parseNotes, parseHits, hitsText, gridFromSteps, LANE_NOTE, LANE_OF, readDevicePreferences, devicePresetRows, engineOrder, ENGINE_ORDER, ENGINE_HIDDEN, PRESET_HIDDEN, aliasOf, fmtValue, FM6, enumShown, F,
-   FM4, fromDigital, fromPerc, DRUM_KIT_E })`,
+   FM4, fromDigital, fromPerc, DRUM_KIT_E,
+   MENU: typeof MENU === "undefined" ? null : MENU, MENU_TABS: typeof MENU_TABS === "undefined" ? null : MENU_TABS,
+   readDeviceMenu: typeof readDeviceMenu === "undefined" ? null : readDeviceMenu })`,
 { setTimeout, clearTimeout, setInterval, clearInterval, console });
 
 async function editorMock() {
@@ -155,6 +157,39 @@ async function editorMock() {
   }
   const none = await E.readDevicePreferences(() => { throw new Error("unexpected request"); }, { uiCaps: 0 }, []);
   ok(none === null, "editor: old firmware receives no unsupported preference requests");
+  if (!E.readDeviceMenu) console.log(`${"editor: MENU settings (this editor has none)".padEnd(64)} skip`);
+  else {   /* the MENU settings (1.0.4): INFO 4E 01 count, MENU_DESC (72), MENU_SET (73) */
+    ok(info.menuCount === 12, "editor: INFO advertises the MENU settings (4E 01 12)");
+    const items = await E.readDeviceMenu(rq, info);
+    ok(items.length === 12 && items.map((d) => d.id).join() === "0,1,2,3,4,5,6,7,8,9,10,11" &&
+       items.map((d) => d.name).join() === "COLOR,STYLE,LARGE,ANIM,LEDS,HOLD,KNOB ACCEL,FX LATCH,BPM LOCK,SPEAKER EQ,USB LEVEL,USB SERIAL" &&
+       items.every((d) => d.kind === 0 && d.min === 0 && d.names.length === d.max - d.min + 1) &&
+       eq(items[0].names, prefs.palettes) && items[0].value === m.state.palette &&
+       items[4].names.join() === "OFF,DIM LO,DIM HI,INV" && items[4].value === 2 && items[5].value === 1,
+       "editor: MENU_DESC lists every setting, its value names and value");
+    ok(items.map((d) => d.tab).join() === "0,0,0,0,0,1,1,1,1,2,2,3" &&
+       items.map((d) => d.tabName).join() === "DISPLAY,DISPLAY,DISPLAY,DISPLAY,DISPLAY,CONTROL,CONTROL,CONTROL,CONTROL,AUDIO,AUDIO,SYSTEM",
+       "editor: MENU_DESC (1.0.5) gives each setting's tab on the device, after its names");
+    ok(E.parse[E.CMD.MENU_DESC](await rq(E.req.menuDesc(12))).id === 127, "editor: MENU_DESC past the list answers id 127");
+    let r = E.parse[E.CMD.MENU_SET](await rq(E.req.menuSet(4, 3)));
+    ok(r.rc === 0 && r.id === 4 && r.value === 3 && E.parse[E.CMD.MENU_DESC](await rq(E.req.menuDesc(4))).value === 3,
+       "editor: MENU_SET round trip (LEDS INV)");
+    const pal = m.state.palette;
+    r = E.parse[E.CMD.MENU_SET](await rq(E.req.menuSet(0, 50)));
+    ok(r.rc === 0 && r.value === 9 && E.parse[E.CMD.UI_STATE](await rq(E.req.uiState())).palette === 9,
+       "editor: MENU_SET clamps (COLOR 50 -> 9), the same setting as UI_SET 0");
+    ok(E.parse[E.CMD.MENU_SET](await rq(E.req.menuSet(12, 1))).rc === 1, "editor: MENU_SET of an unknown id: rc 1");
+    await rq(E.req.menuSet(0, pal)); await rq(E.req.menuSet(4, 2));
+    const d = E.parse[E.CMD.MENU_DESC]([3, 20, 1, 5, 64, 0, 64, 100, 64, 88, 0, 109, 115, 0]);
+    ok(d.kind === 1 && d.value === 5 && d.max === 100 && d.name === "X" && d.unit === "ms" && d.names === null && d.tab === -1,
+       "editor: MENU_DESC kind 1 (a number): its unit");
+    const d2 = E.parse[E.CMD.MENU_DESC]([3, 20, 1, 5, 64, 0, 64, 100, 64, 88, 0, 109, 115, 0, 2, 65, 0]);
+    ok(d2.unit === "ms" && d2.tab === 2 && d2.tabName === "A", "editor: MENU_DESC kind 1 with its tab after the unit");
+    const d3 = E.parse[E.CMD.MENU_DESC]([4, 4, 0, 2, 64, 0, 64, 1, 64, 76, 0, 65, 0, 66, 0]);
+    ok(d3.names.join() === "A,B" && d3.tab === -1 && d3.tabName === "", "editor: MENU_DESC from 1.0.4 firmware (no tab): tab -1");
+    ok((await E.readDeviceMenu(() => { throw new Error("unexpected request"); }, { menuCount: 0 })).length === 0,
+       "editor: firmware without MENU settings is not asked");
+  }
   await rq(E.req.uiSet(3, 0));
   const scale = E.parse[E.CMD.DESC](await rq(E.req.desc(0, 26)));
   const scaleNames = ["CHR", "MAJ", "MIN", "DOR", "MIX", "PEN", "MPEN", "HARM", "PHRY", "LYD", "LOC", "MEL", "BLUES", "WHOLE", "DIMHW", "DIMWH"];
@@ -223,6 +258,15 @@ async function editorSamplePresets() {
   const setPerc = E.parse[C.SET](await rq(E.req.set(0, info.pe0, 4)));
   ok(alias.preset === 0 && setAlias.value === 0 && setPerc.value === 0,
     "SAMPLE: preset 1 and SET 1 / 4 (once TRANH, PERC) land on PIANO");
+  await rq(E.req.preset(10, 0));
+  const kitD = E.parse[C.DESC](await rq(E.req.desc(0, info.pe0)));
+  const kitSet = [];
+  for (const v of [1, 2, 3]) kitSet.push(E.parse[C.SET](await rq(E.req.set(0, info.pe0, v))).value);
+  ok(eq(kitD.names, ["STD", "66", "10", "77", "80", "10", "66", "55", "77"]) &&
+     eq([0, 1, 2, 3, 4, 5, 6, 7, 8].map((v) => E.aliasOf(kitD.names, v)), [0, 6, 5, 8, 4, 5, 6, 7, 8]) &&
+     eq(E.enumShown(kitD).filter((v) => E.aliasOf(kitD.names, v) === v).map((v) => kitD.names[v]), ["STD", "80", "10", "66", "55", "77"]) &&
+     eq(kitSet, [6, 5, 8]),
+    "DRUM: KIT 1..3 (once HAND CYM H+CYM) named 66 10 77, aliases of 6 5 8: hidden, a SET lands there");
   const removed = E.parse[C.PRESET](await rq(E.req.preset(4, 4)));
   const kit = E.parse[C.DUMP](await rq(E.req.dump()), info);
   ok(removed.engine === 10 && removed.preset === 0 && kit.engine === 10 && eq(kit.p.slice(info.pe0), E.DRUM_KIT_E),
@@ -299,6 +343,12 @@ function mockTables() {
   cmp("FM6 patches (init, factory, bank size)", T.FM6, fw.FM6);
   cmp("DRUM grid: the lanes' GM notes", [...E.LANE_NOTE], fw.LANE_NOTE);
   cmp("DRUM grid: the lane of GM 35..81", E.LANE_OF, fw.LANE_OF);
+  const mj = join(DESC, "../menu.json");
+  if (E.MENU && existsSync(mj)) {                   /* the MENU settings: tests/editor_test.c's MENU_DESC replies */
+    const fm = JSON.parse(readFileSync(mj, "utf8"));
+    cmp("MENU settings", E.MENU.map((x) => ({ id: x.id, kind: 0, min: 0, max: (x.names || m2.state.palettes).length - 1,
+      value: x.def, name: x.name, names: x.names || m2.state.palettes, tab: x.tab, tabName: E.MENU_TABS[x.tab] })), fm);
+  }
   diffs.slice(0, 20).forEach((d) => console.log("  " + d));
   ok(!diffs.length, `editor: mock tables == firmware (${diffs.length} differences)`);
   /* #31: percent values as the firmware formats them (param_format), SWG 0..100 shows its value */
@@ -653,6 +703,43 @@ async function editorGrid() {
   const p3 = await E.bank.get(rq, info, 2);
   ok(p3.pattern && p3.grid === null, "grid: a note pattern stays a pattern (kind 0)");
   done();
+}
+
+/* RATCH: a step's ratchet (1..4) after its chance, INFO 52 01 04; older firmware (no tag): none, replies read x1 */
+async function editorRatchet() {
+  const C = E.CMD;
+  const { rq, done } = attachMock({});
+  const info = E.parse[C.INFO](await rq(E.req.info()));
+  if (info.ratchet === undefined) {               /* (an editor without it) */
+    console.log(`${"ratchet (this editor has none)".padEnd(64)} skip`);
+    done();
+    return;
+  }
+  let s = E.parse[C.STEP_SET](await rq(E.req.stepSet(6, { n: 1, notes: [60, 0, 0, 0], time: 0, flags: 1, vel: 100, chance: 70, ratchet: 3 })));
+  ok(info.ratchet === 4 && s.ratchet === 3 && s.chance === 70 && s.flags === 1, "ratchet: INFO 52 01 04, STEP_SET x3 after the chance");
+  s = E.parse[C.STEP_SET](await rq(E.req.stepSet(6, { n: 1, notes: [62, 0, 0, 0], time: 0, flags: 0, vel: 100, chance: 70 })));
+  ok(s.ratchet === 3 && s.notes[0] === 62, "ratchet: a STEP_SET without it (an older editor) keeps the step's");
+  ok(E.req.stepSet(6, { n: 1, notes: [60, 0, 0, 0], time: 0, flags: 0, vel: 100, ratchet: 2 })[1].length === 9,
+    "ratchet: never sent without the chance before it");
+  const w = E.parse[C.TRACK_STEP](await rq(E.req.trackStep(1, 2, { n: 1, notes: [50, 0, 0, 0], time: 0, flags: 0, vel: 90, chance: 100, ratchet: 4 })));
+  ok(w.ratchet === 4 && E.parse[C.TRACK_STEP](await rq(E.req.trackStep(1, 2))).ratchet === 4, "ratchet: TRACK_STEP x4 on another track");
+  const fw = E.parse[C.INFO]([88, 0, 0, 91, 27, 64, 83, 4, 16, 0x55, 1, 9, 0x4d, 1, 64, 1, 0x42, 1, 3, 0x46, 1, 8, 27, 0x53, 1, 3, 0x52, 1, 4]);
+  const f105 = E.parse[C.INFO]([88, 0, 0, 91, 27, 64, 83, 4, 16, 0x55, 1, 9, 0x4d, 1, 64, 1, 0x42, 1, 3, 0x46, 1, 8, 0, 0x53, 1, 3,
+    0x50, 1, 3, 0x4E, 1, 12, 0x52, 1, 4]);         /* 1.0.5: FM6 v2, MENU settings, then RATCH */
+  ok(f105.ratchet === 4 && f105.fm6.caps === 3, "ratchet: INFO 52 01 04 after 50 01 03 and 4E 01 count");
+  const old = E.parse[C.INFO]([88, 0, 0, 91, 27, 64, 83, 4, 16, 0x55, 1, 9, 0x4d, 1, 64, 1, 0x42, 1, 3, 0x46, 1, 8, 27, 0x53, 1, 3]);
+  ok(fw.ratchet === 4 && fw.syncCaps === 3 && old.ratchet === 0 && E.parse[C.STEP_GET]([1, 1, 60, 0, 0, 0, 0, 0, 96, 0, 0, 0, 100]).ratchet === 1,
+    "ratchet: the firmware's INFO trailer; 1.0's has none and its steps read x1");
+  const steps = E.stepsFromPattern([[60, 1 | 2 << 3], [0, 4], [62, 3 << 3], ...Array(13).fill([0, 0])]);
+  ok(steps[0].ratchet === 3 && steps[0].flags === 1 && steps[2].ratchet === 4 && steps[1].time === 1 &&
+     JSON.stringify(E.patternFromSteps(steps).slice(0, 3)) === JSON.stringify([[60, 17], [0, 4], [62, 24]]),
+     "ratchet: a user preset's pattern keeps it in its flags (8 | 16)");
+  done();
+  const o = attachMock({ noSync: true });
+  const oi = E.parse[C.INFO](await o.rq(E.req.info()));
+  s = E.parse[C.STEP_GET](await o.rq(E.req.stepGet(0)));
+  ok(oi.ratchet === 0 && s.ratchet === 1 && s.chance === 100, "ratchet: firmware without it: no tag, steps x1");
+  o.done();
 }
 
 async function editorLive() {
@@ -1408,6 +1495,7 @@ await editorSamplePresets();
 mockTables();
 await editorLibrarian();
 await editorGrid();
+await editorRatchet();
 await editorLive();
 await preferenceReplies();
 await editorTracks();

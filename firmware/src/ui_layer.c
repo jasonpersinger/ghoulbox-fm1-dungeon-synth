@@ -8,7 +8,7 @@
  *              held (HOLD cells, a corner triangle), C4 UNMUTE ALL, F4 TAP tempo; KNOB 1..4 T1..T4 LEVEL;
  *              GLO + PLAY: from the top without stopping
  *   SCL  SET   any key: its note name is ROOT; KNOB 1..4 ROOT SCL CHRD VOIC (LY_SCL: the SCL page's first two,
- *              the CHORD page's two; QNT TRN stay on SCL); the LEDs show the root lit and the scale's notes blinking
+ *              the CHORD page's two; QNT TRN stay on SCL); the LEDs show the root lit and the scale's notes breathing
  *   EDIT SET   the white keys from F3: the engines in PRESETS order (one key each, the NENG_SHOWN one can pick:
  *              engines.c eng_vis), the next white key INIT (LY_INIT: E5)
  *              (the dialog); KNOB 1 ENG, 2 No. (the engine's sounds), 3 FAV. Sound loads as on PRESETS: the steps
@@ -394,6 +394,18 @@ static int layer_play(void)
     return 1;
 }
 
+/* OCT- / OCT+ pressed with a SET layer's button down (FX LATCH: FX's) before it opened: a combo, so it opens now,
+ * before oct_taps and layer_oct read it (else the press was nobody's: no put back / ALL OFF, no octave) */
+static void layer_oct_open(uint32_t pressed)
+{
+    uint32_t l = ui.ly, oct = 1u << panel.btn[B_OCTDN] | 1u << panel.btn[B_OCTUP];
+    if ((pressed & oct) && l && !(ui.ly_t0 & (LY_OPEN | LY_DEAD)) && layer_held() &&
+        (LAYERS[l].kind == LK_SET || (l == LAYER_FX && perf_latch_on))) {
+        ui.ly_t0 |= LY_OPEN | LY_COMBO;
+        layer_opened(l);
+    }
+}
+
 /* OCT- / OCT+ in a SET layer: no octave; OCT- let go puts back what the layer changed. Returns the taps left */
 static uint32_t layer_oct(uint32_t pressed, uint32_t oct)
 {
@@ -430,29 +442,35 @@ static uint32_t layer_oct(uint32_t pressed, uint32_t oct)
 }
 
 /* --------------------------------------------------------- the LEDs --- */
-/* lit = in effect now (held, the value, a track sounding), slow blink = can be pressed, dark = nothing there */
+/* lit = in effect now (held, the value, a track sounding), breathing = can be pressed (*br: dark .. ~60 % and
+ * back, ~1.1 s, hal/fm1_input.h fm1_led_breath; was a hard 250 ms blink, #119), dark = nothing there */
 static int glo_sounding(uint32_t t) { return !trk[t].p[P_MUTE] && (!perf_solo || ((perf_solo >> t) & 1u)); }
-static uint32_t layer_leds(void)
+static uint32_t layer_leds(uint32_t *br)
 {
-    uint32_t k, m = 0, blink = ((fm1_ms / 250u) & 1u) == 0u, l = ui.layer, held = perf_held | perf_latched, ok = perf_avail();
+    uint32_t k, m = 0, n = 0, l = ui.layer, held = perf_held | perf_latched, ok = perf_avail();
     uint32_t mask = scale_mask(TSEL), root = (uint32_t)TSEL->p[P_ROOT] % 12u;
     for (k = 0; k < 27u; k++) {
-        uint32_t p = key_place(k), b = (uint32_t)key_black(k), on = 0, e;
-        if (l == LAYER_FX) {                            /* effects blink, held lit, a too-long REPEAT dark */
+        uint32_t p = key_place(k), b = (uint32_t)key_black(k), on = 0, can = 0, e;
+        if (l == LAYER_FX) {                            /* effects breathe, held lit, a too-long REPEAT dark */
             e = perf_key(k);
-            on = e < PF_N && ((ok >> e) & 1u) && (((held >> e) & 1u) | blink);
-        } else if (l == LAYER_GLO) {
-            on = b ? p < NTRK && glo_sounding(p) :
-                 p < NTRK ? ((lys.solo >> k) & 1u) | blink : p == 4u ? blink : p == 7u && !song.g[G_CLOCK] && blink;
-        } else if (l == LAYER_SCL) {                    /* the root lit, the scale's notes blink */
+            can = e < PF_N && ((ok >> e) & 1u);
+            on = can && ((held >> e) & 1u);
+        } else if (l == LAYER_GLO) {                    /* sounding lit; SOLO held lit, the others, C4, F4 breathe */
+            on = b ? p < NTRK && glo_sounding(p) : p < NTRK && ((lys.solo >> k) & 1u);
+            can = !b && (p < NTRK || p == 4u || (p == 7u && !song.g[G_CLOCK]));
+        } else if (l == LAYER_SCL) {                    /* the root lit, the scale's notes breathe */
             e = (k + 5u + 12u - root) % 12u;
-            on = e == 0u || (((mask >> e) & 1u) && blink);
-        } else if (l == LAYER_EDIT && !b) {             /* the engine lit, the others and INIT blink */
-            on = p < NENG_SHOWN && p < LY_INIT ? eng_vis(p) == TSEL->eng_req % NENGINES || blink :
-                 p == LY_INIT && blink && !chain_busy();
+            on = e == 0u;
+            can = (mask >> e) & 1u;
+        } else if (l == LAYER_EDIT && !b) {             /* the engine lit, the others and INIT breathe */
+            on = p < NENG_SHOWN && p < LY_INIT && eng_vis(p) == TSEL->eng_req % NENGINES;
+            can = p < NENG_SHOWN && p < LY_INIT ? 1u : p == LY_INIT && !chain_busy();
         }
         m |= on << k;
+        n |= (can & !on) << k;
     }
+    if (br)
+        *br = n;
     return m;
 }
 
@@ -614,8 +632,8 @@ static void layer_scl(void)                             /* KNOB 2's scales, 4 x 
 }
 static void layer_edit(void)                            /* the engines from F3, INIT next (LY_INIT), the sound under them */
 {                                                        /* (cells show the engine's icon, not the key's note) */
-    uint32_t n = NENG_SHOWN < LY_INIT ? NENG_SHOWN : LY_INIT, cells = n + 1u, i, h = cells > 8u ? 22u : 28u;   /* (GHOULBOX: its
-                                                     * 12 cells keep the compact rows the alignment is tuned on) */
+    uint32_t n = NENG_SHOWN < LY_INIT ? NENG_SHOWN : LY_INIT, cells = n + 1u, i, h = cells > 8u ? 20u : 28u;   /* 4 rows of 20: 8 px
+                                                     * clear above the sound row (GHOULBOX: its 12 cells too: the tuned rows) */
     for (i = 0; i < cells; i++) {
         int32_t x = LC_X(i % 4u), y = 4 + (int32_t)(h + 4u) * (int32_t)(i / 4u);
         const engine_t *en = ENGINES[eng_vis(i) % NENGINES];

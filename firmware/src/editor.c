@@ -289,8 +289,9 @@ static const param_desc_t *ed_desc(uint32_t scope, uint32_t id, int16_t **vp)
 }
 
 /* a step as STEP_SET / TRACK_STEP send it (na bytes): n, 4 notes, time, flags, vel, then (v5) the lane hits
- * and their accents: hit & 127, acc & 127, bit 7 of each (bit 0 hit, bit 1 acc); each value made valid. 8
- * bytes (an editor of before the grid): the hits stay */
+ * and their accents: hit & 127, acc & 127, bit 7 of each (bit 0 hit, bit 1 acc), (v7) the chance, (RATCH, INFO
+ * 52 01) the hits 1..4; each value made valid. 8 bytes (an editor of before the grid): the hits stay; without
+ * the chance or the ratchet the step keeps its own (flags carry accent and slide only) */
 static void ed_step_put(step_t *st, const uint8_t *a, uint32_t na)
 {
     uint32_t i;
@@ -298,28 +299,30 @@ static void ed_step_put(step_t *st, const uint8_t *a, uint32_t na)
     for (i = 0; i < 4u; i++)
         st->note[i] = a[1 + i] & 0x7Fu;
     st->time = (uint8_t)(a[5] > ST_REST ? ST_REST : a[5]);
-    st->flags = a[6] & (SF_ACCENT | SF_SLIDE);
+    st->flags = (uint8_t)((a[6] & (SF_ACCENT | SF_SLIDE)) | (st->flags & SF_RATCH));
     st->vel = a[7] & 0x7Fu;
     if (na >= 11u) {
         st->hit = (uint8_t)((a[8] & 0x7Fu) | (a[10] & 1u) << 7);
         st->acc = (uint8_t)(((a[9] & 0x7Fu) | (a[10] & 2u) << 6) & st->hit);
     }
     if (na >= 12u) step_set_chance(st, a[11] <= 100u ? a[11] : 100u);
+    if (na >= 13u) step_set_ratchet(st, a[12]);
     ui.force = 1;
 }
-static void ed_step_reply(const step_t *st)              /* the same 11 bytes */
+static void ed_step_reply(const step_t *st)              /* the same 13 bytes */
 {
     uint32_t i;
     ed_b(st->n);
     for (i = 0; i < 4u; i++)
         ed_b(st->note[i]);
     ed_b(st->time);
-    ed_b(st->flags);
+    ed_b(st->flags & (SF_ACCENT | SF_SLIDE));
     ed_b(st->vel);
     ed_b(st->hit & 0x7Fu);
     ed_b(st->acc & 0x7Fu);
     ed_b((uint32_t)(st->hit >> 7) | (uint32_t)(st->acc >> 7) << 1);
     ed_b(step_chance(st));
+    ed_b(step_ratchet(st));
 }
 
 /* a flash write from the editor while the transport runs: stop it first (the erase silences the audio and
@@ -338,6 +341,7 @@ static int ed_flash_stop(void)
 #include "editor_preferences.c"
 #include "editor_backup.c"
 #include "editor_fm6.c"
+#include "editor_menu.c"
 
 static void ed_motion_reply(uint32_t k, uint32_t rc)
 {
@@ -361,16 +365,20 @@ static int ed_args_ok(uint32_t cmd, const uint8_t *a, uint32_t n)
     case ED_SET:
         return n == 4u;
     case ED_STEP_GET: case ED_NAMES: case ED_SMP_BEGIN: case ED_SMP_ERASE:
-    case ED_UP_GET: case ED_UP_LOAD: case ED_UP_ERASE: case ED_WATCH: case ED_TRACK_DUMP:
+    case ED_UP_GET: case ED_UP_LOAD: case ED_UP_ERASE: case ED_WATCH: case ED_TRACK_DUMP: case ED_MENU_DESC:
         return n == 1u;
+    case ED_MENU_SET:
+        return n == 3u;
     case ED_STEP_SET:
-        return n == 9u || n == 12u || (n == 13u && a[12] <= 100u);                 /* notes only, or the complete grid extension */
+        return n == 9u || n == 12u || (n == 13u && a[12] <= 100u) ||               /* notes only, or the complete grid extension, */
+               (n == 14u && a[12] <= 100u && a[13] >= 1u && a[13] <= 4u);       /* its chance, its ratchet */
     case ED_TRACK:
         return n <= 1u;
     case ED_TRACK_MIX:
         return n == 1u || n == 4u;
     case ED_TRACK_STEP:
-        return n == 2u || n == 10u || n == 13u || (n == 14u && a[13] <= 100u);
+        return n == 2u || n == 10u || n == 13u || (n == 14u && a[13] <= 100u) ||
+               (n == 15u && a[13] <= 100u && a[14] >= 1u && a[14] <= 4u);
     case ED_MOTION:
         return (n == 1u || (n == 2u && a[1] == 2u) || (n == 3u && a[1] == 1u && a[2] <= 1u) ||
                 (n == 6u && a[1] == 3u) || (n == 4u && a[1] == 4u)) && a[0] < NTRK;
@@ -396,6 +404,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
     if (ed_ui_handle(cmd, a, na)) { ed_send(); return; }
     if (ed_backup_handle(cmd, a, na)) { ed_send(); return; }
     if (ed_fm6_handle(cmd, a, na)) { ed_send(); return; }
+    if (ed_menu_handle(cmd, a, na)) { ed_send(); return; }
     switch (cmd) {
     case ED_MOTION: {
         track_t *t = &trk[a[0]]; uint32_t rc = 0;
@@ -429,6 +438,8 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         ed_b(0x53); ed_b(1); ed_b(3);   /* live sync: bit 0 WATCH while on keeps the shadow, bit 1 no RELOAD echo */
         ed_b(0x50); ed_b(1); ed_b(3);   /* FM6 patches v2: bit 0 no bank (SLOT F1..F8, 8 OWN), bit 1 user preset
                                          * patches (FM6 target 3, backup id 9) */
+        ed_b(0x4E); ed_b(1); ed_b(ED_MENU_N);   /* MENU settings: cmds 72, 73; the items MENU_DESC offers */
+        ed_b(0x52); ed_b(1); ed_b(4);   /* RATCH: a step's ratchet (1..4 hits) after its chance */
         break;
     case ED_GET:
     case ED_SET:

@@ -42,6 +42,11 @@
  * .noinit) grew with it: after an update its slot 1 still starts with a FUN7 record, which is read; the other
  * slots fail their hash and come back from flash (persist_boot).
  *
+ * A step's RATCH (core.h SF_RATCH, the hits - 1, 0..3) is in bit 7 of its velocity byte (bit 0) and of its chance
+ * byte (bit 1) of FUN7 / FUN8: bits every firmware before wrote 0, so every older project loads with its steps x1,
+ * and no format or size changed. Firmware before RATCH refuses a project that holds a ratchet (those bytes out
+ * of their range), as it would a newer format. FUN6..FUN1 have none (x1).
+ *
  * DIGITAL (engine 1) was retired in 1.0 (fm4_convert.c): a track of it, in any format, loads as FM6 with the
  * patch converted from its values as the track's own (proj_fm4, on every import; the stored record keeps what it
  * holds until saved again). Its motion events on the EDIT or OP ENV values are dropped.
@@ -204,7 +209,7 @@ static void proj_trk_from(proj_trk_t *d, const int16_t *p, uint32_t np, uint8_t 
         memcpy(s->note, step[k].note, 4);
         s->n = step[k].n;
         s->time = step[k].time;
-        s->flags = step[k].flags;
+        s->flags = step[k].flags & 3u;          /* accent, slide: x1 (no RATCH then) */
         s->vel = step[k].vel;
         s->hit = s->acc = 0;
     }
@@ -488,7 +493,10 @@ static int proj_import_old(project_t *q, const void *b, int n)
                 for (k = 0; k < P_COUNT; k++) def[k] = param_desc_of(v->t[i].engine % NENGINES, k)->def;
                 params_by_count(q->t[i].p, v->t[i].p, 69u, def);
                 q->t[i].engine = v->t[i].engine; q->t[i].preset = v->t[i].preset;
-                for (k = 0; k < NSTEP; k++) memcpy(&q->t[i].step[k], &v->t[i].step[k], sizeof(step10_t));
+                for (k = 0; k < NSTEP; k++) {
+                    memcpy(&q->t[i].step[k], &v->t[i].step[k], sizeof(step10_t));
+                    q->t[i].step[k].flags &= 3u;       /* (x1: no RATCH then) */
+                }
             }
             if (bytes == sizeof *v6) q->chain = v6->chain; else chain_defaults(&q->chain);
             q->sum = proj_sum(q); proj_drums_to_part(q); proj_phys(q); proj_tape_off(q);
@@ -537,12 +545,14 @@ static int proj_pack(project_store_t *out, const project_t *q)
         b[pos++] = q->t[t].engine; b[pos++] = q->t[t].preset;
         for (i = 0; i < NSTEP; i++) {
             const step_t *s = &q->t[t].step[i];
-            if (s->n > 4u || s->time > ST_REST || (s->flags & ~3u) || s->probability > 101u) return 0;
+            uint32_t r = step_ratchet(s) - 1u;          /* RATCH: bit 7 of the velocity and chance bytes (see the top) */
+            if (s->n > 4u || s->time > ST_REST || (s->flags & ~(3u | SF_RATCH)) || s->probability > 101u) return 0;
             for (uint32_t j = 0; j < 4u; j++)           /* what proj_unpack checks, so a saved project always loads: */
                 b[pos++] = s->note[j] > 127u ? 127u : s->note[j];   /* notes and velocity 0..127, accents */
-            b[pos++] = (uint8_t)(s->n | s->time << 3 | s->flags << 5);   /* only on hits */
-            b[pos++] = s->vel > 127u ? 127u : s->vel; b[pos++] = s->hit; b[pos++] = s->acc & s->hit;
-            b[pos++] = s->probability;
+            b[pos++] = (uint8_t)(s->n | s->time << 3 | (s->flags & 3u) << 5);   /* only on hits */
+            b[pos++] = (uint8_t)((s->vel > 127u ? 127u : s->vel) | (r & 1u) << 7); b[pos++] = s->hit;
+            b[pos++] = s->acc & s->hit;
+            b[pos++] = (uint8_t)(s->probability | (r >> 1) << 7);
         }
     }
     if (pos + sizeof q->chain + sizeof q->motion > PROJ_FM6_OFF) return 0;
@@ -589,10 +599,13 @@ static int proj_unpack(project_t *q, const uint8_t *b, uint32_t st)
             step_t *s = &q->t[t].step[i]; uint32_t meta;
             memcpy(s->note, b + pos, 4); pos += 4; meta = b[pos++];
             s->n = meta & 7u; s->time = (meta >> 3) & 3u; s->flags = (meta >> 5) & 3u;
-            s->vel = b[pos++]; s->hit = b[pos++]; s->acc = b[pos++]; s->probability = b[pos++];
-            if (meta > 127u || s->n > 4u || s->time > ST_REST || s->probability > 101u) return 0;
+            s->vel = b[pos] & 127u; meta |= (b[pos++] & 128u) << 1;      /* (RATCH bit 0 at bit 8 of meta) */
+            s->hit = b[pos++]; s->acc = b[pos++];
+            s->probability = b[pos] & 127u; meta |= (b[pos++] & 128u) << 2;   /* (bit 1 at bit 9) */
+            if ((meta & 255u) > 127u || s->n > 4u || s->time > ST_REST || s->probability > 101u) return 0;
             for (uint32_t j = 0; j < 4u; j++) if (s->note[j] > 127u) return 0;
-            if (s->vel > 127u || (s->acc & ~s->hit)) return 0;
+            if (s->acc & ~s->hit) return 0;
+            step_set_ratchet(s, (meta >> 8) + 1u);
         }
     }
     memcpy(&q->chain, b + pos, sizeof q->chain); pos += sizeof q->chain;
@@ -671,13 +684,13 @@ static void proj_bound(project_t *q)
         proj_steps(q->t[t].step);
         for (i = 0; i < NSTEP; i++) {
             step_t *s = &q->t[t].step[i];
-            s->flags &= 3u;
+            s->flags &= 3u | SF_RATCH;
             s->vel &= 127u;
             if (s->probability > 101u) s->probability = 0;
         }
         for (i = 0; i < P_COUNT; i++) {
             const param_desc_t *d = param_desc_of(q->t[t].engine % NENGINES, i);
-            q->t[t].p[i] = (int16_t)clamp(q->t[t].p[i], d->min, d->max);
+            q->t[t].p[i] = (int16_t)param_fit(d, q->t[t].p[i]);   /* (a retired KIT: the kit it plays) */
         }
     }
     q->sum = proj_sum(q);
@@ -839,9 +852,9 @@ static int project_restore_runtime(const project_t *input)
         uint32_t e = s->engine % NENGINES;
         t->eng_req = (uint8_t)e;
         t->user = 0;                                    /* (no user preset slot is saved) */
-        for (i = 0; i < P_COUNT; i++) {                 /* every value back inside its range */
+        for (i = 0; i < P_COUNT; i++) {                 /* every value back inside its range (param_fit) */
             const param_desc_t *d = param_desc_of(e, i);
-            t->p[i] = (int16_t)clamp(s->p[i], d->min, d->max);
+            t->p[i] = (int16_t)param_fit(d, s->p[i]);
         }
         t->preset = (uint8_t)(ENGINES[e]->npresets ? (s->preset >= PROJ_DEF_KEEP ? 0u : s->preset) % ENGINES[e]->npresets : 0u);
         memcpy(t->step, s->step, sizeof t->step);
@@ -880,6 +893,7 @@ static int project_restore_runtime(const project_t *input)
     sync_reload = 1;
     ui.force = 1;
     ui_message("LOADED");
+    memset(snd_said, 0, sizeof snd_said);               /* a missing sample is said again, after LOADED */
     return 0;
 }
 static void project_load(uint32_t slot)

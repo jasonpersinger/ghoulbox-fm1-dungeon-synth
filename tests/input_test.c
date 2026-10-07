@@ -15,7 +15,14 @@
  *   - the LED scan through fm1_input_tick: lit LEDs all of their tick, dim ones a pulse over the start of the
  *     595 shift (no wait) that settles to FM1_LED_DIM_NS (DIM HI) or FM1_LED_DIM_LO_NS (DIM LO, fm1_led_dim_level)
  *     +-30 % on every column whatever the bus speed, every
- *     frame, each only on its own column, the lines dark at every latch; the cost of a tick.
+ *     frame, each only on its own column, the lines dark at every latch; the cost of a tick;
+ *   - #119 the breath (fm1_led_breath), DIM HI and LO, the ticks 100 us apart, every LED's on-time a frame from the
+ *     trace of the line writes against a lit LED: dark .. ~60 % of lit (LO ~30 %) and back over
+ *     FM1_LED_BREATH_FRAMES, from its peak, dark at half a period; the low end a share of the pulse, over the glow whole
+ *     lit frames; smooth and monotonic (32-frame means); no flicker near the peak (a dark run between two lit frames
+ *     <= 9 frames, ~10 ms, where the breath is over half its peak; the runs over a quarter and at all printed); in
+ *     step on two columns; the glow still its target +-30 %; a lit or dim LED never breathing, nothing of another
+ *     column, the lines dark at the latch, the tick as before (the same writes) once nothing breathes.
  * The GPIO / timer helpers of the header are compiled, never called. */
 #include <stdint.h>
 #include <stdio.h>
@@ -417,18 +424,168 @@ int main(void)
             printf("LEDs %s, bus %u: the pulse spans %u..%u bits of the shift%s\n", lv ? "LO" : "HI", (unsigned)host_bus, (unsigned)kmin,
                    (unsigned)kmax, waits ? " (the shift shorter than the pulse: the rest waited)" : " (no wait)");
         }
+        for (bi = 0; bi < 4u; bi++) {                   /* #119 the breath: bus 1 and 2 (a 16 and a ~12 bit pulse) x HI, LO */
+            enum { BF = FM1_LED_BREATH_FRAMES, SETTLE = 20u, NF = 2u * FM1_LED_BREATH_FRAMES, WIN = 32u };
+            /* the on-time of each LED a frame (TIMER4 ticks), from the trace of the line writes: before the latch they
+             * drive column p (its pulse), the last one column n until the next tick's first write; the ticks 100 us apart */
+            static uint32_t on[NF][FM1_NCOL][5], mean[NF / WIN];
+            const uint32_t lo = bi >> 1, bus = 1u + (bi & 1u), TICK = FM1_LED_TICK_US * FM1_TICKS_PER_US;
+            const uint32_t T = ((lo ? FM1_LED_DIM_LO_NS : FM1_LED_DIM_NS) * FM1_TICKS_PER_US + 500u) / 1000u;
+            const uint32_t PK = lo ? FM1_LED_BREATH_PK_LO : FM1_LED_BREATH_PK;
+            uint32_t t, f, c, r, i, bad = 0, badw = 0, wmin = ~0u, wmax = 0, after = 0, others = 0, step = 0, mono = 0;
+            uint32_t lit = 0, peak = 0, first = 0, dark = 0, dimok = 0, run, run50 = 0, run25 = 0, runlit = 0, lastw = 0, lastt = 0;
+            uint32_t tstart, frames = NF, n6 = 0;
+            uint64_t litsum = 0;
+            char what[160];
+            reset();
+            fm1_led_dim_level(lo);
+            FM1_PR(FM1_PA, FM1_IN) = FM1_PR(FM1_PB, FM1_IN) = 0xFFFFFFFFu;
+            memset(fm1_led, 0, sizeof fm1_led);
+            memset(fm1_led_dim, 0, sizeof fm1_led_dim);
+            memset(fm1_led_breath, 0, sizeof fm1_led_breath);
+            fm1_led[3] = 1u << 2;                       /* column 3: row 2 lit (also set to breathe), row 4 breathes */
+            fm1_led_dim[4] = 0x1Eu;                     /* column 4: every row dim, row 1 also set to breathe */
+            fm1_led[7] = 1u << 3;                       /* column 7: row 3 lit (the reference), nothing else */
+            host_step = 1u;
+            host_bus = bus;
+            for (t = 0; t < SETTLE * FM1_NCOL || fm1__tick_col; t++)   /* the glow settled, nothing breathing yet; */
+                fm1_input_tick();                                  /* (then from column 0: frame 0 the first) */
+            fm1_led_breath[3] = 1u << 2 | 1u << 4;
+            fm1_led_breath[4] = 1u << 1;
+            fm1_led_breath[6] = 1u << 1;                /* column 6: breathes alone (no dim, no lit) */
+            memset(on, 0, sizeof on);
+            latch_lit = 0;
+            tstart = host_now + TICK;
+            for (t = 0; t <= frames * FM1_NCOL; t++) {  /* (one tick more: the end of the last lit time) */
+                uint32_t p = fm1__tick_col, n = p + 1u == FM1_NCOL ? 0u : p + 1u, pre;
+                f = t / FM1_NCOL;
+                if (host_now < tstart + t * TICK)
+                    host_now = tstart + t * TICK;
+                led_nw = 0;
+                fm1_input_tick();
+                if (t) {                                /* the last tick's last write lit column p until now */
+                    uint32_t fl = (t - 1u) / FM1_NCOL;
+                    for (r = 1; r < 5u; r++)
+                        on[fl][p][r] += (lastw >> r & 1u) * (led_wt[0] - lastt);
+                }
+                if (t == frames * FM1_NCOL)
+                    break;
+                pre = fm1_led[p] | fm1_led_dim[p] | fm1_led_breath[p];
+                for (i = 0; i + 1u < led_nw; i++) {     /* column p's writes (the key read, the pulse) */
+                    bad += (led_w[i] & ~pre) != 0u;     /* its own LEDs only */
+                    for (r = 1; r < 5u; r++)
+                        on[f][p][r] += (led_w[i] >> r & 1u) * (led_wt[i + 1u] - led_wt[i]);
+                }
+                if (led_nw == 5u) {                     /* the pulse with the breath's write: the glow's width */
+                    uint32_t pw = led_wt[3] - led_wt[1];
+                    badw += led_w[0] != 0u || led_w[3] != 0u ||
+                            (led_w[1] & (fm1_led[p] | (fm1_led_dim[p] & ~fm1_led[p]))) != (fm1_led[p] | (fm1_led_dim[p] & ~fm1_led[p]));
+                    if (f >= 4u) {
+                        wmin = pw < wmin ? pw : wmin;
+                        wmax = pw > wmax ? pw : wmax;
+                    }
+                } else {
+                    badw += led_nw != 2u || led_w[0] != 0u; /* no pulse: the key read, then column n */
+                }
+                /* column n: its lit ones, and its breathing ones (not dim) or none */
+                badw += (led_w[led_nw - 1u] & fm1_led[n]) != fm1_led[n] ||
+                        (led_w[led_nw - 1u] & ~(uint32_t)(fm1_led[n] | (fm1_led_breath[n] & ~fm1_led_dim[n]))) != 0u;
+                lastw = led_w[led_nw - 1u];
+                lastt = led_wt[led_nw - 1u];
+            }
+            for (f = 0; f < frames; f++) {
+                lit = on[f][7][3];
+                litsum += lit;
+                /* in step (both columns 1..10): lit in the same frames, the pulses within half the glow (fm1__dim_k
+                 * may differ by a bit between the two) */
+                bad += (on[f][3][4] * 2u >= lit) != (on[f][6][1] * 2u >= lit) ||
+                       (on[f][3][4] > on[f][6][1] ? on[f][3][4] - on[f][6][1] : on[f][6][1] - on[f][3][4]) * 2u > T;
+                bad += on[f][3][2] * 10u < lit * 9u;    /* lit stays lit */
+                dimok += on[f][4][1] == on[f][4][2] && on[f][4][1] * 8u < lit && on[f][4][1] > 0u;   /* dim: the glow */
+                for (c = 0; c < FM1_NCOL; c++)
+                    for (r = 1; r < 5u; r++)
+                        others += on[f][c][r] && !((c == 3u && (r == 2u || r == 4u)) || c == 4u || (c == 6u && r == 1u) ||
+                                                   (c == 7u && r == 3u));
+            }
+            lit = (uint32_t)(litsum / frames);          /* a lit LED's time a frame */
+            for (i = 0; i < NF / WIN; i++) {            /* WIN-frame means of the breath (column 6), /1000 of lit */
+                uint32_t s = 0;
+                for (f = i * WIN; f < (i + 1u) * WIN; f++)
+                    s += on[f][6][1];
+                mean[i] = (uint32_t)((uint64_t)s * 1000u / ((uint64_t)lit * WIN));
+                peak = mean[i] > peak ? mean[i] : peak;
+                if (i) {
+                    uint32_t dd = mean[i] > mean[i - 1u] ? mean[i] - mean[i - 1u] : mean[i - 1u] - mean[i];
+                    step = dd > step ? dd : step;
+                    /* frames 0..BF/2 fall, BF/2..BF rise, and again: 2 lit frames of slack (the sigma-delta) */
+                    if (((i * WIN) % BF) < BF / 2u)
+                        mono += mean[i] > mean[i - 1u] + 2000u / WIN && (i * WIN) % BF != 0u;
+                    else
+                        mono += mean[i] + 2000u / WIN < mean[i - 1u];
+                }
+            }
+            first = mean[0];
+            for (f = BF / 2u - 2u; f < BF / 2u + 2u; f++)
+                dark += on[f][6][1];
+            /* the flicker: the dark runs (frames not lit, on < half a lit frame) between two lit frames of the same half
+             * (fall or rise), by the breath's mean where they are: over 50 % and 25 % of its peak, and at all */
+            for (f = 0, i = ~0u; f < frames; f++) {
+                if (on[f][6][1] * 2u < lit)
+                    continue;
+                n6++;
+                if (i != ~0u && i / (BF / 2u) == f / (BF / 2u)) {
+                    uint32_t m = mean[(i + f) / 2u / WIN];
+                    run = f - i - 1u;
+                    run50 = m * 2u >= peak && run > run50 ? run : run50;
+                    run25 = m * 4u >= peak && run > run25 ? run : run25;
+                    runlit = run > runlit ? run : runlit;
+                }
+                i = f;
+            }
+            /* then nothing breathes: the tick as before (the same writes) */
+            memset(fm1_led_breath, 0, sizeof fm1_led_breath);
+            for (t = 0; t < 2u * FM1_NCOL; t++) {
+                uint32_t p = fm1__tick_col, n = p + 1u == FM1_NCOL ? 0u : p + 1u, d = fm1_led_dim[p] & ~fm1_led[p];
+                led_nw = 0;
+                fm1_input_tick();
+                if (t >= FM1_NCOL)
+                    after += led_nw != (d ? 4u : 2u) || led_w[led_nw - 1u] != fm1_led[n] ||
+                             (d && (led_w[1] != (fm1_led[p] | d) || led_w[2] != 0u));
+            }
+            snprintf(what, sizeof what, "#119 breath %s, bus %u: own column, the writes, lit / dim never breathing, in step",
+                     lo ? "LO" : "HI", (unsigned)bus);
+            check(what, !bad && !badw && !latch_lit && !others && dimok == frames && !after && !fm1__br_on && !fm1__br_lit);
+            snprintf(what, sizeof what, "  peak %u.%u %% of lit (%u..%u), from the peak (%u.%u %%), dark at half a period",
+                     (unsigned)(peak / 10u), (unsigned)(peak % 10u), lo ? 25u : 50u, lo ? 35u : 70u, (unsigned)(first / 10u),
+                     (unsigned)(first % 10u));
+            check(what, peak >= (lo ? 250u : 500u) && peak <= (lo ? 350u : 700u) && first * 10u >= peak * 9u && !dark &&
+                  peak * 256u + 7680u >= PK * 1000u && peak * 256u <= PK * 1000u + 7680u);
+            snprintf(what, sizeof what, "  smooth: %u-frame means step <= %u.%u %% of lit (<= 15 %% of the peak + 2 frames), monotonic",
+                     (unsigned)WIN, (unsigned)(step / 10u), (unsigned)(step % 10u));
+            check(what, step * 100u <= peak * 15u + 200000u / WIN && !mono);
+            snprintf(what, sizeof what, "  flicker: dark runs %u fr over 50 %% of the peak (<= 9: ~10 ms), %u over 25 %%, %u at all",
+                     (unsigned)run50, (unsigned)run25, (unsigned)runlit);
+            check(what, run50 <= 9u && n6 > 0u);
+            snprintf(what, sizeof what, "  the glow still %u..%u ns (target %u +-30 %%)", (unsigned)(wmin * 1000u / FM1_TICKS_PER_US),
+                     (unsigned)(wmax * 1000u / FM1_TICKS_PER_US), (unsigned)(T * 1000u / FM1_TICKS_PER_US));
+            check(what, wmin * 10u >= T * 7u && wmax * 10u <= T * 13u);
+        }
+        memset(fm1_led_breath, 0, sizeof fm1_led_breath);
         host_bus = 0;
         host_step = 2400u;
         fm1_led_dim_level(0);
         printf("LEDs: refresh %u Hz lit, %u Hz dim\n", (unsigned)(1000000u / (FM1_NCOL * TICK_US)),
                (unsigned)(1000000u / (FM1_NCOL * TICK_US * FM1_LED_DIM_DIV)));
-        {   /* the host cost of a tick, the dim LEDs on and off (no bus time: the shift waits out the pulse) */
+        {   /* the host cost of a tick, the dim LEDs off, on, on and breathing (no bus time: the shift waits out the pulse) */
             uint32_t k, t, n = 2000000u;
-            double ns[2];
+            double ns[3];
             host_step = 1000u;                       /* (the clock far ahead on each read: no wait on the host) */
-            for (k = 0; k < 2u; k++) {
+            for (k = 0; k < 3u; k++) {
                 clock_t c0;
                 memset(fm1_led_dim, k ? 0x1E : 0, sizeof fm1_led_dim);
+                memset(fm1_led_breath, k == 2u ? 0x1E : 0, sizeof fm1_led_breath);
+                if (k == 2u)
+                    memset(fm1_led_dim, 0x0E, sizeof fm1_led_dim);   /* (row 4 breathes) */
                 c0 = clock();
                 for (t = 0; t < n; t++) {
                     led_nw = 0;
@@ -437,7 +594,9 @@ int main(void)
                 ns[k] = (double)(clock() - c0) * 1e9 / CLOCKS_PER_SEC / n;
             }
             host_step = 2400u;
-            printf("LEDs: host %.1f ns per tick without dim LEDs, %.1f ns with\n", ns[0], ns[1]);
+            memset(fm1_led_breath, 0, sizeof fm1_led_breath);
+            printf("LEDs: host %.1f ns per tick without dim LEDs, %.1f ns with, %.1f ns with a breath too\n", ns[0], ns[1],
+                   ns[2]);
         }
     }
 

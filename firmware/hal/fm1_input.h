@@ -50,6 +50,25 @@
  * Two glows (MENU > LEDS): fm1_led_dim_level(0) FM1_LED_DIM_NS (DIM HI, the default), (1) FM1_LED_DIM_LO_NS
  * (DIM LO, ~1/60). The tick reads the target from fm1__dim_t (TIMER4 ticks, set here only, never divided):
  * both are shorter than the shift (~3-5 us measured, dim_pulse_ns 3125 at 14 of 16 bits), so neither waits.
+ * Levels: a column has one pulse, so per LED there are three: dark, the glow, lit; the pulse cannot grow towards
+ * lit without a wait in the ISR (~95 us). But a second set can end inside the pulse, and a frame can be lit or
+ * not: a breath (#119). fm1_led_breath[col] breathe, dark .. ~60 % of lit and back, all in step
+ * (FM1_LED_BREATH_FRAMES ~1.1 s). The frame's level B (of a lit LED, /65536) is a smoothstep squared x the peak
+ * (FM1_LED_BREATH_PK, /256; DIM LO FM1_LED_BREATH_PK_LO ~30 %: fm1_led_dim_level sets both). Two ranges, one curve:
+ *   B <= the glow G (the pulse's share of a lit frame, FM1_LED_DIM_NS / FM1_LED_TICK_US, ~1/31): lit with the
+ *     pulse and dark again after the first kb of its k bits (one more line write in the shift), kb = k x B / G,
+ *     dithered over 8 frames to 1/8 bit (~114 Hz, a ripple of one bit, ~1/400 of lit);
+ *   B > G: whole frames lit as a lit LED (its tick and its pulse), the others the full glow; which ones a first
+ *     order sigma-delta picks (one accumulator for all, lit share s = (B - G) / (1 - G)): the lit frames as evenly
+ *     spread as can be, a dark run between two at most ~1 / s frames (input_test: at the peak 1 frame; over half
+ *     the peak <= 3 frames, ~300 Hz and up; over a quarter <= 8, ~100 Hz). Only the bottom of the range, just over
+ *     the glow (s < ~0.1, ~0.1 s of each fade, ~0.15 s with DIM LO), is slower than ~100 Hz: a lit frame every
+ *     10..40 frames over the glow. No finer step exists without a wait: a frame of a column is lit or not.
+ * Both from constants: no division in the ISR. While any LED breathes every pulse has that write (the same width
+ * on every column; fm1__dim_k measures it with the rest); with none the tick is as before (the same writes). A
+ * breath starting from none starts at its peak (shown at once). An LED lit or in the glow does not breathe.
+ * Cost: the level once a frame (11 bytes ORed, a few multiplies, an add), a multiply and one line write a pulse,
+ * an AND / OR on the two lit writes.
  */
 #pragma once
 #include <stdint.h>
@@ -77,6 +96,16 @@
 #endif
 #ifndef FM1_LED_DIM_DIV
 #define FM1_LED_DIM_DIV 1u        /* a dim LED: the pulse on 1 frame in DIV (1: every frame, ~910 Hz) */
+#endif
+#define FM1_LED_BREATH_FRAMES 1024u   /* a breath: frames dark -> the peak -> dark (~1.13 s; a power of 2) */
+#ifndef FM1_LED_BREATH_PK
+#define FM1_LED_BREATH_PK 154u        /* the breath's peak, /256 of lit: ~60 % (DIM HI, OFF, INV) */
+#endif
+#ifndef FM1_LED_BREATH_PK_LO
+#define FM1_LED_BREATH_PK_LO 77u      /* with DIM LO: ~30 % */
+#endif
+#ifndef FM1_LED_TICK_US
+#define FM1_LED_TICK_US 100u          /* fm1_input_tick's period (TIMER5, 10 kHz): a lit LED's time a frame */
 #endif
 #ifndef FM1_LED_TRACE
 #define FM1_LED_TRACE(rowmask) ((void)0)   /* input_test.c: every write of the LED lines */
@@ -123,6 +152,7 @@ static volatile struct {
 } fm1_in;
 static uint8_t fm1_led[FM1_NCOL];
 static uint8_t fm1_led_dim[FM1_NCOL];
+static uint8_t fm1_led_breath[FM1_NCOL];   /* breathing LEDs (see top): dark .. ~60 % of lit, in step */
 
 /* scan diagnostics (console `inp`, read and cleared by the main loop): the gap between ticks
  * = the on-time of the column lit in it, in TIMER4 ticks (24 MHz) */
@@ -338,19 +368,57 @@ static void fm1__frame(void)
 #define FM1__DIM_T(ns) (((ns) * FM1_TICKS_PER_US + 500u) / 1000u)   /* a pulse in TIMER4 ticks */
 static uint8_t fm1__tick_col, fm1__dim_k = 16u;   /* the bits of the shift the dim pulse spans (0..16) */
 static uint16_t fm1__dim_t = FM1__DIM_T(FM1_LED_DIM_NS);   /* the pulse the tick aims at (fm1_led_dim_level) */
-/* the glow (main loop, any time; fm1__dim_k follows it in a few frames): 0 FM1_LED_DIM_NS, 1 FM1_LED_DIM_LO_NS */
+/* the breath's constants for each glow (see top): its peak (/256 of lit), the glow G (of a lit frame, /65536),
+ * 2^24 / G (the pulse's share: B x it >> 16, 0..256), 2^30 / (65536 - G) (the lit share: (B - G) x it >> 14) */
+#define FM1__BR_G(ns) ((ns) * 65536u / (FM1_LED_TICK_US * 1000u * FM1_LED_DIM_DIV))
+#define FM1__BR(pk, ns) {(pk), FM1__BR_G(ns), (1u << 24) / FM1__BR_G(ns), (1u << 30) / (65536u - FM1__BR_G(ns))}
+static const uint32_t FM1__BR_K[2][4] = {FM1__BR(FM1_LED_BREATH_PK, FM1_LED_DIM_NS),
+                                         FM1__BR(FM1_LED_BREATH_PK_LO, FM1_LED_DIM_LO_NS)};
+static uint8_t fm1__br_sel;                       /* FM1__BR_K[it]: 0 DIM HI (OFF, INV), 1 DIM LO */
+/* the glow (main loop, any time; fm1__dim_k follows it in a few frames): 0 FM1_LED_DIM_NS, 1 FM1_LED_DIM_LO_NS;
+ * and the breath's peak with it: 0 FM1_LED_BREATH_PK, 1 FM1_LED_BREATH_PK_LO */
 static void fm1_led_dim_level(uint32_t lo)
 {
     fm1__dim_t = (uint16_t)(lo ? FM1__DIM_T(FM1_LED_DIM_LO_NS) : FM1__DIM_T(FM1_LED_DIM_NS));
+    fm1__br_sel = lo != 0u;
 }
 #if FM1_LED_DIM_DIV > 1
 static uint8_t fm1__dim_ph;
 #endif
+static uint16_t fm1__br_ph;                       /* the breath: frames into it (0 and 1023 dark, 512 the peak) */
+static uint16_t fm1__br_lv, fm1__br_acc;          /* this frame: the pulse's share 0..256; the sigma-delta */
+static uint8_t fm1__br_on, fm1__br_d, fm1__br_lit;   /* this frame: any LED breathing, the dither, lit */
+static void fm1__breath_frame(void)               /* (a new frame, before column 0's pulse) */
+{
+    const uint32_t *q = FM1__BR_K[fm1__br_sel];
+    uint32_t c, any = 0, x, d;
+    for (c = 0; c < FM1_NCOL; c++)
+        any |= fm1_led_breath[c];
+    x = !any ? 0u : fm1__br_on ? (fm1__br_ph + 1u) & (FM1_LED_BREATH_FRAMES - 1u) : FM1_LED_BREATH_FRAMES / 2u;
+    fm1__br_on = any != 0u;
+    fm1__br_ph = (uint16_t)x;
+    d = x & 7u;                                    /* the dither: 0..7 bit-reversed, x 32 */
+    fm1__br_d = (uint8_t)(((d & 1u) << 7) | ((d & 2u) << 5) | ((d & 4u) << 3));
+    x = x * 512u / FM1_LED_BREATH_FRAMES;          /* 0..511 */
+    x = x & 256u ? 511u - x : x;                   /* a triangle 0..255 */
+    x = x * x * (768u - 2u * x) >> 16;             /* smoothstep, 0..255 */
+    x = x * x * q[0] >> 8;                         /* squared (the eye), x the peak: B, of lit /65536 */
+    if (x <= q[1]) {                               /* up to the glow: a share of the pulse */
+        fm1__br_lv = (uint16_t)(x * q[2] >> 16);
+        fm1__br_lit = 0;
+    } else {                                       /* over it: lit frames among full glows */
+        x = fm1__br_acc + ((x - q[1]) * q[3] >> 14);
+        fm1__br_lit = x >= 65536u;
+        fm1__br_acc = (uint16_t)x;                 /* (- 65536 when lit) */
+        fm1__br_lv = 256u;
+    }
+}
 static void fm1_input_tick(void)
 {
     uint32_t p = fm1__tick_col, n = p + 1u == FM1_NCOL ? 0u : p + 1u;
     uint32_t t0 = fm1_ticks(), g = t0 - fm1_in_stat.last, b = 0;
-    uint32_t w = 0xFFFFu ^ (1u << n) ^ (n < 2u ? 1u << (11u + n) : 0u), lit = fm1_led[p], dim = 0, k = fm1__dim_k;
+    uint32_t w = 0xFFFFu ^ (1u << n) ^ (n < 2u ? 1u << (11u + n) : 0u), lit, dim = 0, k = fm1__dim_k;
+    uint32_t br = 0, kb = 0;
     fm1__led_lines(0);
     fm1_in_stat.last = t0;
     while (b < FM1_GAP_BINS - 1u && g >= (150u * FM1_TICKS_PER_US << b))
@@ -362,17 +430,32 @@ static void fm1_input_tick(void)
     if (g > fm1_in_stat.on_max[p])
         fm1_in_stat.on_max[p] = g;
     fm1_in.raw[p] = (uint8_t)fm1__rows();          /* column p has been latched one tick (the lines dark) */
+    if (p == 0u)
+        fm1__breath_frame();
+    lit = fm1_led[p] | (fm1__br_lit ? fm1_led_breath[p] & ~fm1_led_dim[p] : 0u);   /* (a lit frame: as lit) */
 #if FM1_LED_DIM_DIV > 1
     if (p == 0u)                                   /* a new frame: the dim LEDs' turn on 1 in FM1_LED_DIM_DIV */
         fm1__dim_ph = (uint8_t)(fm1__dim_ph + 1u >= FM1_LED_DIM_DIV ? 0u : fm1__dim_ph + 1u);
     if (!fm1__dim_ph)
 #endif
+    {
         dim = fm1_led_dim[p] & ~lit;
-    if (dim) {                                     /* the dim pulse of column p: over the first k bits */
+        if (fm1__br_on) {                          /* breathing: the first kb of the k bits (kb <= k) */
+            kb = (k * fm1__br_lv + fm1__br_d) >> 8;
+            br = kb ? fm1_led_breath[p] & ~(lit | dim) : 0u;
+        }
+    }
+    if (dim | br) {                                /* the dim pulse of column p: over the first k bits */
         uint32_t t1, d, T = fm1__dim_t;
         t1 = fm1_ticks();                          /* (before the write: d spans one write and the bits) */
-        fm1__led_lines(lit | dim);
-        fm1__sr_bits(w, 0, k);                     /* (the 595 still drives column p) */
+        fm1__led_lines(lit | dim | br);
+        if (fm1__br_on) {                          /* (every pulse while any LED breathes: the same width) */
+            fm1__sr_bits(w, 0, kb);
+            fm1__led_lines(lit | dim);             /* (a shift shorter than the pulse waits after: the breath not) */
+            fm1__sr_bits(w, kb, k);
+        } else {
+            fm1__sr_bits(w, 0, k);                 /* (the 595 still drives column p) */
+        }
         d = fm1_ticks() - t1;
         while (k == 16u && d < T)                 /* only a shift shorter than the pulse waits */
             d = fm1_ticks() - t1;
@@ -385,7 +468,7 @@ static void fm1_input_tick(void)
     }
     fm1__sr_bits(w, k, 16u);
     fm1__sr_latch();                               /* column n, the lines dark */
-    fm1__led_lines(fm1_led[n]);
+    fm1__led_lines(fm1_led[n] | (fm1__br_lit ? fm1_led_breath[n] & ~fm1_led_dim[n] : 0u));
     fm1__tick_col = (uint8_t)n;
     fm1__keys(p);                                  /* its keys now: no wait for the frame's end */
     if (n == 0u)

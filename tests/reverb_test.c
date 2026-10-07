@@ -308,6 +308,23 @@ static void test_spring(void)
 }
 
 /* --------------------------------------------------------- model change --- */
+/* rev_clear: every sample of both buffers silent (rev_u's int16 view has an odd count, 556 + 441: clearing it
+ * through its int32 view left the last sample, which ROOM then played back after a model change) */
+static void test_clear(void)
+{
+    uint32_t i, left = 0;
+    for (i = 0; i < sizeof rev_u.ap / 2u; i++)
+        rev_u.ap[i] = 1000;
+    for (i = 0; i < sizeof rev_comb / 2u; i++)
+        rev_comb[i] = 1000;
+    rev_clear();
+    for (i = 0; i < sizeof rev_u.ap / 2u; i++)
+        left += rev_u.ap[i] != 0;
+    for (i = 0; i < sizeof rev_comb / 2u; i++)
+        left += rev_comb[i] != 0;
+    check("rev_clear: every sample of the combs and the allpasses silent", !left);
+}
+
 static void test_switch(void)
 {
     static int32_t c[CTL], d[CTL], r[CTL], w[CTL];
@@ -641,6 +658,7 @@ int main(int argc, char **argv)
 {
     test_room_identical();
     test_spring();
+    test_clear();
     test_switch();
     test_hall();
     test_hall_delay();

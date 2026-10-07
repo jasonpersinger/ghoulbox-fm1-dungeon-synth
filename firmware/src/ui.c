@@ -89,7 +89,8 @@ static struct {
     uint8_t lane;                /* SEQ > STEP on a DRUM track (the grid): the lane the keys and KNOB 3 / 4 edit */
     uint8_t hot_col, hot_t;      /* column whose knob was just turned (drawn white) */
     uint8_t menu;                /* 0 off, 1 list, 2 about + credits (HOME held) */
-    uint8_t menu_sel;
+    uint8_t menu_sel;            /* MENU: the row (menu_items.c MI_*; its tab MI_TAB), kept while the device runs */
+    uint8_t menu_row[4];         /* MENU: the row last picked in each tab, from its first (ALGORITHM comes back to it) */
     uint16_t menu_scroll;        /* continuous ABOUT + CREDITS position, pixels */
     uint32_t menu_sig, home_t0;  /* HOME press time (btn_hold) */
     uint8_t force;               /* full redraw pending */
@@ -129,8 +130,8 @@ static struct {
 } ui;
 
 enum { CF_NONE, CF_CLEAR_SEQ, CF_CLEAR_TRK, CF_OVR_PROJ, CF_OVR_USER, CF_LOAD_PAT,
-       CF_DEL_ROW, CF_CLEAR_SONG, CF_INIT_SOUND, CF_CLEAR_MOTION, CF_ERASE_USER };   /* ui.confirm: REC held on
-                                   * SEQ / ARP, on TRACKS; SAVE over a used slot; a pattern over the user's steps;
+       CF_DEL_ROW, CF_CLEAR_SONG, CF_INIT_SOUND, CF_CLEAR_MOTION, CF_ERASE_USER };   /* ui.confirm: TOOLS' clears, REC
+                                   * held on SEQ (#91); SAVE over a used slot; a pattern over the user's steps;
                                    * USER ERASE */
 
 static const page_t *page_over;   /* a quick layer's own four knobs (ui_layer.c), while it edits or draws them */
@@ -144,7 +145,7 @@ static const page_t *cur_page(void) { return page_over ? page_over : &PAGES[ui.p
  *            page's title and number in L on the others (their charts cannot be read that small);
  *   LK_LABEL the list and graph pages (PRESETS, USER, PROJECT, PATTERNS, SONG, the piano roll and the drum grid,
  *            CHANCE, SLICES) and the quick layers' maps: the layout as it is, the card labels in M;
- *   LK_OFF   LARGE off; the menu, the dialogs and NAME keep their own layout in every case. */
+ *   LK_OFF   LARGE off; the menu (its own LARGE: ui_menu.c), the dialogs and NAME keep their own layout in every case. */
 enum { LK_OFF, LK_LABEL, LK_TALL };
 static uint32_t large_kind(void)
 {
@@ -182,7 +183,7 @@ enum { LAYER_NONE, LAYER_FX, LAYER_GLO, LAYER_SCL, LAYER_EDIT, LAYER_N };
 static void draw_layer(void);
 static const char *layer_head(void);
 static int layer_locked(void);
-static uint32_t layer_leds(void);
+static uint32_t layer_leds(uint32_t *br);
 static uint32_t layer_btn(void);
 
 /* FM operator pages belong to DIGITAL; they never appear on other instruments (without FELUCCA_FM4: never). SLICES:
@@ -221,6 +222,11 @@ static void ui_say(const char *a, const char *b)
 }
 
 static void ui_message(const char *s) { ui_say(s, ""); }
+/* a message led by an icon: its first byte (ui_draw.c draw_head draws the icon, then the words) */
+#define MSG_NOFILE "\x01"                      /* the no-file icon (ICON_X_NOFILE) */
+/* a missing sample (ui_input.c sample_notice): NO SAMPLE (SAMPLE NOT FOUND, the SLICES page's, is 4 px too wide
+ * for the header's 130 px after the icon) */
+#define MSG_NO_SAMPLE MSG_NOFILE "NO SAMPLE"
 
 static int chain_busy(void) { return chain.running || chain.armed; }
 /* Main loop only, with interrupts enabled. PLAY may be consumed between reads;
@@ -540,7 +546,7 @@ static void undo_swap(void)
     motion_store_t current_motion;
     motion_snapshot_track(t, &current_motion);
     if (motion_replace_track(t, &undo.motion_backup) != 0) {
-        ui_message("MOTION FULL");
+        ui_message("AUTOMATION FULL");
         return;
     }
     undo.motion_backup = current_motion;
@@ -609,7 +615,7 @@ static void load_pat16(track_t *t, const uint8_t *note, const uint8_t *flags)
         s->note[0] = n;
         s->n = n ? 1 : 0;
         s->time = (fl & 4u) ? ST_TIE : n ? ST_NOTE : ST_REST;
-        s->flags = n ? (fl & (SF_ACCENT | SF_SLIDE)) : 0;
+        s->flags = n ? (fl & (SF_ACCENT | SF_SLIDE | SF_RATCH)) : 0;
         s->vel = n ? 96 : 0;
         s->hit = s->acc = 0;
         s->probability = 0;
@@ -1007,8 +1013,10 @@ static void preset_go(uint32_t n)                    /* load list index n into t
  * made with it (slot order). List index of the current sound; *total the length */
 static uint32_t eng_list_pos(uint32_t *total)
 {
-    uint32_t e = TSEL->eng_req % NENGINES, np = ENGINES[e]->npresets, u = user_of(TSEL), k, n = 0;
-    uint32_t cur = np ? TSEL->preset % np : 0u;
+    const engine_t *en = ENGINES[TSEL->eng_req % NENGINES];
+    uint32_t e = TSEL->eng_req % NENGINES, np = preset_shown(e), u = user_of(TSEL), k, n = 0;
+    uint32_t cur = np ? preset_rank(en, preset_orig(en, TSEL->preset % en->npresets)) : 0u;   /* (#124: the aliases
+                                        * skipped, as on PRESETS: SAMPLE 1 loads as 0, so counting it stuck KNOB 2) */
     for (k = 0; k < UP_SLOTS; k++)
         if (up_used(k) && up_engine(k) == e) {
             if (k == u)
@@ -1021,12 +1029,19 @@ static uint32_t eng_list_pos(uint32_t *total)
 
 static void eng_list_step(int32_t direction)         /* the next / previous sound of the engine (wraps) */
 {
-    uint32_t total, cur = eng_list_pos(&total), e = TSEL->eng_req % NENGINES, np = ENGINES[e]->npresets, k, n;
-    if (total < 2u)
+    uint32_t total, cur = eng_list_pos(&total), e = TSEL->eng_req % NENGINES, np = preset_shown(e), k, n;
+    if (!total)
         return;
-    n = (cur + (direction > 0 ? 1u : total - 1u)) % total;
+    if (user_of(TSEL) >= UP_SLOTS && np && preset_hidden(ENGINES[e], TSEL->preset % ENGINES[e]->npresets))
+        n = direction > 0 ? cur % total : (cur + total - 1u) % total;   /* GHOULBOX: from a retired one, its neighbour */
+    else if (total < 2u)
+        return;
+    else
+        n = (cur + (direction > 0 ? 1u : total - 1u)) % total;
     if (n < np) {
-        apply_preset(n);
+        for (k = 0; preset_hidden(ENGINES[e], k) || n--; k++)       /* the n-th shown preset (GHOULBOX: retired ones too) */
+            ;
+        apply_preset(k);
     } else {
         n -= np;
         for (k = 0; k < UP_SLOTS; k++)
@@ -1157,7 +1172,7 @@ static const char *act_name(uint32_t c)          /* column c's action (the foote
     return id == G_CLRSEQ ? "CLEAR" : id == G_INITSND ? "INIT" : id == G_LOAD ? "LOAD" : "SAVE";
 }
 
-/* the picked action would do something now (OCT+ blinks): another pattern, a used slot, stopped for
+/* the picked action would do something now (OCT+ breathes): another pattern, a used slot, stopped for
  * a flash write, steps to clear */
 static int act_ready(void)
 {

@@ -414,6 +414,8 @@ function readHits(r, o) {
   if (r.i + 3 <= r.a.length) { const h = r.b(), c = r.b(), x = r.b(); o.hit = h | (x & 1) << 7; o.acc = (c | (x & 2) << 6) & o.hit; }
   o.chance = r.i < r.a.length ? r.b() : 100;
   if (o.chance > 100) throw new Error("Invalid step chance");
+  o.ratchet = r.i < r.a.length ? r.b() : 1;       /* RATCH (INFO 52 01): the step's hits 1..4; older firmware: 1 */
+  if (o.ratchet < 1 || o.ratchet > 4) throw new Error("Invalid step ratchet");
   return o;
 }
 
@@ -443,11 +445,15 @@ const parse = {
     }
     o.fm6 = null;                                 /* FM6 patches (cmds 68..71): the factory and bank slot counts */
     o.syncCaps = 0;                               /* live sync: bit 0 WATCH while on keeps pending pushes, bit 1 no RELOAD */
+    o.ratchet = 0;                                /* a step's ratchet (STEP_SET's byte after the chance), 0 = none */
     for (const p of [8, 11]) if (o.motionMax && trailer[p] === 0x46 && trailer[p + 1] === 1) {   /* for the editor's */
       o.fm6 = { factory: trailer[p + 2], bank: trailer[p + 3], caps: 0 };                         /* PRESET / G_ENGSEL */
       if (trailer[p + 4] === 0x53 && trailer[p + 5] === 1) o.syncCaps = trailer[p + 6] & 3;
       /* FM6 v2 (1.0.3): bit 0 no bank (SLOT F1..Fn, n = OWN: 8 on Felucca, 15 on GHOULBOX 0.6), bit 1 the user presets carry their patch (target 3) */
       if (trailer[p + 7] === 0x50 && trailer[p + 8] === 1) o.fm6.caps = trailer[p + 9] & 3;
+      let r = trailer[p + 7] === 0x50 ? p + 10 : p + 7;                                   /* RATCH after FM6 v2 */
+      if (trailer[r] === 0x4E && trailer[r + 1] === 1) r += 3;                            /* and the MENU settings (1.0.4) */
+      if (o.syncCaps && trailer[r] === 0x52 && trailer[r + 1] === 1) o.ratchet = trailer[r + 2];   /* RATCH: max hits */
     }
     return o;
   },
@@ -603,7 +609,8 @@ const req = {
     const notes = [0, 1, 2, 3].map((k) => (st.notes[k] | 0) & 0x7F);
     return [CMD.STEP_SET, [i, n, ...notes, Math.max(0, Math.min(2, st.time | 0)), st.flags & 3, (st.vel | 0) & 0x7F,
       ...(st.hit == null && st.chance == null ? [] : hitsEnc(st.hit | 0, st.acc | 0)),
-      ...(st.chance == null ? [] : [Math.max(0, Math.min(100, st.chance | 0))])]];
+      ...(st.chance == null ? [] : [Math.max(0, Math.min(100, st.chance | 0))]),
+      ...(st.chance == null || st.ratchet == null ? [] : [Math.max(1, Math.min(4, st.ratchet | 0))])]];   /* (only after the chance) */
   },
   preset: (e, p) => [CMD.PRESET, [e & 0x7F, p & 0x7F]],
   project: (op, slot) => { if (![0, 1, 2].includes(op)) throw new Error("bad PROJECT op"); return [CMD.PROJECT, [op, slot & 3]]; },   /* 0 load, 1 save, 2 query */
@@ -1070,22 +1077,25 @@ function tailParams(p, n, pe0) {
   return out;
 }
 
-/* one pattern step as the firmware keeps it (up_pat_norm): a tie has no note, a rest no flags */
-const patNorm = (n, f) => (f & 4 ? [0, 4] : [n & 0x7F, n ? f & 3 : 0]);
+/* one pattern step as the firmware keeps it (up_pat_norm): a tie has no note, a rest no flags; flags 1 accent, 2 slide,
+   4 tie, 8 | 16 the ratchet - 1 (core.h SF_RATCH) */
+const patNorm = (n, f) => (f & 4 ? [0, 4] : [n & 0x7F, n ? f & 27 : 0]);
 /* sequencer steps (STEP_GET objects) -> 16-step pattern, as the firmware's UP_STORE does (up_pat_from):
    the first note of a NOTE step, flag 4 for a TIE step */
 function patternFromSteps(steps) {
   return Array.from({ length: UP.PAT }, (_, i) => {
     const s = steps[i];
     if (!s) return [0, 0];
-    return patNorm(s.time === 0 && s.n ? s.notes[0] : 0, s.time === 1 ? 4 : s.flags);
+    return patNorm(s.time === 0 && s.n ? s.notes[0] : 0, s.time === 1 ? 4 : (s.flags & 3) | ((s.ratchet || 1) - 1) << 3);
   });
 }
-/* pattern -> 16 STEP_SET objects, as the firmware loads one (load_pat16; velocity 96) */
+/* pattern -> 16 STEP_SET objects, as the firmware loads one (load_pat16; velocity 96); the ratchet is sent only with a
+   chance (req.stepSet) */
 function stepsFromPattern(pat) {
   return Array.from({ length: UP.PAT }, (_, i) => {
     const [n, f] = (pat && pat[i]) || [0, 0];
-    return { n: n ? 1 : 0, notes: [n & 0x7F, 0, 0, 0], time: f & 4 ? 1 : n ? 0 : 2, flags: n ? f & 3 : 0, vel: n ? 96 : 0 };
+    return { n: n ? 1 : 0, notes: [n & 0x7F, 0, 0, 0], time: f & 4 ? 1 : n ? 0 : 2, flags: n ? f & 3 : 0, vel: n ? 96 : 0,
+      ratchet: n ? (f >> 3 & 3) + 1 : 1 };
   });
 }
 const patternUsed = (pat) => !!pat && pat.some((x) => x && x[0]);
@@ -1755,7 +1765,7 @@ function makeMockDevice(opt = {}) {
         P("TOMS", [2, 0, 52, 40, 30, 100, 40, 30], [0, 100, 127, 70], 0, 2), P("DRONE STRING", [3, 127, 80, 88, 64, 100, 92, 0], [0, 100, 127, 90], 0, 3),
         P("HARP", [3, 8, 62, 74, 60, 90, 0, 0], [0, 100, 127, 80], 0, 3),
         /* GHOULBOX presets (tools/ghoulbox_presets.py) */ P("LUTE", [1, 48, 55, 70, 30, 127, 0, 0], [0, 100, 127, 70], 0, 3), P("HARPSICHORD", [1, 80, 110, 78, 12, 127, 0, 0], [0, 100, 127, 50], 0, 3), P("DUNGEON HARP", [3, 4, 50, 80, 70, 127, 0, 0], [0, 100, 127, 90], 0, 3), P("GURDY DRONE", [3, 1, 70, 95, 80, 127, 110, 0], [30, 100, 127, 90], 0, 5) /* GHOULBOX end */] },
-    { name: "DRUM", titles: ["KIT", "HIT"], edit: [E("KIT", ["STD", "HAND", "CYM", "H+CYM"], 0), D("TUNE", F.PCT, 0, 127, 64),
+    { name: "DRUM", titles: ["KIT", "HIT"], edit: [E("KIT", ["STD", "66", "10", "77", "80", "10", "66", "55", "77"], 0), D("TUNE", F.PCT, 0, 127, 64),
         D("TONE", F.PCT, 0, 127, 64), D("DECY", F.PCT, 0, 127, 64), D("SNAP", F.PCT, 0, 127, 64), D("ACC", F.PCT, 0, 127, 100),
         E("KICK", ["PUNCH", "ROUND"], 0), D("DRV", F.PCT, 0, 127, 0)],
       presets: [P("DRUM KIT", [0, 64, 70, 64, 64, 100, 0, 0], [0, 100, 127, 100], 0, 12)] },
@@ -1777,7 +1787,7 @@ function makeMockDevice(opt = {}) {
         P("GLASS CHOIR", [0, 0, 0, 0, 0, 0, 20, 10], [0, 0, 127, 0], 0, 14), P("DARK STRINGS", [0, 0, 0, 0, 0, 0, 25, 11], [0, 0, 127, 0], 0, 14),
         P("LOFI FLUTE", [0, 0, 0, 0, 0, 0, 15, 12], [0, 0, 127, 0], 1, 15), P("PIPE ORGAN", [0, 0, 0, 0, 0, 0, 0, 13], [0, 0, 127, 0], 0, 14),
         P("TUBA", [0, 0, 0, 0, 0, 0, 0, 14], [0, 0, 127, 0], 1, 8)] },
-    { name: "SLICE", titles: ["SLCE", "PLAY"], edit: [E("SRC", ["BREAK", "USR1", "USR2", "USR3"], 0),
+    { name: "SLICE", titles: ["SLCE", "PLAY"], edit: [E("SRC", ["BREAK", "USR1", "USR2", "USR3", "PIANO"], 0),
         E("DIV", ["4", "8", "16", "32", "AUTO", "MAN"], 2), D("START", F.INT, 0, 31, 0), D("PTCH", F.SEMI, -24, 24, 0),
         E("MODE", ["ONE", "GATE", "LOOP"], 0), E("REV", ["OFF", "ON"], 0), D("DCAY", F.TIME, 0, 127, 127), D("TONE", F.INT, 0, 127, 127)],
       presets: [P("CHOP", [0, 2, 0, 0, 0, 0, 127, 127], [0, 127, 127, 30], 0, 9), P("STUTTER", [0, 1, 0, 0, 1, 0, 90, 110], [0, 127, 127, 12], 0, 10)] },
@@ -1822,7 +1832,7 @@ function makeMockDevice(opt = {}) {
   const newTrack = () => ({ engine: 0, preset: 0, fm6: FM6.INIT_PK.slice(),
     p: TP.map((d) => d.def).concat(new Array(8).fill(0)),
     motion: {on: true, events: []},
-    step: Array.from({ length: NSTEP }, () => ({ chance: 100, n: 0, notes: [0, 0, 0, 0], time: 2, flags: 0, vel: 0, hit: 0, acc: 0 })) });
+    step: Array.from({ length: NSTEP }, () => ({ chance: 100, ratchet: 1, n: 0, notes: [0, 0, 0, 0], time: 2, flags: 0, vel: 0, hit: 0, acc: 0 })) });
   const st = {
     tracks: [0, 1, 2, 3].map(newTrack), sel: 0, rec: 0,
     g: GP.map((d) => d.def),
@@ -1841,7 +1851,7 @@ function makeMockDevice(opt = {}) {
   const watchMs = opt.watchMs || 3000;
   const desc = (scope, id) => (scope === 0 && id < P_COUNT ? (id >= P_E0 ? ENG[st.engine].edit[id - P_E0] : TP[id])
     : scope === 1 && id < G_COUNT ? GP[id] : null);
-  const EMPTY = { n: 0, notes: [0, 0, 0, 0], time: 2, flags: 0, vel: 0, hit: 0, acc: 0 };
+  const EMPTY = { n: 0, notes: [0, 0, 0, 0], time: 2, flags: 0, vel: 0, hit: 0, acc: 0, chance: 100, ratchet: 1 };
   const isDrum = () => ENG[st.engine].name === "DRUM";
   const clearSteps = () => st.step.forEach((s) => Object.assign(s, EMPTY, { notes: [0, 0, 0, 0] }));
   function toGrid(s) {                            /* eng_drum.c step_to_grid: a lane's own note becomes its hit */
@@ -1914,11 +1924,13 @@ function makeMockDevice(opt = {}) {
     return patternUsed(grid) ? { engine: st.engine, name, p: st.p.slice(), pattern: null, grid, fm6 }
       : { engine: st.engine, name, p: st.p.slice(), pattern: patternFromSteps(st.step), grid: null, fm6 };
   };
-  const stepOut = (x, b) => { b(x.n); x.notes.forEach(b); b(x.time); b(x.flags); b(x.vel); hitsEnc(x.hit, x.acc).forEach(b); if (!opt.legacy && !opt.v3 && !opt.v5) b(x.chance ?? 100); };
-  function stepIn(x, a) {                         /* editor.c ed_step_put: n, 4 notes, time, flags, vel [, hits (3)] */
+  const ratchetOn = () => !!syncCaps() && !opt.noRatchet;   /* (INFO 52 01 04, after the sync tag) */
+  const stepOut = (x, b) => { b(x.n); x.notes.forEach(b); b(x.time); b(x.flags); b(x.vel); hitsEnc(x.hit, x.acc).forEach(b); if (!opt.legacy && !opt.v3 && !opt.v5) b(x.chance ?? 100); if (ratchetOn()) b(x.ratchet ?? 1); };
+  function stepIn(x, a) {                         /* editor.c ed_step_put: n, 4 notes, time, flags, vel [, hits (3) [, chance [, ratchet]]] */
     x.n = Math.min(4, a[0]); x.notes = a.slice(1, 5); x.time = Math.min(2, a[5]); x.flags = a[6] & 3; x.vel = a[7];
     if (a.length >= 11) { x.hit = a[8] | (a[10] & 1) << 7; x.acc = (a[9] | (a[10] & 2) << 6) & x.hit; }
     if (a.length >= 12) x.chance = Math.min(100, a[11]);
+    if (a.length >= 13 && ratchetOn()) x.ratchet = Math.max(1, Math.min(4, a[12]));
   }
   /* a few user presets to start with, each with its preset's suggested pattern stored (as UP_STORE would) */
   [[0, 0, 0, "MY LEAD"], [1, FM6_E, 1, "GLASS BELL"], [2, 2, 3, "PHASE RESO"], [5, 3, 2, "8BIT ARP"]].forEach(([slot, e, p, name]) => {
@@ -2085,7 +2097,7 @@ function makeMockDevice(opt = {}) {
         if (!opt.legacy && !opt.v3 && !opt.v5) {
           b(16);
           if (st.uiCaps) { b(0x55); b(1); b(st.uiCaps); b(0x4d); b(1); b(64); b(1); if (!opt.noFm6) { b(0x46); b(1); b(FM6.FACTORY_PK.length); b(0); }
-            if (syncCaps()) { b(0x53); b(1); b(syncCaps()); if (!opt.noFm6) { b(0x50); b(1); b(3); } } }   /* (FM6 v2: no bank, preset patches) */
+            if (syncCaps()) { b(0x53); b(1); b(syncCaps()); if (!opt.noFm6) { b(0x50); b(1); b(3); } if (ratchetOn()) { b(0x52); b(1); b(4); } } }   /* (FM6 v2: no bank, preset patches) */
         }
         break;
       case CMD.GET: case CMD.SET: {
@@ -2409,9 +2421,15 @@ async function readDevicePreferences(rq, info, names, previous = null) {
   }
   return { state, palettes, favorites, slots };
 }
-/* an enum value or a preset named like an earlier one is an alias kept for stored numbers (SAMPLE / GRAIN 1,
-   once TRANH: PIANO): the device loads the earlier one, the lists hide it. -> the first index with names[i] */
-function aliasOf(names, i) { const k = names ? names.indexOf(names[i]) : -1; return k >= 0 && k < i ? k : i; }
+/* an enum value or a preset named like another is an alias kept for stored numbers: the device loads the original,
+   the lists hide the alias (shown when set). The original: the first entry when it has that name (SAMPLE / GRAIN 1
+   and 4, once TRANH and PERC: PIANO 0), else the last with it (DRUM KIT 1..3, once HAND CYM H+CYM: 66 10 77 at 6 5 8;
+   EDITOR_PROTOCOL.md). -> the original's index */
+function aliasOf(names, i) {
+  if (!names || names[i] == null) return i;
+  const k = names[0] === names[i] ? 0 : names.lastIndexOf(names[i]);
+  return k >= 0 ? k : i;
+}
 
 /* #48: note divisions (1/4, 8T, 2BAR, ...) are listed by length, longest first, as the device's knobs step them
    (src/params.c enum_order); the values stay. Any other list: in value order. -> d's values in the order shown */
@@ -2527,7 +2545,7 @@ const TEXT = {
     fm6Factories: "ファクトリー音色",
     fm6NeedDevice: "FM-1 を接続すると 6-OP FM の音色を編集してトラックへ送れます。",
     fm6NoFw: "このファームウェアには 6-OP FM（FM6）がありません。Felucca 1.0 以降に更新すると使えます。",
-    motion: "モーション", motionOn: "再生", motionClear: "モーションを消去", motionConfirm: "選択トラックのモーションを消しますか？", chance: "確率 %", motionStep: "ステップ", motionParam: "パラメーター", motionValue: "値",
+    motion: "オートメーション", motionOn: "再生", motionClear: "オートメーションを消去", motionConfirm: "選択トラックのオートメーションを消しますか？", chance: "確率 %", ratchet: "ラチェット", motionStep: "ステップ", motionParam: "パラメーター", motionValue: "値",
     backupTitle: "全体バックアップ", backupExport: "バックアップ保存", backupImport: "バックアップ復元", backupHelp: "現在の曲・A〜D・音色バンク・ユーザーサンプル・設定を、このパソコンへ保存。", backupOld: "全体バックアップには対応版への更新が必要です。", backupConfirm: "全体バックアップを復元しますか？ 現在の曲、保存データとサンプルを置き換えます。USBを抜かないでください。", backupWorking: "バックアップ処理中 ", backupDone: "バックアップを保存しました", backupRestored: "全体バックアップを復元しました",
     deviceDisplay: "本体の画面",
     deviceDisplayHelp: "FM-1 の画面に反映し、保存します。再生中の変更は停止後に保存されます。",
@@ -2630,7 +2648,7 @@ const TEXT = {
     fm6Factories: "Factory patch",
     fm6NeedDevice: "Connect the FM-1 to edit 6-OP FM voices and send them to a track.",
     fm6NoFw: "This firmware has no 6-OP FM (FM6). Update to Felucca 1.0 or later to use it.",
-    motion: "Motion", motionOn: "Play motion", motionClear: "Clear motion", motionConfirm: "Clear this track's motion?", chance: "Chance %", motionStep: "Step", motionParam: "Parameter", motionValue: "Value",
+    motion: "Automation", motionOn: "Play automation", motionClear: "Clear automation", motionConfirm: "Clear this track's automation?", chance: "Chance %", ratchet: "Ratchet", motionStep: "Step", motionParam: "Parameter", motionValue: "Value",
     backupTitle: "Complete backup", backupExport: "Save backup", backupImport: "Restore backup", backupHelp: "Save the current music, A–D, sound banks, user samples and settings to this computer.", backupOld: "Complete backups need firmware with archive support.", backupConfirm: "Restore this complete backup? Current music, saved data and samples will be replaced. Keep USB connected.", backupWorking: "Backing up / restoring ", backupDone: "Backup saved", backupRestored: "Complete backup restored",
     deviceDisplay: "Device display",
     deviceDisplayHelp: "Changes apply to the FM-1 screen and save. Changes made while playing save after STOP.",
@@ -3416,12 +3434,12 @@ function renderMotion() {
       value.addEventListener("change", () => op(async () => {
         assertSession(d);
         const r = parse[CMD.MOTION](await sessionRequest(d, req.motion(m.track, 3, {...e,value:+value.value})));
-        if (r.rc) throw new Error("Motion edit refused"); d.motion = r; renderMotion();
+        if (r.rc) throw new Error("Automation edit refused"); d.motion = r; renderMotion();
       }));
       return el("tr", {}, el("td", {text:e.step + 1}), el("td", {text:label}), el("td", {}, value),
         el("td", {}, el("button", {text:t("remove"),onclick:() => op(async () => {
           const r = parse[CMD.MOTION](await sessionRequest(d, req.motion(m.track, 4, e)));
-          if (r.rc) throw new Error("Motion edit refused"); d.motion = r; renderMotion();
+          if (r.rc) throw new Error("Automation edit refused"); d.motion = r; renderMotion();
         })})));
     }));
 }
@@ -3429,13 +3447,13 @@ $("motion-on").addEventListener("change", () => op(async () => {
   const d = dev, track = d?.sel ?? 0;
   if (!d?.info?.motionMax) return;
   const r = parse[CMD.MOTION](await sessionRequest(d, req.motion(track, 1, {on:$("motion-on").checked})));
-  if (r.rc) throw new Error("Motion edit refused"); d.motion = r; renderMotion();
+  if (r.rc) throw new Error("Automation edit refused"); d.motion = r; renderMotion();
 }));
 $("motion-clear").addEventListener("click", () => op(async () => {
   const d = dev;
   if (!d?.info?.motionMax || !confirm(t("motionConfirm"))) return;
   const r = parse[CMD.MOTION](await sessionRequest(d, req.motion(d.sel ?? 0, 2)));
-  if (r.rc) throw new Error("Motion edit refused"); d.motion = r; renderMotion();
+  if (r.rc) throw new Error("Automation edit refused"); d.motion = r; renderMotion();
 }));
 setInterval(async () => {
   const d = dev;
@@ -3464,7 +3482,8 @@ function renderSteps() {
   const tables = [];
   for (let b = 0; b < len; b += 16) {
     const tb = el("table", {}, el("tr", {}, el("th"), el("th", { text: t("notes") }), el("th", { text: t("hits") }), el("th", { text: t("time") }),
-      el("th", { text: t("acc") }), el("th", { text: t("slide") }), el("th", { text: t("vel") }), ...(dev.info.chance ? [el("th", { text: t("chance") })] : [])));
+      el("th", { text: t("acc") }), el("th", { text: t("slide") }), el("th", { text: t("vel") }), ...(dev.info.chance ? [el("th", { text: t("chance") })] : []),
+      ...(dev.info.ratchet ? [el("th", { text: t("ratchet") })] : [])));
     for (let i = b; i < Math.min(len, b + 16); i++) tb.append(stepRow(i));
     tables.push(tb);
   }
@@ -3478,9 +3497,12 @@ function stepRow(i) {
   const sl = el("input", { type: "checkbox" });
   const vel = el("input", { type: "number", min: 0, max: 127 });
   const chance = dev.info.chance ? el("input", { type: "number", min: 0, max: 100, "aria-label": `${t("chance")} ${i + 1}` }) : null;
+  const ratchet = dev.info.ratchet ? el("select", { "aria-label": `${t("ratchet")} ${i + 1}` },
+    ...Array.from({ length: dev.info.ratchet }, (_, k) => el("option", { value: k + 1, text: `x${k + 1}` }))) : null;
   const tr = el("tr", { "data-i": i }, el("td", { class: "i", text: String(i + 1) }),
-    el("td", {}, notes), el("td", {}, hits), el("td", {}, time), el("td", {}, acc), el("td", {}, sl), el("td", {}, vel), ...(chance ? [el("td", {}, chance)] : []));
-  tr._c = { notes, hits, time, acc, sl, vel, chance };
+    el("td", {}, notes), el("td", {}, hits), el("td", {}, time), el("td", {}, acc), el("td", {}, sl), el("td", {}, vel), ...(chance ? [el("td", {}, chance)] : []),
+    ...(ratchet ? [el("td", {}, ratchet)] : []));
+  tr._c = { notes, hits, time, acc, sl, vel, chance, ratchet };
   fillStep(tr, dev.steps[i]);
   const send = () => writeStep(i, tr);
   notes.addEventListener("change", send);
@@ -3490,6 +3512,7 @@ function stepRow(i) {
   sl.addEventListener("change", send);
   vel.addEventListener("change", send);
   if (chance) chance.addEventListener("change", send);
+  if (ratchet) ratchet.addEventListener("change", send);
   return tr;
 }
 function fillStep(tr, s) {
@@ -3504,6 +3527,7 @@ function fillStep(tr, s) {
   c.sl.checked = !!(s.flags & 2);
   c.vel.value = String(s.vel);
   if (c.chance) c.chance.value = String(s.chance ?? 100);
+  if (c.ratchet) c.ratchet.value = String(s.ratchet ?? 1);
   tr.classList.toggle("off", !stepOn(s));
 }
 function updateStepRows() {
@@ -3525,7 +3549,7 @@ function renderGrid() {
     const i = +b.dataset.i, s = dev.steps[i];
     const on = stepOn(s), tie = !!s && s.time === 1;
     const txt = on ? [stepNotes(s), hitsText(s.hit | 0, s.acc | 0)].filter(Boolean).join(" ") : tie ? "—" : "";
-    const marks = s && on ? (s.flags & 1 ? " >" : "") + (s.flags & 2 ? " ~" : "") : "";
+    const marks = s && on ? (s.flags & 1 ? " >" : "") + (s.flags & 2 ? " ~" : "") + (s.ratchet > 1 ? " x" + s.ratchet : "") : "";
     b.className = [on && "on", tie && "tie", on && s.flags & 1 && "acc", i % 4 === 0 && "beat"].filter(Boolean).join(" ");
     b.title = `${i + 1}: ${on ? txt : tie ? "TIE" : "REST"}${marks}`;
     b.replaceChildren(el("span", { class: "n", text: String(i + 1) + marks }), el("span", { class: "x", text: txt }));
@@ -3552,6 +3576,7 @@ async function writeStep(i, tr) {
   const s = { n: notes.length, notes: all, time, flags: (c.acc.checked ? 1 : 0) | (c.sl.checked ? 2 : 0),
     vel: Math.max(0, Math.min(127, +c.vel.value || 0)), hit: hits.hit, acc: hits.acc };
   if (c.chance) s.chance = Math.max(0, Math.min(100, Math.round(+c.chance.value || 0)));
+  if (c.ratchet && c.chance) s.ratchet = Math.max(1, Math.min(4, +c.ratchet.value || 1));
   if ((s.n || s.hit) && !s.vel) s.vel = 96;
   stepEdit.set(i, performance.now());
   try {
@@ -3570,7 +3595,7 @@ $("clearseq").addEventListener("click", async () => {
   try {
     for (let i = 0; i < dev.info.nstep; i++) {
       if (i % 8 === 0) sayK("applying", `${i}/${dev.info.nstep}`);
-      dev.steps[i] = parse[CMD.STEP_SET](await rq(req.stepSet(i, { n: 0, notes: [0, 0, 0, 0], time: 2, flags: 0, vel: 0, hit: 0, acc: 0, ...(dev.info.chance ? {chance:100} : {}) })));
+      dev.steps[i] = parse[CMD.STEP_SET](await rq(req.stepSet(i, { n: 0, notes: [0, 0, 0, 0], time: 2, flags: 0, vel: 0, hit: 0, acc: 0, ...(dev.info.chance ? {chance:100} : {}), ...(dev.info.ratchet ? {ratchet:1} : {}) })));
     }
     if (dev.info.motionMax) { dev.motion = parse[CMD.MOTION](await rq(req.motion(dev.sel ?? 0, 2))); renderMotion(); }
     $("steptables").dataset.len = "";

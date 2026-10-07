@@ -29,6 +29,9 @@
  * step i's lane hits (bit l = lane l), flags[i] their accents. A DRUM track whose first 16 steps strike a
  * lane is stored so (its notes on their lanes); every other sound as version 2, which older firmware reads.
  * Older firmware shows a version 3 record as empty and keeps its bytes.
+ * A note pattern keeps each step's RATCH in its flags (core.h SF_RATCH, 8 | 16; 0 = x1, every older record):
+ * bits firmware before RATCH drops when it loads the pattern, so the record is the same version. A drum grid
+ * has no room for it (its flags are the accents): it loads x1.
  * A record of engine 1 (DIGITAL, retired in 1.0) stays as it is (UP_PUT takes it too): its values are DIGITAL's,
  * and every load converts them to an FM6 sound with its own patch (ui.c fm4_apply, fm4_convert.c); lists count it
  * with FM6's (up_engine).
@@ -45,8 +48,8 @@ typedef struct {
     uint8_t used, ver, engine, np;               /* UP_USED, UP_VER, engine, P_COUNT when stored */
     char name[12];                               /* ASCII 32..126, 0-padded (no 0 when 12 long) */
     union { int16_t p[UP_PMAX]; uint8_t packed[UP_PMAX * 2u]; };
-    uint8_t note[16], flags[16];                 /* note 0 = rest; flags 1 accent, 2 slide, 4 tie (UP_VER_GRID:
-                                                  * lane hits, their accents) */
+    uint8_t note[16], flags[16];                 /* note 0 = rest; flags 1 accent, 2 slide, 4 tie, SF_RATCH
+                                                  * (UP_VER_GRID: lane hits, their accents) */
 } up_rec_t;
 typedef struct {
     uint32_t magic;
@@ -134,7 +137,7 @@ static void up_pat_norm(uint8_t *note, uint8_t *flags)   /* tie: no note; rest: 
         *note = 0;
         *flags = 4;
     } else {
-        *flags = *note ? (uint8_t)(*flags & (SF_ACCENT | SF_SLIDE)) : 0u;
+        *flags = *note ? (uint8_t)(*flags & (SF_ACCENT | SF_SLIDE | SF_RATCH)) : 0u;
     }
 }
 
@@ -219,7 +222,7 @@ static void up_values(const up_rec_t *r, int16_t *v)   /* mapped and clamped for
     if (r->ver == 1u && ENGINES[r->engine] == &ENG_PHYS)   /* (before 1.0: MODEL 2 was DUST) */
         phys_legacy(&v[P_E0]);
     for (i = 0; i < P_COUNT; i++)
-        v[i] = (int16_t)clamp(v[i], param_desc_of(r->engine, i)->min, param_desc_of(r->engine, i)->max);
+        v[i] = (int16_t)param_fit(param_desc_of(r->engine, i), v[i]);   /* (a retired KIT: the kit it plays) */
 }
 
 #include "up_fm6.c"                            /* the FM6 user presets' patches: the same kind of store */

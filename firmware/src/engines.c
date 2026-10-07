@@ -54,6 +54,27 @@ static const engine_t *const ENGINES[NENGINES] = {
 /* a track's engine number as an index (the audio paths: a compare, cheaper than % NENGINES; a bad number: 0) */
 static inline uint32_t eng_idx(uint32_t e) { return e < NENGINES ? e : 0u; }
 
+/* the sample source a track's sound plays that has no data (SAMPLE's SET, GRAIN's SRC, SLICE's SRC: an empty or
+ * invalid user slot, a set or PIANO this build lacks): its name (it plays a sine: eng_sample.c smp_sine), 0 = none;
+ * *code a small number for it (1.., per engine and source) so the UI says it once (ui_input.c sample_notice) */
+static uint8_t snd_said[NTRK];   /* per track: the code last said, 0 = none (a project load clears them: said again) */
+static const char *snd_missing(const track_t *t, uint32_t *code)
+{
+    const engine_t *e = ENGINES[eng_idx(t->eng_req)];
+    uint32_t si = (uint32_t)t->p[P_E0] % SMP_NALL;
+#if FELUCCA_SLICE
+    if (e == &ENG_SLICE) {
+        si = slc_src_of(t->p);
+        *code = 64u + si;
+        return slc_get(si) ? 0 : N_SLC_SRC[si];
+    }
+#endif
+    if (e != &ENG_SAMPLE && e != &ENG_GRAIN)
+        return 0;
+    *code = (e == &ENG_GRAIN ? 32u : 1u) + si % 32u;
+    return smp_set_missing(si) ? SMP_ALL_NAMES[si] : 0;
+}
+
 /* the order the engines are shown in (PRESETS browsing and its ENG knob, the EDIT layer's keys, the editor's list):
  * engine indices, never DIGITAL's reserved 1 (with FELUCCA_FM4 it follows FM6). The indices stay as they are (the
  * stores and the protocol hold them); only this table orders them */

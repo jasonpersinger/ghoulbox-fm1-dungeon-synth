@@ -96,6 +96,30 @@ static void smp_user_scan(uint32_t k)
     slc_user_scan(k, 1);
 }
 
+/* A missing sample (SAMPLE, GRAIN, SLICE: an empty or invalid user slot, a set this build has no data for) plays
+ * this instead, like a hardware sampler with its sample gone: a plain sine at the note's pitch (+ d16, 1/16
+ * semitones), at half the peak of a full sample, through the engine's one-pole low-pass (lp Q15, state *y) and the
+ * voice's amp (the ADSR: no click at the start, phase 0, or the end). *ph its phase. The UI says so once
+ * (engines.c snd_missing, ui_input.c sample_notice). */
+static void smp_sine(int32_t *out, uint32_t n, const vmod_t *m, int32_t d16, int32_t lp, uint32_t *ph, int32_t *y)
+{
+    uint32_t i, p = *ph, inc = pitch_inc((uint32_t)clamp(m->pitch16 + d16, 0, 2047));
+    int32_t s = *y;
+    for (i = 0; i < n; i++, p += inc) {
+        s += mulq15((sine_i(p) >> 1) - s, lp);
+        out[i] += voice_amp(s, m, i) << 1;
+    }
+    *ph = p;
+    *y = s;
+}
+/* SET / SRC si (0..SMP_NALL - 1) has no sample data: an empty or invalid user slot, a built-in set without data */
+static int smp_set_missing(uint32_t si)
+{
+    if (si < SMP_NSETS)
+        return !SMP_ZONES[SMP_SETS[si].z0].n;
+    return !usr_nz[(si - SMP_NSETS) % SMP_USER_SLOTS];
+}
+
 /* zone index in a voice: < 0x8000 built-in, else 0x8000 | slot << 5 | zone */
 static inline const smp_zone_t *smp_zone(uint32_t zi)
 {
@@ -156,6 +180,8 @@ static void sample_note_on(track_t *t, voice_t *v)
     v->s[2] = v->s[3] = 0;
     v->s[6] = zi == 0xFFFFu;     /* 1 = sample ended (one-shot); a kit key with no sound stays silent */
     v->s[7] = 0;                 /* lo-pass state */
+    if (smp_set_missing(si))
+        v->s[6] = 2;             /* 2 = no sample data: the sine (smp_sine; ph[0] its phase) */
 }
 
 static void sample_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vmod_t *m)
@@ -167,6 +193,10 @@ static void sample_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, cons
     uint32_t r = pow2_q16(d16), stepq = (r >> 8) * (z->rate >> 8);   /* Q16 samples per output */
     int32_t bits = p[P_E2], lp = 4000 + ((clamp((p[P_E4] << 8) + m->cutoff, 0, 127 << 8) * 28767) >> 15);
     int32_t drv = p[P_E6], sh = bits / 10;
+    if (v->s[6] == 2) {                               /* no sample data: the sine at the note's pitch + TUNE */
+        smp_sine(out, n, m, p[P_E1] * 16, lp, &v->ph[0], &v->s[7]);
+        return;
+    }
     if (v->s[6] || !z->n) {
         v->active = 0;
         return;

@@ -23,6 +23,7 @@ static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint1
 #include "../firmware/src/gfx.c"
 #include "../firmware/src/panel.c"
 #include "../firmware/src/ui.c"
+#include "../firmware/src/menu_items.c"
 static void panel_setup(void) {}
 
 static uint8_t nor[0x100000], flash_ok = 1;
@@ -55,11 +56,14 @@ static void fl_plain_window_init(void) {}
 #include "../firmware/src/project.c"
 
 enum { ED_UI_STATE = 34, ED_UI_SET, ED_UI_PALETTES, ED_FAV_GET, ED_FAV_SET };
-static void ed_b(uint32_t n) { (void)n; }
-static void ed_v(int32_t n) { (void)n; }
+static uint8_t ed_rep[64];                        /* the reply's bytes (MENU_SET) */
+static uint32_t ed_repn;
+static void ed_b(uint32_t n) { if (ed_repn < sizeof ed_rep) ed_rep[ed_repn++] = (uint8_t)(n & 127u); }
+static void ed_v(int32_t n) { ed_b((uint32_t)(n + 8192)); ed_b((uint32_t)(n + 8192) >> 7); }
 static int32_t ed_rv(const uint8_t *a) { return (int32_t)(a[0] | (uint32_t)a[1] << 7) - 8192; }
 static void ed_str(const char *s, uint32_t n) { (void)s; (void)n; }
 #include "../firmware/src/editor_preferences.c"
+#include "../firmware/src/editor_menu.c"
 
 static int check(const char *what, int ok)
 {
@@ -251,6 +255,46 @@ int main(void)
                       !persist_pending && persist_saved.palette == palette_to_stored(0));
         const uint8_t bold[] = {1, 1};
         bad += check("the retired font weight is refused without a write", ed_ui_set(bold, sizeof bold) == 2);
+    }
+    {   /* MENU_SET (editor_menu.c): the same settings record, the same deferral, retry and idempotence */
+        const uint8_t leds_off[] = {4, 0, 64}, large_on[] = {2, 1, 64}, hold_06[] = {5, 3, 64}, eq_bass[] = {9, 2, 64};
+        persist_t q;
+        reset();
+        settings_init();
+        song.playing = 1;
+        ed_repn = 0; ed_menu_handle(ED_MENU_SET, leds_off, 3);
+        bad += check("MENU_SET while playing: applied, rc 4 (queued until STOP), no erase",
+                     ed_repn == 4 && ed_rep[0] == 4 && ed_rep[1] == 4 && settings_leds == LEDS_OFF && persist_pending == 1 && !erases);
+        song.playing = 0;
+        settings_poll();
+        bad += check("STOP commits the MENU setting (LEDS OFF in the settings record)",
+                     !persist_pending && erases == 1 && st_load(OBJ_SETTINGS, &q, sizeof q) == (int)sizeof q &&
+                     leds_from_stored(q.zoom) == LEDS_OFF);
+        ed_repn = 0; ed_menu_handle(ED_MENU_SET, large_on, 3);
+        ok = ed_rep[0] == 0 && (ui_prefs & PREF_LARGE);
+        ed_repn = 0; ed_menu_handle(ED_MENU_SET, hold_06, 3);
+        ok &= ed_rep[0] == 0 && settings_hold == 3u;
+        ed_repn = 0; ed_menu_handle(ED_MENU_SET, eq_bass, 3);
+        ok &= ed_rep[0] == 0 && st_load(OBJ_SETTINGS, &q, sizeof q) == (int)sizeof q && q.lowcut == 2u &&
+              hold_from_stored(q.bold) == 3u && (q.favorites.factory[15][30] & PREF_LARGE) && leds_from_stored(q.zoom) == LEDS_OFF;
+        bad += check("MENU_SET stopped: rc 0, saved at once (LARGE, HOLD, SPEAKER EQ), the others kept", ok);
+        before = erases;
+        ed_repn = 0; ed_menu_handle(ED_MENU_SET, hold_06, 3);
+        bad += check("repeating an unchanged MENU_SET: rc 0, no erase", ed_rep[0] == 0 && erases == before);
+        erase_error = 1;
+        ed_repn = 0; ed_menu_handle(ED_MENU_SET, leds_off, 3);   /* unchanged: still rc 0 (no write) */
+        ok = ed_rep[0] == 0;
+        {
+            const uint8_t leds_inv[] = {4, 3, 64};
+            ed_repn = 0; ed_menu_handle(ED_MENU_SET, leds_inv, 3);
+        }
+        ok &= ed_rep[0] == 3 && settings_leds == LEDS_INV && persist_pending == 2 && leds_from_stored(persist_saved.zoom) == LEDS_OFF;
+        bad += check("MENU_SET with a failing flash: applied, rc 3, the saved setting kept", ok);
+        erase_error = 0;
+        fm1_ms += 1000;
+        settings_poll();
+        bad += check("... and retried by the settings path", !persist_pending && leds_from_stored(persist_saved.zoom) == LEDS_INV);
+        settings_hold = HOLD_DEF; settings_leds = LEDS_DIM;
     }
     reset();
     settings.palette = 3;

@@ -22,9 +22,10 @@ static int32_t cv_trk(int32_t x, int32_t y, uint32_t size, uint32_t k, uint16_t 
     char s[2] = {(char)('1' + k), 0};
     const aag_t *g = &f->g[glyph(f, (uint8_t)s[0])];
     int32_t in = size > 16u ? 2 : 0, w = (int32_t)size - 2 * in;
+    int32_t nud = k == 0u ? 1 : 0;   /* the 1's ink centred looks right of centre (its flag): nudged left 1 px (2 looked left) */
     cv_rrect(x + in, y + in, w, w, -(w / 4), fill, under);
-    GFX_HOOK_ALIGN(x + in, y + in, x + in + w, y + in + w, AL_HV, "track cushion digit");
-    cv_text_on(x + in + (w - g->bw) / 2 - g->bx, y + in + (w - g->bh) / 2 - g->by, f, s, under, fill);   /* its ink centred */
+    GFX_HOOK_ALIGN(x + in - nud, y + in, x + in + w - nud, y + in + w, AL_HV, "track cushion digit");   /* (the 1: measured against its nudge) */
+    cv_text_on(x + in + (w - g->bw) / 2 - g->bx - nud, y + in + (w - g->bh) / 2 - g->by, f, s, under, fill);   /* its ink centred */
     GFX_HOOK_ITEM(x + in, y + in, x + in + w, y + in + w);
     return (int32_t)size;
 }

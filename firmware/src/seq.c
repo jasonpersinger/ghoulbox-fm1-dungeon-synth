@@ -502,6 +502,7 @@ static void seq_start(void)
         t->seq_pos = 0x7FFFFFFF;                   /* step 0 fires on the first block */
         t->rskip_n = 0;
         t->rh_n = 0;
+        t->rat_left = 0;
     }
     song.tick = 0;
     beat_pos = 0; beat_n = 0;                      /* the ARP LED's beat from the top too */
@@ -531,6 +532,7 @@ static void seq_stop(void)
     for (i = 0; i < NTRK; i++) {
         seq_release(&trk[i]);
         trk[i].rh_n = 0;                           /* a recorded note held over the stop: as far as it got */
+        trk[i].rat_left = 0;
     }
     chain_stop();
     motion_end();
@@ -539,23 +541,32 @@ static void seq_stop(void)
 /* play one step: TIE extends, REST releases, NOTE (re)triggers its notes, then its lane hits (their GM
  * notes, DRUM_LANE_NOTE; an accented hit at 127); a SLIDE on the previous step makes this one legato with a
  * glide (acid style). skip: bit k = note k, bit 8 + l = the hit of lane l already sounds from live
- * recording (not triggered, not released here). */
+ * recording (not triggered, not released here); SEQ_REP: a RATCH repeat (seq_ratchet).
+ * RATCH x2..x4 (core.h step_ratchet): a NOTE step plays all of it again in equal parts of its swung length, each
+ * part retriggered with GATE of the part; the chance is rolled once for the whole step (a failed roll: no part),
+ * a slide into it glides into the first part only, and it never slides or ties out (its last part ends at its
+ * gate). x1, what every older pattern holds, is the step exactly as before. */
+#define SEQ_REP (1u << 16)
 static __attribute__((noinline)) void seq_step(track_t *t, const step_t *s, uint32_t period, uint32_t skip)
 {
     uint32_t i, j, gate = period * (uint32_t)t->p[P_SGATE] / 128u;
     uint32_t vel = (s->flags & SF_ACCENT) ? 127u : (s->vel ? s->vel : 96u);
-    uint32_t slide_in = t->seq_hold && t->seq_n;
+    uint32_t slide_in = t->seq_hold && t->seq_n && !(skip & SEQ_REP);
     uint32_t len = t->p[P_SLEN] ? (uint32_t)t->p[P_SLEN] : 1u;
     uint32_t next_tie = seq_steps(t)[(t->seq_idx + 1u) % len].time == ST_TIE;
+    uint32_t hits = step_ratchet(s);
     uint8_t nn[4 + NLANE], vv[4 + NLANE];           /* the notes it plays: its notes, then its hits */
     uint32_t m = 0, sk = 0;
     /* QNT SEQ: the step's notes (not the lane hits) snap to the scale as they play; never on a drum kit, the slices
      * or another engine that maps the keys itself. seq_notes keeps the notes that sound: their note-offs match */
     const engine_t *e = ENGINES[eng_idx(t->eng_req)];
     uint32_t qseq = t->p[P_QUANT] == QN_SEQ && !(e->keys && e->keys(t, 0) >= 0);
-    if (step_chance(s) < 100u && rng() % 100u >= step_chance(s)) {
-        seq_release(t);
-        return;
+    if (!(skip & SEQ_REP)) {
+        t->rat_left = 0;
+        if (step_chance(s) < 100u && rng() % 100u >= step_chance(s)) {
+            seq_release(t);
+            return;
+        }
     }
     if (s->time == ST_TIE) {
         if (t->seq_n) {
@@ -567,6 +578,11 @@ static __attribute__((noinline)) void seq_step(track_t *t, const step_t *s, uint
     if (s->time == ST_REST || (!s->n && !s->hit)) {
         seq_release(t);
         return;
+    }
+    if (hits > 1u) {                                /* RATCH: the gate of a part, no slide or tie out */
+        gate = step_samples(t, period, t->seq_idx) / hits * (uint32_t)t->p[P_SGATE] / 128u;
+        if (!(skip & SEQ_REP))
+            t->rat_left = (uint8_t)(hits - 1u);
     }
     for (i = 0; i < s->n && i < 4u; i++) {
         uint32_t x = s->note[i];
@@ -607,7 +623,23 @@ static __attribute__((noinline)) void seq_step(track_t *t, const step_t *s, uint
         if (!((sk >> i) & 1u))
             t->seq_notes[t->seq_n++] = nn[i];
     t->seq_off = gate;
-    t->seq_hold = (s->flags & SF_SLIDE) != 0 || next_tie;   /* next step a TIE: keep the notes to it */
+    t->seq_hold = hits == 1u && ((s->flags & SF_SLIDE) != 0 || next_tie);   /* next step a TIE: keep the notes to it */
+}
+
+/* RATCH: the next part of the playing step once the sequencer is that far into it (seq_step played the first).
+ * The step is read again: an edit to fewer parts (or another source in a song) ends the repeats */
+static __attribute__((noinline)) void seq_ratchet(track_t *t, uint32_t period)
+{
+    const step_t *s = &seq_steps(t)[t->seq_idx];
+    uint32_t hits = step_ratchet(s);
+    if (t->rat_left >= hits) {
+        t->rat_left = 0;
+        return;
+    }
+    if (t->seq_pos < (hits - t->rat_left) * (step_samples(t, period, t->seq_idx) / hits))
+        return;
+    t->rat_left--;
+    seq_step(t, s, period, SEQ_REP);
 }
 
 static void seq_tick(track_t *t, uint32_t n)
@@ -649,6 +681,8 @@ static void seq_tick(track_t *t, uint32_t n)
             seq_step(t, s, period, skip);
         }
     }
+    if (t->rat_left)
+        seq_ratchet(t, period);
 }
 
 /* MIDI in: the track a channel plays (0..15): G_ROUTE CH1-4 (0) channels 1..4 their parts (5..16 never get
@@ -702,7 +736,7 @@ static void events_block(uint32_t n)
         midi_hint = 0;
         for (i = 0; i < NTRK; i++) {
             trk[i].rh_n = trk[i].rskip_n = 0;
-            trk[i].seq_n = trk[i].seq_hold = trk[i].slide_glide = 0;
+            trk[i].seq_n = trk[i].seq_hold = trk[i].slide_glide = trk[i].rat_left = 0;
         }
         pr |= (1u << NTRK) - 1u;
         RING_PUBLISH();

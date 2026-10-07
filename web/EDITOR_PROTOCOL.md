@@ -28,6 +28,13 @@ restore the whole device. P_COUNT is 89 and P_E0 is 81: twenty FM operator param
 before the engine parameters, which moved from 61..68 to 81..88. Always take P_E0 from `INFO`. INFO ends with
 tagged capability blocks for these (see `INFO`).
 
+**MENU settings (1.0.4):** `MENU_DESC` (72) and `MENU_SET` (73) read and set the device's MENU settings, described
+by the device (see "MENU settings" at the end); INFO advertises them with `4E 01 count`. 1.0.5: a `MENU_DESC` reply
+ends with the item's tab on the device (index and name), after the bytes 1.0.4 sent.
+
+**Ratchet (1.0.5, INFO `52 01 04`):** a step gets a ratchet byte (its hits, 1..4) after its chance: one more byte at
+the end of the step replies, and an optional last byte of a step write (see "Ratchet" below). Nothing else changed.
+
 **Chord keys (91 parameters, 1.0):** two track parameters, `CHRD` (81) and `VOIC` (82), went in before the
 engine parameters, which moved from 81..88 to 83..90: P_COUNT 91, P_E0 83. No command changed; an editor that
 takes P_COUNT and P_E0 from `INFO` keeps working (see "The chord keys" below).
@@ -43,8 +50,8 @@ Every valid request gets exactly one reply, with the same header and the same `<
 Unknown commands and invalid fixed argument lengths get no reply; argument errors
 follow the command-specific rules below.
 Fixed-size commands require exactly the lengths in the tables; step writes accept the
-8-byte legacy step, the 11-byte grid step or the 12-byte step with its chance (a chance above 100 gets
-no reply). Every data byte is 7 bit.
+8-byte legacy step, the 11-byte grid step, the 12-byte step with its chance (a chance above 100 gets
+no reply) or the 13-byte step with its ratchet (a ratchet outside 1..4 gets no reply). Every data byte is 7 bit.
 MIDI realtime bytes may occur inside SysEx; another status aborts the partial frame. While the editor
 watches (v2, `WATCH`), the device also sends push frames (cmds 23, 24, 26) at any time.
 
@@ -119,17 +126,26 @@ Other enums that grew: `P_SDIV` (DIV, id 30) has 10 names (1/4, 1/8, 1/16, 1/32,
 4BAR; the first six keep their numbers), `P_AMODE` (id 17) 7 (OFF, UP, DN, UPDN, RND, ORD, REPEAT) and the
 global `G_CLOCK` (id 2, label "CLK") 3 (INT, USB, TRS). `G_MIDI` (id 12) is an enum of USB / TRS that nothing reads.
 
+**Retired enum values (aliases).** A value that no longer exists keeps its number, so stored sounds stay valid:
+`DESC` names it like the value it now plays (an alias), the device never holds it (a `SET` of it lands on that value
+and the reply says so) and its knob steps over it. Of a repeated name, the original is the first value when that has
+the name, else the last one with it; an editor should list only the originals and show an alias by its name when
+it ever sees one. Today: SAMPLE SET and GRAIN SRC 1 and 4 (once TRANH, PERC) = 0 PIANO; DRUM KIT (engine 10, E1)
+1, 2, 3 (once HAND, CYM, H+CYM; 1.0.5) = 6 (66), 5 (10), 8 (77): its names are STD 66 10 77 80 10 66 55 77, the
+device's knob steps STD 80 10 66 55 77. An editor of before 1.0.5 (first of a name = original) offers 66 10 77
+at 1..3 and hides 6 5 8: what it sets still plays the right kit, and the device answers with 6 5 8.
+
 ## Commands
 
 | cmd | Request args | Reply args |
 | --- | --- | --- |
-| 1 INFO | — | version string, NENGINES, P_COUNT, G_COUNT, NSTEP, P_E0, then NENGINES engine-name strings, then (v3) NTRK (4), then (v6) CHAIN_ROWS (16), then the tagged blocks `55 01 uiCaps`, `4D 01 64 01`, `42 01 3`, `46 01 nfactory nbank` and `53 01 3` (below); older firmware ends earlier |
+| 1 INFO | — | version string, NENGINES, P_COUNT, G_COUNT, NSTEP, P_E0, then NENGINES engine-name strings, then (v3) NTRK (4), then (v6) CHAIN_ROWS (16), then the tagged blocks `55 01 uiCaps`, `4D 01 64 01`, `42 01 3`, `46 01 nfactory nbank`, `53 01 3`, (1.0.3) `50 01 3` and (1.0.4) `4E 01 count` (MENU settings) and (1.0.5) `52 01 4` (ratchet) (below); older firmware ends earlier |
 | 2 GET | scope, id | scope, id, v14 |
 | 3 SET | scope, id, v14 | scope, id, v14 (the value after clamping). Setting global `G_ENGSEL` (id from DESC label "ENG") changes the engine: its defaults, then its first preset (as on the device) |
 | 4 DUMP | — | engine, preset, then P_COUNT × v14 (the selected track), then G_COUNT × v14 (globals) |
 | 5 DESC | scope, id | scope, id, fmt, min v14, max v14, def v14, label string, unit string, then for an enum (fmt 8) one name string per value (at most 24; firmware before the matrix: at most 16) |
-| 6 STEP_GET | index 0..NSTEP−1 | index, n (0..4 notes), note0..note3, time (0 NOTE, 1 TIE, 2 REST), flags (1 accent, 2 slide), vel, then (v5) hits (3 bytes, below), then (v7) chance 0..100 |
-| 7 STEP_SET | index, n, note0..3, time, flags, vel [, hits (3 bytes, v5) [, chance 0..100 (v7)]] | same as STEP_GET (after the write). Without the hits the step keeps its own; without the chance it keeps its own. The chance can only follow the hits |
+| 6 STEP_GET | index 0..NSTEP−1 | index, n (0..4 notes), note0..note3, time (0 NOTE, 1 TIE, 2 REST), flags (1 accent, 2 slide), vel, then (v5) hits (3 bytes, below), then (v7) chance 0..100, then (`52 01`) ratchet 1..4 |
+| 7 STEP_SET | index, n, note0..3, time, flags, vel [, hits (3 bytes, v5) [, chance 0..100 (v7) [, ratchet 1..4]]] | same as STEP_GET (after the write). Without the hits the step keeps its own; without the chance or the ratchet it keeps its own. The chance can only follow the hits, the ratchet the chance |
 | 8 PRESET | engine, preset | engine, preset (applies the preset's sound to the selected track and sends; the steps and the track's own parameters stay, see "Sound loads and undo"). For another track, select it with `TRACK` first |
 | 9 PROJECT | op (0 load, 1 save, 2 query), slot 0..3 | op, slot, used (1/0). Save writes flash: allow ~2 s; it stops the transport first (see "Saves while playing") |
 | 10 NAMES | engine | engine, count, count preset-name strings, then the two edit-page titles |
@@ -155,7 +171,7 @@ global `G_CLOCK` (id 2, label "CLK") 3 (INT, USB, TRS). `G_MIDI` (id 12) is an e
 | 27 TRACK | — (query), or track (select it) | selected track, NTRK, then per track: engine byte, preset, level v14, mute (0/1), armed (0/1, live recording) |
 | 28 TRACK_MIX | track (get), or track, level v14 (0..127), mute (set) | track, level v14, mute: the track's `P_LEVEL` and `P_MUTE` |
 | 29 TRACK_DUMP | track | track, engine byte, preset, P_COUNT × v14 (that track's parameters; no globals) |
-| 30 TRACK_STEP | track, index (get), or track, index, n, note0..3, time, flags, vel [, hits (v5) [, chance (v7)]] (set) | track, index, n, note0..3, time, flags, vel, then (v5) hits, then (v7) chance |
+| 30 TRACK_STEP | track, index (get), or track, index, n, note0..3, time, flags, vel [, hits (v5) [, chance (v7) [, ratchet]]] (set) | track, index, n, note0..3, time, flags, vel, then (v5) hits, then (v7) chance, then (`52 01`) ratchet |
 
 | cmd (v4) | Request args | Reply args |
 | --- | --- | --- |
@@ -212,7 +228,8 @@ is not required.
 
 A user preset = engine (0..NENGINES−1), name (1..12 chars, ASCII 32..126; the device shows it upper
 case), all P_COUNT instrument parameters (v14 each, the same order as `DUMP`), and a 16-step pattern:
-16 × (note 0..127 (0 = rest), flags: 1 accent, 2 slide, 4 tie). Loading one applies the engine and
+16 × (note 0..127 (0 = rest), flags: 1 accent, 2 slide, 4 tie, 8 | 16 the ratchet − 1 (firmware with `52 01`;
+before, 0: x1, and such firmware drops those bits when it loads the pattern)). Loading one applies the engine and
 the parameters of the sound, as a factory preset (the track's own parameters, the steps and LEN stay; see
 "Sound loads and undo"). The stored pattern is kept and returned by `UP_GET`; on the device SEQ > PHRASES
 lists it as "U07" and loads it, with the stored LEN (at most 16), DIV, SWING and GATE. The slots are
@@ -234,6 +251,9 @@ numbered 0..31 (the device shows U01..U32).
   E1..E8 = DRUM KIT's {0, 64, 70, 64, 64, 100, 0, 0}, the other values and the pattern as they were). Projects
   and `PRESET` 4 / 4 do the same (a project's track keeps its steps). SET 4 itself stays (`DESC` names it "PIANO":
   an alias, as SET 1; a `SET` of 4 lands on 0), and USR1..USR3 stay 5..7; GRAIN's SRC 4 plays PIANO.
+- **DRUM KIT 1..3** were HAND, CYM and H+CYM until 1.0.4 (STD with a conga / claves, a cymbal, both). Since 1.0.5
+  they play the VA kits 66, 10 and 77, and a record holding one loads as that kit: `UP_GET` / `UP_LOAD` give KIT 6, 5
+  or 8 (the record itself is not rewritten). Projects, motion events and `SET` do the same.
 - `UP_STORE`: name "" stores with the automatic name the device uses (engine name + slot number,
   "ANALOG 07"). rc 1 for a bad slot or name.
 - rc 2 = the flash write failed or there is no flash. A failed flash write keeps the previous
@@ -269,8 +289,8 @@ grid lives in the steps themselves, so every engine has it:
 
 - **Hits.** Each step has a lane mask `hit` and an accent mask `acc` (bit l = lane l, `acc` only on
   lanes that hit). The lanes and the General MIDI note each plays: 0 KICK 36, 1 SNARE 38, 2 CLAP 39,
-  3 HAT CL 42, 4 HAT OP 46, 5 TOM 45, 6 RIM 37, 7 BELL 56 (KIT HAND plays CONGA / CLAVE on lanes 5 / 6, KIT
-  CYM a cymbal on lane 8). A NOTE step plays its notes and then its hits, on any engine (DRUM strikes its
+  3 HAT CL 42, 4 HAT OP 46, 5 TOM 45, 6 RIM 37, 7 BELL 56 (a VA kit plays its own piece on each: KIT 66 a conga
+  on lane 5, 77 claves on lane 6, 10 and 77 a cymbal on lane 7). A NOTE step plays its notes and then its hits, on any engine (DRUM strikes its
   lanes, a synth plays the pitches); an accented hit at velocity 127, the others at
   the step's velocity (0 = 96). A TIE or REST step plays no hits.
 - **On the wire** (after `vel`): `hit & 127`, `acc & 127`, then `(hit >> 7) | (acc >> 7) << 1`. A
@@ -482,7 +502,8 @@ when the track's engine is not the saved one).
 - **Projects (FUN7).** 3388 bytes, little endian, in the same A/B sectors as before: `46 55 4E 37` ("FUN7"),
   size u32 (3388), the 27 globals as i16 (bytes 8..61), sel, parts, phys (62..64), P_COUNT as stored (byte 66),
   then from byte 68 for each of the 4 tracks: P_COUNT bytes (value + 64), engine, preset, 64 steps of 9 bytes
-  (4 notes; n | time << 3 | flags << 5; vel; hit; acc; chance byte where 0 = 100 %, 1..100, 101 = never);
+  (4 notes; n | time << 3 | flags << 5; vel; hit; acc; chance byte where 0 = 100 %, 1..100, 101 = never; firmware
+  with `52 01`: the ratchet − 1 in bit 7 of vel (bit 0) and of the chance byte (bit 1), see "Ratchet");
   then the song chain, then the motion (260 bytes: count, on mask, 2 reserved, 64 × (track << 6 | step, id,
   i16 value)); the reserved tail is zero up to byte 3371; bytes 3372..3383 are the project's name (since
   1.0: ASCII 32..126, upper case, 0-padded; all zero = no name, as firmware before wrote them; a byte
@@ -502,6 +523,24 @@ when the track's engine is not the saved one).
   without a pulse stops the transport. Changing `G_CLOCK` stops it.
 - Pitch bend, sustain (CC64), RPN 0 (bend range, ±0..24 semitones), CC120 / 121 / 123 are MIDI only and
   have no parameters, protocol or saved state.
+
+## Ratchet
+
+INFO advertises `52 01 4` after the MENU settings tag (`4E 01 count`): a step plays up to 4 times. Firmware without the tag has no
+ratchet byte (read every step as 1).
+
+- A NOTE step's ratchet 2..4 plays all of it (its notes and its drum hits) that many times, in equal parts of the
+  step as swung, each part retriggered and held for GATE of the part. The chance is rolled once for the step (a
+  failed roll: no part). A slide into it glides into the first part; it never slides or ties into the next step. 1
+  (the default, what every older pattern holds) is the step as before. TIE and REST steps ignore it.
+- `STEP_GET` / `STEP_SET` / `TRACK_STEP`: the byte after the chance, 1..4. The flags byte stays 1 accent, 2 slide in
+  both directions; a write without the ratchet byte (an older editor) keeps the step's ratchet.
+- On the device: SEQ > CHANCE, KNOB 3 (RATCH x1..x4) of the cursor step; the piano roll and the DRUM grid draw a
+  ratcheted step in its parts. Changing it pushes `STEP_CHANGED`.
+- Saved in projects (FUN7 / FUN8 layout unchanged: bit 7 of the velocity byte is the ratchet − 1's bit 0, bit 7 of
+  the chance byte its bit 1; 0 in every older project, which load x1), so also in backups and song rows. Firmware
+  before the ratchet refuses a project that holds one. A user preset's note pattern keeps it in its flags (8 | 16);
+  a drum grid record has no room for it and loads x1.
 
 ## v7: full backup (65-67)
 
@@ -642,3 +681,75 @@ rc 0 = applied and saved; 1 = invalid arguments; 2 = unsupported feature;
 by the same persistence path as the panel. These changes never stop playback.
 Unchanged writes do not erase flash. Replies echo preference ids/values and
 favorite ranges so the editor rejects replies to a different request.
+
+## MENU settings (72, 73; 1.0.4)
+
+The device describes the settings of its MENU (HOME held) to the editor, which builds its settings from what it
+is told: no list of settings is fixed in the editor. INFO advertises `4E 01 count` after the FM6 v2 tag
+(`50 01 caps`): `count` items, MENU_DESC index 0..count−1. Firmware without the tag answers neither command.
+
+| cmd | Request args | Reply args |
+| --- | --- | --- |
+| 72 MENU_DESC | index (0..count−1) | index, id, kind, value v14, min v14, max v14, name string, then for kind 0 (max−min+1) value-name strings, for kind 1 a unit string; then (1.0.5) tab, tab-name string. An index past the list: index, 127 (no more bytes) |
+| 73 MENU_SET | id, value v14 | rc, id, value v14: the device's value after the write (clamped to min..max) |
+
+- **index** is the position in the device's menu order (show them in this order); **id** names the setting and
+  never changes its meaning: a new setting takes a new id (append-only), wherever it shows in the menu. Ids are
+  0..126; 127 means "no item". Remember settings by id, not by index.
+- **kind**: 0 an enum (the value is an index into the names, min..max), 1 a number (min..max, its unit after the
+  name; no setting uses it yet). An editor shows a kind it does not know read-only, or not at all.
+- Values are v14 like the rest of the protocol, so a setting may later go past 127; today every value is 0..9.
+- **rc** as `UI_SET`: 0 applied and saved, 3 applied in RAM only (no flash or a failed write; retried by the
+  settings path), 4 applied and saved after STOP; 1 an unknown id (the request's id and value are echoed,
+  nothing changes). A value out of range is not refused: it is clamped and the reply says which value the device
+  took. A wrong argument length gets no reply.
+- A MENU_SET is applied exactly as the menu's KNOB 1 / OCT+ applies it (`src/menu_items.c` `menu_put`, shared by
+  both), and saved through the same settings record (`settings_save`; unchanged values write nothing). If the
+  device shows the MENU page, it redraws with the new value. There is no push: an editor that wants to follow
+  changes made on the device reads MENU_DESC again (for instance when its settings page opens).
+- CALIBRATION and ABOUT have no value and are not offered. COLOR (id 0) is the same setting as `UI_SET` id 0.
+- **tab** (1.0.5): the MENU shows its settings in tabs (ALGORITHM steps between them on the device). After the
+  names (kind 0) or the unit (kind 1) the reply carries the item's tab: its index (0.., the device's tab order,
+  left to right) and its name (≤ 12 characters). An editor that wants the device's grouping shows the items by tab,
+  in tab-index order, each tab's items in index order; the tab names come from the device, as the item names do.
+  Firmware 1.0.4 ends the reply after the names: no tab (show the items as one list). An editor written for 1.0.4
+  reads exactly the names and ignores what follows, so the tab changes nothing for it. Tab indexes are not ids: an
+  item may move to another tab in a later firmware, and tabs may be added (appended); remember settings by id.
+  A tab may hold items with no value that are not offered (this firmware: SYSTEM also holds CALIBRATION and ABOUT).
+  For a kind it does not know, an editor cannot find the tab (it does not know that kind's bytes).
+
+This firmware (count 12; tabs 0 DISPLAY, 1 CONTROL, 2 AUDIO, 3 SYSTEM):
+
+| index | id | name | kind | values (min 0) | default | tab |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 | 0 | COLOR | 0 | 0..9: GREY GREEN AMBER ICE VIOLET ROSE PAPER HI-CON NIGHT MONO (the order of `UI_PALETTES`) | GREY | 0 DISPLAY |
+| 1 | 1 | STYLE | 0 | 0 FLAT, 1 LINE | FLAT | 0 DISPLAY |
+| 2 | 2 | LARGE | 0 | 0 OFF, 1 ON | OFF | 0 DISPLAY |
+| 3 | 3 | ANIM | 0 | 0 ON, 1 OFF | ON | 0 DISPLAY |
+| 4 | 4 | LEDS | 0 | 0 OFF, 1 DIM LO, 2 DIM HI, 3 INV (darkest first, as the menu steps them) | DIM HI | 0 DISPLAY |
+| 5 | 5 | HOLD | 0 | 0 "0.3 s", 1 "0.4 s", 2 "0.5 s", 3 "0.6 s" | 0.4 s | 1 CONTROL |
+| 6 | 6 | KNOB ACCEL | 0 | 0 OFF, 1 ON | OFF | 1 CONTROL |
+| 7 | 7 | FX LATCH | 0 | 0 OFF, 1 ON | OFF | 1 CONTROL |
+| 8 | 8 | BPM LOCK | 0 | 0 OFF, 1 ON | OFF | 1 CONTROL |
+| 9 | 9 | SPEAKER EQ | 0 | 0 FLAT, 1 LOWCUT, 2 BASS+ | FLAT | 2 AUDIO |
+| 10 | 10 | USB LEVEL | 0 | 0 MASTER, 1 FIXED | MASTER | 2 AUDIO |
+| 11 | 11 | USB SERIAL | 0 | 0 ON, 1 OFF | ON | 3 SYSTEM |
+
+Example (bytes in hex): `F0 7D 46 4C 48 04 F7` asks for index 4; the reply
+`F0 7D 46 4C 48 04 04 00 02 40 00 40 03 40 4C 45 44 53 00 4F 46 46 00 44 49 4D 20 4C 4F 00 44 49 4D 20 48 49 00 49 4E 56 00 00 44 49 53 50 4C 41 59 00 F7`
+is index 4, id 4, kind 0, value 2 (`02 40`), min 0 (`00 40`), max 3 (`03 40`), "LEDS", then "OFF" "DIM LO"
+"DIM HI" "INV", then tab 0 "DISPLAY" (1.0.4 firmware: the same reply without `00 44 49 53 50 4C 41 59 00`). `F0 7D 46 4C 49 04 03 40 F7` sets LEDS to INV and answers `F0 7D 46 4C 49 00 04 03 40 F7` (rc 0).
+`F0 7D 46 4C 49 00 32 40 F7` (COLOR 50) answers `F0 7D 46 4C 49 00 00 09 40 F7` (clamped to 9, MONO).
+`F0 7D 46 4C 48 0C F7` answers `F0 7D 46 4C 48 0C 7F F7` (no index 12).
+
+**USB SERIAL (id 11).** The menu applies it when it closes; a MENU_SET applies it about 200 ms after its reply
+(`usb_serial_apply`), so the reply leaves first (if the device shows the MENU at that moment: when it closes).
+A change (ON <-> OFF; setting the value it already has does nothing) re-enumerates the whole device: it drops off
+the bus (its D+ pull-up off) and comes back with the other descriptors, so USB-MIDI, USB audio and the serial
+console all go away and come back. On the device the gap is about 25 ms plus one main-loop pass (`usb_retry`,
+`usb_start`), or up to 1 s when it re-enumerated in the second before; the host then debounces the attach
+(>= 100 ms), resets and enumerates the device. Measured on macOS (CoreMIDI): OFF -> ON, the reply at ~0.04 s, the
+device gone at ~0.3 s, the MIDI port gone at ~0.57 s and back at ~1.15 s; ON -> OFF, the serial port goes
+at ~0.6 s while the MIDI port was not seen to disappear at all (so do not wait for a disconnect event: after
+a real change, wait ~1.5 s and open again). What the editor sends in that window is lost, `WATCH` ends with the
+bus reset (send `INFO` and `WATCH` again after reconnecting), and a backup in progress answers rc 5 (stale).
