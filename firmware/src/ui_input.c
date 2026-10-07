@@ -1238,35 +1238,3 @@ timeout:
     ui.force = 1;
     ui_message("SETUP CANCELLED");
 }
-
-/* GHOULBOX: the boot intro (main.c). The power-on scene plays from the top under the splash for INTRO_MS (two bars at
- * 72 BPM, 1/8 steps); a button, note key or knob turn stops it at once and is consumed (the UI never sees it: its
- * edges are drained, a held button waits for its release). intro_tick: 1 while the intro owns screen and input. */
-#define INTRO_MS 3400u
-static uint8_t intro_on;                        /* 0 off, 1 playing, 2 stopped by an input, waiting for its release */
-static uint32_t intro_t0;
-static void intro_start(uint32_t now)
-{
-    intro_on = 1;
-    intro_t0 = now;
-    transport_req = 1;
-}
-static int intro_tick(uint32_t now, uint32_t held)
-{
-    uint32_t e, input;
-    if (!intro_on)
-        return 0;
-    input = held | fm1_input_edges(0) | fm1_input_note_edges();
-    for (e = 0; e < 7u; e++)
-        input |= fm1_enc_take(e) != 0;
-    if (intro_on == 1u && (input || now - intro_t0 >= INTRO_MS)) {
-        transport_req = 2;                      /* (the HALL tail rings on under the UI) */
-        intro_on = 2;
-    }
-    if (held || (intro_on == 1u && now - intro_t0 < INTRO_MS))
-        return 1;
-    intro_on = 0;
-    lcd_fill(0, 0, 240, 240, T_BG);             /* the splash goes */
-    ui.force = 1;
-    return 0;
-}

@@ -8,8 +8,7 @@ medieval and fantasy synth music, from Old Tower and Hole Dweller to Mortiis-era
 Felucca's sequencer, song mode, effects, editor and backups all work as they do there; GHOULBOX adds:
 
 - **A dungeon at power-on.** The FM-1 starts in D minor at 72 BPM: a hurdy-gurdy melody, a crypt pad,
-  chanting monks and a drone, a few seconds of it under the skull splash (any key skips it), then ready
-  to play: press PLAY.
+  chanting monks and a drone, loaded and ready to play: press PLAY.
 - **HALL reverb**: a third REVERB TYPE beside ROOM and SPRING, 1.5 s stone chamber to 12 s cathedral, on at
   power-on; it borrows the delay's buffer, so it needs no extra RAM.
 - **TAPE and CRSH** (FX > TAPE): the mix through a worn cassette (wow, flutter, saturation, hiss) and a

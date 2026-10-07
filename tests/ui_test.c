@@ -6032,39 +6032,6 @@ static int test_head_centres(void)
     return bad;
 }
 
-/* GHOULBOX: the boot intro (main.c): the scene from the top under the splash, stopped after INTRO_MS or at the first
- * press / note / turn (that input not handed on), then the screen cleared for the UI */
-static int test_boot_intro(void)
-{
-    int bad = 0, ok;
-    ui_power_on();
-    transport_req = 0; song.playing = 0; ui.force = 0;
-    intro_start(1000u);
-    ok = intro_on && transport_req == 1u && intro_tick(1000u + INTRO_MS - 1u, 0) && transport_req == 1u && !ui.force;
-    song.playing = 1; transport_req = 0;
-    ok &= !intro_tick(1000u + INTRO_MS, 0) && transport_req == 2u && !intro_on && ui.force;
-    bad += check("boot intro: plays from the top, stops after INTRO_MS, the UI takes over", ok && INTRO_MS >= 2000u && INTRO_MS <= 5000u);
-
-    song.playing = 1; transport_req = 0; ui.force = 0;
-    intro_start(0);
-    song.playing = 1; transport_req = 0;
-    host_pressed = 1u << panel.btn[B_PLAY];
-    ok = intro_tick(500u, 1u << panel.btn[B_PLAY]) && transport_req == 2u && intro_on;   /* held: stopped, waiting */
-    ok &= intro_tick(600u, 1u << panel.btn[B_PLAY]) && !ui.force;
-    ok &= !intro_tick(700u, 0) && !intro_on && ui.force && host_pressed == 0;            /* released: the edge drained */
-    bad += check("boot intro: a button stops it at once; the UI waits for its release and never sees the press", ok);
-
-    intro_start(0);
-    host_enc[3] = 2; host_notes = 1;
-    ok = !intro_tick(100u, 0) && !host_enc[3] && !host_notes && !intro_on && transport_req == 2u;
-    bad += check("boot intro: a knob turn or a note key skips it too (consumed)", ok);
-    host_pressed = 4u; host_notes = 2u; host_enc[1] = 1;
-    ok = !intro_tick(5000u, 4u) && host_pressed == 4u && host_notes == 2u && host_enc[1] == 1;
-    host_pressed = host_notes = 0; host_enc[1] = 0;
-    bad += check("boot intro: once over, it takes no input from the UI", ok);
-    return bad;
-}
-
 /* GHOULBOX: the presets the owner retired (engines.c GB_HIDDEN, by name) and the engines left without any (SAMPLE,
  * DRUM, SLICE): not browsed, not picked, but every stored number still loads its sound */
 static int test_hidden_presets(void)
@@ -6175,7 +6142,6 @@ int main(void)
     int bad = 0;
     bad += test_large_face();
     bad += test_sound_loads();
-    bad += test_boot_intro();
     bad += test_hidden_presets();
     bad += test_sample_values();
     bad += test_patterns();
