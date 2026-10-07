@@ -358,7 +358,7 @@ async function editorFm4() {
   let d0 = E.parse[C.DUMP](await rq(E.req.dump()), info);
   await rq(E.req.set(1, 20, 1));
   let d = E.parse[C.DUMP](await rq(E.req.dump()), info);
-  const owned = (p) => p.map((v, i) => (i === info.pe0 + 7 ? 8 : v));   /* (1.0.3: the converted patch is the track's own: SLOT OWN) */
+  const owned = (p) => p.map((v, i) => (i === info.pe0 + 7 ? E.FM6.FACTORY_PK.length : v));   /* (1.0.3: the converted patch is the track's own: SLOT OWN) */
   let want = E.FM4.convert(digital(0, d0.p), info.pe0);
   ok(d.engine === 12 && d.preset === 0 && eq(d.p, owned(want.p)) && eq(await fm6Of(), E.FM6.pack(want.voice)),
     "DIGITAL retired: SET G_ENGSEL 1 -> FM6 with E.PIANO converted (its own patch, SLOT OWN, preset TINE EP)");
@@ -921,8 +921,9 @@ async function editorFm6() {
   ok(bank.length === 4104 && bank[0] === 0xF0 && bank[3] === 9 && bank[4103] === 0xF7 && one.length === 163 && one[5] === 0x1B,
     "FM6: a 32-voice bank SysEx is 4104 bytes, a single voice 163");
   let r = F6.parseSysex(bank);
-  ok(r.voices.length === 32 && !r.badSum && r.voices.slice(0, 8).every((x, k) => eq(F6.pack(x.v), F6.FACTORY_PK[k])) &&
-     r.voices[8].name === "INIT VOICE" && r.voices[1].name === "GLASS BELL", "FM6: bank SysEx round trip (names, checksum)");
+  const NF = F6.FACTORY_PK.length;               /* (15 on GHOULBOX: Felucca's 8, then F9..F15) */
+  ok(r.voices.length === 32 && !r.badSum && r.voices.slice(0, NF).every((x, k) => eq(F6.pack(x.v), F6.FACTORY_PK[k])) &&
+     r.voices[NF].name === "INIT VOICE" && r.voices[1].name === "GLASS BELL", "FM6: bank SysEx round trip (names, checksum)");
   r = F6.parseSysex(Uint8Array.from([...one, ...one]));
   ok(r.voices.length === 2 && eq(F6.pack(r.voices[1].v), F6.FACTORY_PK[3]), "FM6: two single-voice messages in one file");
   const bad = Uint8Array.from(one); bad[161] ^= 1;
@@ -938,9 +939,9 @@ async function editorFm6() {
   [...m.access.inputs.values()][0].onmidimessage = (e) => link.receive(e.data);
   const rq = (x) => link.request(x), C = E.CMD;
   const info = E.parse[C.INFO](await rq(E.req.info()));
-  ok(info.fm6 && info.fm6.factory === 8 && info.fm6.bank === 0 && info.fm6.caps === 3, "FM6: INFO tag (8 factory, no bank; FM6 v2 caps 3)");
+  ok(info.fm6 && info.fm6.factory === 15 && info.fm6.bank === 0 && info.fm6.caps === 3, "FM6: INFO tag (15 factory, no bank; FM6 v2 caps 3)");
   let list = E.parse[C.FM6_LIST](await rq(E.req.fm6List()));
-  ok(list.factory === 8 && list.bank === 0 && list.slots.length === 8 && list.slots[0].name === "TINE EP", "FM6: LIST names the factory patches, nbank 0");
+  ok(list.factory === 15 && list.bank === 0 && list.slots.length === 15 && list.slots[0].name === "TINE EP" && list.slots[8].name === "FR HORN", "FM6: LIST names the factory patches, nbank 0");
   const mine = F6.setName(F6.factory(2), "my bass");
   let p = E.parse[C.FM6_PUT](await rq(E.req.fm6Put(1, 4, F6.pack(mine))));
   let g = E.parse[C.FM6_GET](await rq(E.req.fm6Get(1, 4)));
@@ -952,11 +953,11 @@ async function editorFm6() {
   p = E.parse[C.FM6_PUT](await rq(E.req.fm6Put(0, 0, F6.pack(mine))));
   g = E.parse[C.FM6_GET](await rq(E.req.fm6Get(0, 0)));
   let sv = E.parse[C.GET](await rq(E.req.get(0, slotId))).value;
-  ok(!p.rc && F6.name(F6.unpack(g.packed)) === "MY BASS" && sv === 8, `FM6: send to the track: its own patch, SLOT (P_E0 + 7 = ${slotId}) OWN`);
+  ok(!p.rc && F6.name(F6.unpack(g.packed)) === "MY BASS" && sv === 15, `FM6: send to the track: its own patch, SLOT (P_E0 + 7 = ${slotId}) OWN`);
   await rq(E.req.set(0, slotId, 1));
   g = E.parse[C.FM6_GET](await rq(E.req.fm6Get(0, 0)));
   ok(eq(g.packed, F6.FACTORY_PK[1]), "FM6: SLOT F2 loads the factory patch");
-  await rq(E.req.set(0, slotId, 8));
+  await rq(E.req.set(0, slotId, 15));
   g = E.parse[C.FM6_GET](await rq(E.req.fm6Get(0, 0)));
   ok(F6.name(F6.unpack(g.packed)) === "MY BASS", "FM6: SLOT back to OWN brings the own patch back");
   const edited = F6.unpack(g.packed); edited[F6.VI.ALG] = 31;
@@ -971,7 +972,7 @@ async function editorFm6() {
   await rq(E.req.upLoad(20));
   g = E.parse[C.FM6_GET](await rq(E.req.fm6Get(0, 0)));
   sv = E.parse[C.GET](await rq(E.req.get(0, slotId))).value;
-  ok(eq(g.packed, F6.pack(edited)) && sv === 8, "FM6: UP_LOAD plays it again, SLOT OWN");
+  ok(eq(g.packed, F6.pack(edited)) && sv === 15, "FM6: UP_LOAD plays it again, SLOT OWN");
   const u = await E.bank.get(rq, info, 20);
   ok(u.used && eq(u.fm6, F6.pack(edited)), "FM6: the librarian reads a user preset with its patch");
   const other = F6.pack(F6.setName(F6.factory(5), "OTHER"));
@@ -1000,8 +1001,9 @@ async function editorFm6() {
 function fm6Tolerant(F6, voices, bank, one) {
   const U = (...xs) => Uint8Array.from(xs.flatMap((x) => Array.from(x)));
   const names = (r) => r.voices.map((x) => x.name);
-  const bankOk = (r, n = 32) => r.voices.length === n && r.voices.slice(0, 8).every((x, k) => eq(F6.pack(x.v), F6.FACTORY_PK[k]))
-    && r.voices[1].name === "GLASS BELL" && r.voices[8].name === "INIT VOICE";
+  const NF = F6.FACTORY_PK.length;
+  const bankOk = (r, n = 32) => r.voices.length === n && r.voices.slice(0, NF).every((x, k) => eq(F6.pack(x.v), F6.FACTORY_PK[k]))
+    && r.voices[1].name === "GLASS BELL" && r.voices[NF].name === "INIT VOICE";
   const msg = (hdr, n, fill = 0) => { const d = new Array(n).fill(fill); return U(hdr, d, [F6.checksum(d), 0xF7]); };
   const otherMaker = U([0xF0, 0x41, 0x10, 0x42, 0x12, 0x40, 0, 0x7F, 0, 0x41, 0xF7]);
   let r = F6.parseSysex(U(bank.subarray(0, 4102), [0xF7]));

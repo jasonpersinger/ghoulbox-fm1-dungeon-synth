@@ -160,7 +160,8 @@ static uint32_t upf_migrate(const fm6_bank_t *b)
         int32_t s;
         if (!upf_fm6(k) || !upf_get(k, pk))
             continue;
-        s = up_value(r, r->np - 1u) - (int32_t)FM6_NFACTORY;   /* SLOT (P_E7): the record's last value */
+        s = up_value(r, r->np - 1u) - (int32_t)FM6_NFACTORY_V1;   /* SLOT (P_E7): the record's last value, B n as
+                                                                   * 1.0.2 stored it (8 + n) */
         if (s >= 0 && s < (int32_t)FM6_BANK_N && ((b->used >> s) & 1u)) {
             upf_set(k, b->v[s]);
             moved++;
@@ -187,7 +188,8 @@ static void upf_boot(void)                       /* up_boot, after the user pres
 }
 
 /* up_load: track t (its values just loaded from slot k) gets the record's patch; without one, as before 1.0.3:
- * SLOT F n that factory patch, OWN the init voice. SLOT then shows F n or OWN (fm6_adopt) */
+ * SLOT F n that factory patch, OWN the init voice. SLOT then shows F n or OWN (fm6_adopt). (A record without a patch
+ * was stored before 1.0.3: its SLOT counts Felucca's 8 factory patches, FM6_NFACTORY_V1) */
 static void upf_track_load(track_t *t, uint32_t k)
 {
     uint8_t pk[FM6_PACKED], v[FP_SIZE + 1u];
@@ -196,7 +198,7 @@ static void upf_track_load(track_t *t, uint32_t k)
         return;
     if (upf_get(k, pk)) {
         int32_t s = t->p[P_E7];
-        memcpy(pk, s >= 0 && s < (int32_t)FM6_NFACTORY ? FM6_FACTORY[s] : FM6_INIT, FM6_PACKED);
+        memcpy(pk, s >= 0 && s < (int32_t)FM6_NFACTORY_V1 ? FM6_FACTORY[s] : FM6_INIT, FM6_PACKED);
     }
     fm6_unpack(pk, v);
     fm6_set_patch(tr, v);

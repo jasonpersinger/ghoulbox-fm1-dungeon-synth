@@ -118,6 +118,64 @@ PATCHES = [
         op(ol=0),
         op(ol=0)],
         fb=0, lpms=0)),
+    # GHOULBOX: the dungeon patches F9..F15 (appended: F1..F8 keep their numbers; OWN moves to 15, see
+    # FM6_NFACTORY_V1 in eng_fm6.c). Dark and slow, for the HALL: rates 99 fastest, levels 99 loudest
+    ("FRENCH HORN", voice("FR HORN", 5, [          # three pairs, modulators low (round, not brassy), swelling in
+        op(r=(48, 40, 35, 52), l=(99, 92, 88, 0), ol=97, kvs=2),
+        op(r=(40, 35, 30, 50), l=(92, 80, 72, 0), ol=66, kvs=4),
+        op(r=(46, 40, 35, 52), l=(99, 90, 86, 0), ol=88, det=9, kvs=2),
+        op(r=(38, 35, 30, 50), l=(90, 78, 70, 0), ol=60, kvs=4),
+        op(r=(44, 40, 35, 52), l=(99, 90, 86, 0), ol=78, fc=0, det=5, kvs=1),
+        op(r=(36, 35, 30, 50), l=(88, 75, 68, 0), ol=58, fc=1, kvs=3)],
+        fb=3, pr=(72, 60, 99, 55), pl=(46, 50, 50, 50), lfs=32, lfd=70, lpmd=5, lfw=4, lpms=3)),
+    ("HARPSICHORD", voice("VIRGINAL", 5, [         # a plucked jack: no velocity, a buzzing 4' choir an octave up
+        op(r=(99, 32, 24, 72), l=(99, 70, 0, 0), ol=98, rs=3),
+        op(r=(99, 55, 30, 72), l=(99, 45, 0, 0), ol=78, fc=3, rs=3),
+        op(r=(99, 34, 26, 72), l=(99, 66, 0, 0), ol=82, fc=2, det=9, rs=3),
+        op(r=(99, 60, 35, 72), l=(99, 40, 0, 0), ol=74, fc=5, rs=3),
+        op(r=(99, 40, 28, 72), l=(99, 55, 0, 0), ol=70, det=5, rs=3),
+        op(r=(99, 70, 40, 72), l=(99, 30, 0, 0), ol=80, fc=4, rs=3)],
+        fb=6, lpms=0)),
+    ("GLASS CHOIR", voice("GLASSCHOIR", 22, [      # alg 22: 1<-2, and 6 under 3, 4, 5: a vowel body, a glass top
+        op(r=(30, 30, 40, 38), l=(99, 92, 90, 0), ol=72, fc=4, ff=2),
+        op(r=(30, 30, 40, 38), l=(90, 85, 80, 0), ol=48, fc=1),
+        op(r=(34, 30, 40, 36), l=(99, 95, 92, 0), ol=94, det=6),
+        op(r=(32, 30, 40, 36), l=(99, 95, 92, 0), ol=86, fc=2, det=9),
+        op(r=(30, 30, 40, 36), l=(99, 95, 92, 0), ol=76, fc=3, det=7),
+        op(r=(28, 30, 40, 36), l=(92, 88, 85, 0), ol=62, fc=1)],
+        fb=4, lfs=28, lfd=55, lpmd=6, lamd=4, lfw=4, lpms=3)),
+    ("DARK STRINGS", voice("DARK STRGS", 5, [      # a low section: an octave down under the unison, a bow's rasp
+        op(r=(42, 30, 40, 44), l=(99, 94, 92, 0), ol=94, det=5),
+        op(r=(36, 30, 40, 44), l=(88, 85, 80, 0), ol=64, kvs=2),
+        op(r=(42, 30, 40, 44), l=(99, 94, 92, 0), ol=92, det=10),
+        op(r=(36, 30, 40, 44), l=(88, 85, 80, 0), ol=62, kvs=2),
+        op(r=(40, 30, 40, 44), l=(99, 94, 92, 0), ol=88, fc=0, det=7),
+        op(r=(34, 30, 40, 44), l=(85, 82, 78, 0), ol=66, fc=1)],
+        fb=5, lfs=30, lfd=65, lpmd=5, lfw=4, lpms=2)),
+    ("LOFI FLUTE", voice("LOFI FLUTE", 5, [        # a soft tone, a faint octave, a breath (feedback noise) and chiff
+        op(r=(70, 40, 40, 55), l=(99, 92, 90, 0), ol=98, det=8, kvs=2),
+        op(r=(70, 40, 40, 55), l=(80, 70, 66, 0), ol=52),
+        op(r=(66, 40, 40, 55), l=(99, 90, 88, 0), ol=62, fc=2, det=6),
+        op(r=(66, 40, 40, 55), l=(70, 60, 55, 0), ol=40),
+        op(r=(90, 60, 40, 60), l=(99, 55, 45, 0), ol=64),
+        op(r=(90, 65, 40, 60), l=(99, 60, 50, 0), ol=84, fc=7)],
+        fb=7, lfs=36, lfd=40, lpmd=4, lfw=4, lpms=3)),
+    ("CRYPT ORGAN", voice("PIPE ORGAN", 32, [      # six pipes, 16' to 2', the top one reedy (feedback)
+        op(r=(80, 99, 99, 60), l=(99, 99, 99, 0), ol=86, fc=0),
+        op(r=(80, 99, 99, 60), l=(99, 99, 99, 0), ol=92),
+        op(r=(80, 99, 99, 60), l=(99, 99, 99, 0), ol=84, fc=2, det=8),
+        op(r=(80, 99, 99, 60), l=(99, 99, 99, 0), ol=74, fc=3),
+        op(r=(80, 99, 99, 60), l=(99, 99, 99, 0), ol=72, fc=4, det=6),
+        op(r=(78, 99, 99, 60), l=(99, 99, 99, 0), ol=70, fc=1)],
+        fb=6, lfs=50, lpmd=2, lfw=4, lpms=2)),
+    ("TUBA", voice("TUBA", 1, [                    # alg 1: 1<-2 the tone, 3<-4<-5<-6 a soft growl under it
+        op(r=(50, 40, 35, 55), l=(99, 92, 90, 0), ol=99, kvs=2),
+        op(r=(42, 38, 30, 52), l=(90, 78, 72, 0), ol=68, kvs=4),
+        op(r=(48, 40, 35, 55), l=(99, 90, 88, 0), ol=80, fc=0, det=8, kvs=1),
+        op(r=(40, 38, 30, 52), l=(88, 76, 70, 0), ol=58, fc=1),
+        op(r=(40, 38, 30, 52), l=(85, 75, 68, 0), ol=48, fc=1),
+        op(r=(40, 38, 30, 52), l=(80, 70, 64, 0), ol=40, fc=1)],
+        fb=4, pr=(70, 60, 99, 55), pl=(47, 50, 50, 50), lfs=30, lfd=75, lpmd=3, lfw=4, lpms=2)),
 ]
 
 

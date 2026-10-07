@@ -435,7 +435,10 @@ static void macros(void)
         trk[0].p[P_E7] = FM6_OWN;
         fm6_poll();
         check("SLOT back to OWN: the own patch again", fm6_slot[0] == FM6_OWN && !memcmp(fm6_patch[0], own, FP_SIZE));
-        check("SLOT: F1..F8 and OWN, nothing past it", ENG_FM6.edit[7].max == FM6_OWN && FM6_OWN == FM6_NFACTORY &&
+        check("SLOT (GHOULBOX): F1..F15, the dungeon patches F9.. after Felucca's 8 (V1), stored values written before keep "
+              "their meaning", FM6_NFACTORY == 15u && FM6_NFACTORY_V1 == 8u && !memcmp(FM6_FACTORY[8] + 118, "FR HORN", 7) &&
+              !memcmp(FM6_FACTORY[7] + 118, "NYLON PICK", 10) && !memcmp(FM6_FACTORY[14] + 118, "TUBA", 4));
+        check("SLOT: F1..F15 and OWN, nothing past it", ENG_FM6.edit[7].max == FM6_OWN && FM6_OWN == FM6_NFACTORY &&
               !strcmp(ENG_FM6.edit[7].names[FM6_OWN], "OWN") && !ENG_FM6.edit[7].names[FM6_OWN + 1]);
         trk[0].p[P_E7] = FM6_OWN;
         fm6_set_patch(0, own);
@@ -450,7 +453,7 @@ static void macros(void)
             fm6_set_patch(0, v);
             fm6_adopt(0);
             check("fm6_adopt: edited, it is the track's own (OWN)", trk[0].p[P_E7] == FM6_OWN && fm6_slot[0] == FM6_OWN);
-            trk[0].p[P_E7] = FM6_NFACTORY + 3;       /* (a stored B4 of 1.0.2) */
+            trk[0].p[P_E7] = FM6_NFACTORY_V1 + 3;    /* (a stored B4 of 1.0.2) */
             fm6_unpack(FM6_FACTORY[6], v);
             fm6_set_patch(0, v);
             fm6_adopt(0);

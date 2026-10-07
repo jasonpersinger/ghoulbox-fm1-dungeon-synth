@@ -34,7 +34,8 @@
 
 #define ENGI_FM6 12u             /* engines.c ENGINES[] (append-only) */
 #define FM6_POLY 6               /* engine_t.poly */
-#define FM6_OWN FM6_NFACTORY     /* SLOT: the track's own patch (F1..F8 before it) */
+#define FM6_OWN FM6_NFACTORY     /* SLOT: the track's own patch (F1..F15 before it) */
+#define FM6_NFACTORY_V1 8u      /* Felucca's factory count: a SLOT stored before GHOULBOX 0.6 (B n = 8 + n, 8 OWN) */
 #define FM6_PACKED 128u
 
 static uint8_t fm6_patch[NTRK][FP_SIZE + 1u];   /* the tracks' patches (main loop writes, then fm6_pgen) */
@@ -368,7 +369,8 @@ static void fm6_render(track_t *t, voice_t *v, int32_t *out, uint32_t len, const
 static const char *const N_FM6_ALG[] = {"PAT", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13",
                                         "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25",
                                         "26", "27", "28", "29", "30", "31", "32", 0};
-static const char *const N_FM6_PATCH[] = {"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "OWN", 0};
+static const char *const N_FM6_PATCH[] = {"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
+                                          "F13", "F14", "F15", "OWN", 0};   /* F9..F15: GHOULBOX */
 _Static_assert(NELEM(N_FM6_PATCH) == FM6_OWN + 2u, "a SLOT name per value");
 
 /* {ALG, FB, MLVL, MRAT, MEG, VMOD, DTUN, SLOT}: the factory patch F1..F8 as it is, DTUN on the pad */
@@ -381,6 +383,14 @@ static const preset_t FM6_PRESETS[] = {
     {"MARIMBA", {0, 0, 0, 0, 0, 0, 0, 5}, {0, 0, 127, 0}, 0, 0, FX(0, 0, 25, 40), PAT(3)},
     {"ORGAN", {0, 0, 0, 0, 0, 0, 0, 6}, {0, 0, 127, 0}, 0, 0, FX(10, 40, 0, 30), PAT(6)},
     {"PLUCK", {0, 0, 0, 0, 0, 0, 0, 7}, {0, 0, 127, 0}, 0, 0, FX(0, 20, 35, 30), PAT(13)},
+    /* GHOULBOX: F9..F15 (tools/gen_fm6_patches.py), the sends high for the HALL */
+    {"FRENCH HORN", {0, 0, 0, 0, 0, 0, 0, 8}, {0, 0, 127, 0}, 0, 0, FX(0, 15, 10, 95), PAT(15)},
+    {"VIRGINAL", {0, 0, 0, 0, 0, 0, 0, 9}, {0, 0, 127, 0}, 0, 0, FX(0, 0, 15, 75), PAT(3)},
+    {"GLASS CHOIR", {0, 0, 0, 0, 0, 0, 20, 10}, {0, 0, 127, 0}, 0, 0, FX(0, 40, 20, 115), PAT(14)},
+    {"DARK STRINGS", {0, 0, 0, 0, 0, 0, 25, 11}, {0, 0, 127, 0}, 0, 0, FX(0, 50, 10, 105), PAT(14)},
+    {"LOFI FLUTE", {0, 0, 0, 0, 0, 0, 15, 12}, {0, 0, 127, 0}, 0, 1, FX(0, 30, 25, 95), PAT(15)},
+    {"PIPE ORGAN", {0, 0, 0, 0, 0, 0, 0, 13}, {0, 0, 127, 0}, 0, 0, FX(0, 10, 0, 110), PAT(14)},
+    {"TUBA", {0, 0, 0, 0, 0, 0, 0, 14}, {0, 0, 127, 0}, 0, 1, FX(0, 0, 0, 70), PAT(8)},
 };
 
 static const engine_t ENG_FM6 = {

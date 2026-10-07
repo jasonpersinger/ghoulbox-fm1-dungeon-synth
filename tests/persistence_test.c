@@ -116,11 +116,11 @@ static void mig_setup(void)
     memset(nor, 0xFF, sizeof nor);
     memset(b, 0, sizeof b);
     for (uint32_t i = 0; i < 2u; i++) { b[i].magic = UP_BANK_MAGIC; b[i].rsize = sizeof(up_rec_t); b[i].nslot = UP_PER_BANK; }
-    mig_rec(&b[0], 0, ENGI_FM6, FM6_NFACTORY + 2, 'A');
+    mig_rec(&b[0], 0, ENGI_FM6, FM6_NFACTORY_V1 + 2, 'A');
     mig_rec(&b[0], 1, ENGI_FM6, 1, 'B');
-    mig_rec(&b[0], 2, ENGI_FM6, FM6_NFACTORY + 4, 'C');
-    mig_rec(&b[0], 3, ENGI_DRUM, FM6_NFACTORY + 2, 'D');
-    mig_rec(&b[1], 1, ENGI_FM6, FM6_NFACTORY + 0, 'E');
+    mig_rec(&b[0], 2, ENGI_FM6, FM6_NFACTORY_V1 + 4, 'C');
+    mig_rec(&b[0], 3, ENGI_DRUM, FM6_NFACTORY_V1 + 2, 'D');
+    mig_rec(&b[1], 1, ENGI_FM6, FM6_NFACTORY_V1 + 0, 'E');
     st_save(OBJ_UPRESET0, &b[0], sizeof b[0]);
     st_save(OBJ_UPRESET0 + 1, &b[1], sizeof b[1]);
     memset(&mig_bank, 0, sizeof mig_bank);

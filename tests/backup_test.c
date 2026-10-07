@@ -299,7 +299,7 @@ int main(void)
         static fm6_bank_t bk;
         static upf_t got;
         uint8_t pk[FM6_PACKED];
-        static const int16_t SL[5] = {FM6_NFACTORY + 2, 1, FM6_NFACTORY + 4, FM6_NFACTORY + 2, FM6_NFACTORY + 2};
+        static const int16_t SL[5] = {FM6_NFACTORY_V1 + 2, 1, FM6_NFACTORY_V1 + 4, FM6_NFACTORY_V1 + 2, FM6_NFACTORY_V1 + 2};
         memset(&ub, 0, sizeof ub);
         ub.magic = UP_BANK_MAGIC; ub.rsize = sizeof(up_rec_t); ub.nslot = UP_PER_BANK;
         for (uint32_t k = 0; k < 5u; k++) {             /* slots 1..5: B3, F2, B5 (empty), B3 on DRUM, B3 */

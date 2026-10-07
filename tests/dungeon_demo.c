@@ -209,6 +209,9 @@ int main(int argc, char **argv)
         {2, "GRIM BRASS", K_MELODY}, {11, "CAVE WIND", K_HOLD}, {11, "TORCH", K_HOLD},
         {ENGI_GURDY, "HURDY GURDY", K_MELODY}, {ENGI_GURDY, "DRONE WHEEL", K_MELODY}, {ENGI_GURDY, "DANCE GURDY", K_MELODY},
         {ENGI_GURDY, "TROMPETTE", K_MELODY}, {ENGI_GURDY, "VIELLE", K_MELODY},
+        {ENGI_FM6, "FRENCH HORN", K_MELODY}, {ENGI_FM6, "VIRGINAL", K_ARP}, {ENGI_FM6, "GLASS CHOIR", K_CHORDS},
+        {ENGI_FM6, "DARK STRINGS", K_CHORDS}, {ENGI_FM6, "LOFI FLUTE", K_MELODY}, {ENGI_FM6, "PIPE ORGAN", K_CHORDS},
+        {ENGI_FM6, "TUBA", K_BASS},
     };
     const char *dir = argc > 1 ? argv[1] : "build/dungeon_demo";
     char sub[512];
