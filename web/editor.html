@@ -2429,18 +2429,22 @@ function enumShown(d) {
 /* the order the device shows its engines in (src/engines.c ENGINE_ORDER): the lists here follow it, the protocol keeps
    the engine numbers. engineOrder(names): the indices of names in that order, "-" (a reserved number) left out; a name
    the list does not know (another firmware) follows in index order */
-const ENGINE_ORDER = ["ANALOG", "FM6", "DIGITAL", "PHASE", "LOFI", "SAMPLE", "VOICE", "TRIO", "WHEEL", "GRAIN", "PHYS", "GURDY",
-  "NOISE", "SLICE", "DRUM"];
+const ENGINE_ORDER = ["ANALOG", "FM6", "DIGITAL", "PHASE", "LOFI", "VOICE", "TRIO", "WHEEL", "GRAIN", "PHYS", "GURDY", "NOISE"];
+/* GHOULBOX: the engines and factory presets the device no longer offers (src/engines.c ENGINE_ORDER, GB_HIDDEN; a
+   stored number still loads them): left out of the lists here too. test_web.mjs: == the firmware's */
+const ENGINE_HIDDEN = ["SAMPLE", "SLICE", "DRUM"];
+const PRESET_HIDDEN = { ANALOG: ["SAW LEAD", "SQR BASS", "ACID", "SINE KEY", "RAVE", "PLUCK", "BRASS"], PHASE: ["BRASS", "ORGAN", "RESO", "BELL", "WIRE"], LOFI: ["PULSE LD", "WAVE BASS", "ARP 8BIT", "WAVE LEAD", "STEP LEAD"], SAMPLE: ["PIANO", "FLUTE", "SAX"], VOICE: ["VOX LEAD", "WOW BASS", "WHISPER"], TRIO: ["FAT BASS", "ARP LEAD", "SYNC LEAD", "RING BELL"], WHEEL: ["JAZZ PERC", "GOSPEL", "ROCK DRIVE"], GRAIN: ["GLITCH", "SHIMMER"], PHYS: ["BELL TREE", "MARIMBA", "PLUCK", "BOWED METAL", "KALIMBA", "HAND DRUM", "TOMS", "DRONE STRING", "HARP"], DRUM: ["DRUM KIT"], NOISE: ["WIND", "RAIN", "ARCADE", "METAL"], FM6: ["TINE EP", "FM BASS", "BRASS", "MARIMBA", "ORGAN", "PLUCK"], SLICE: ["CHOP", "STUTTER"] };
 function engineOrder(names) {
   const rank = (n) => { const k = ENGINE_ORDER.indexOf(n); return k < 0 ? ENGINE_ORDER.length : k; };
-  return (names || []).map((n, i) => i).filter((i) => names[i] !== "-")
+  return (names || []).map((n, i) => i).filter((i) => names[i] !== "-" && !ENGINE_HIDDEN.includes(names[i]))
     .sort((a, b) => rank(names[a]) - rank(names[b]) || a - b);
 }
 
 function devicePresetRows(info, names, preferences) {
   if (!preferences || !(preferences.state.caps & 8)) return [];
   const rows = engineOrder(info.engines).filter((engine) => names[engine]).flatMap((engine) => names[engine]
-    .map((name, preset) => ({ engine, preset, name, user: false })).filter((row) => aliasOf(names[engine], row.preset) === row.preset));
+    .map((name, preset) => ({ engine, preset, name, user: false })).filter((row) => aliasOf(names[engine], row.preset) === row.preset &&
+      !(PRESET_HIDDEN[info.engines[engine]] || []).includes(row.name)));
   for (const slot of preferences.slots.slots) if (slot.used)
     rows.push({ engine: info.nengines, preset: slot.slot, name: slot.name, user: true });
   return rows.map((row) => ({ ...row, favorite: !!(preferences.favorites[row.engine] || [])[row.preset] }))

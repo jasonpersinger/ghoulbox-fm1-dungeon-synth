@@ -720,18 +720,48 @@ static uint32_t preset_orig(const engine_t *e, uint32_t k)
     return e->presets == SMP_PRESET_TABLE && k < SMP_NSETS ? SMP_SET_ORIG[k] : k;
 }
 
+/* browsing skips preset k of engine e: an alias, or one GHOULBOX retired (engines.c GB_HIDDEN, by name: a bit per
+ * preset, made once). It still loads when a stored number names it */
+static int preset_hidden(const engine_t *e, uint32_t k)
+{
+    static uint32_t hid[NENGINES];
+    static uint8_t made;
+    uint32_t i, j;
+    if (!made) {
+        for (i = 0; i < NELEM(GB_HIDDEN); i++) {
+            const engine_t *en = ENGINES[GB_HIDDEN[i].e % NENGINES];
+            for (j = 0; j < en->npresets && j < 32u; j++)
+                if (str_eq(en->presets[j].name, GB_HIDDEN[i].name))
+                    hid[GB_HIDDEN[i].e % NENGINES] |= 1u << j;
+        }
+        made = 1;
+    }
+    if (preset_orig(e, k) != k)
+        return 1;
+    for (i = 0; i < NENGINES && ENGINES[i] != e; i++)
+        ;
+    return i < NENGINES && k < 32u && ((hid[i] >> k) & 1u);
+}
+
 /* the presets of engine e that browsing shows before preset k (k = npresets: all of them) */
 static uint32_t preset_rank(const engine_t *e, uint32_t k)
 {
     uint32_t i, n = 0;
-    if (e->presets != SMP_PRESET_TABLE)
-        return k;
-    for (i = 0; i < k; i++)
-        n += preset_orig(e, i) == i;
+    for (i = 0; i < k && i < e->npresets; i++)
+        n += !preset_hidden(e, i);
     return n;
 }
 
-#define preset_shown(e) (ENGINES[e]->npresets - (ENGINES[e]->presets == SMP_PRESET_TABLE ? SMP_NALIAS : 0u))
+#define preset_shown(e) preset_rank(ENGINES[e], ENGINES[e]->npresets)
+
+/* the first preset browsing shows (an engine picked: its sound); 0 when it shows none (DRUM: its kit) */
+static uint32_t preset_first(const engine_t *e)
+{
+    uint32_t k;
+    for (k = 0; k < e->npresets && preset_hidden(e, k); k++)
+        ;
+    return k < e->npresets ? k : 0u;
+}
 
 #if !FELUCCA_FM4
 /* DIGITAL (engine 1, retired): t's sound = p, values as DIGITAL has them, converted to FM6 with a patch of its own
@@ -840,7 +870,7 @@ static void set_engine_of(track_t *t, uint32_t ei)
     t->eng_req = (uint8_t)(ei % NENGINES);
     for (i = 0; i < 8u; i++)
         t->p[P_E0 + i] = e->edit[i].def;
-    apply_preset_to(t, 0);
+    apply_preset_to(t, preset_first(e));             /* GHOULBOX: its first preset browsing shows */
     fm1_irq_on();
     load_end(t);
 }
@@ -892,7 +922,7 @@ static uint32_t preset_all_at(uint32_t n, uint32_t *k)
         return NENGINES;
     }
     e = eng_vis(r);
-    for (i = 0; preset_orig(ENGINES[e], i) != i || n--; i++)    /* the n-th shown preset */
+    for (i = 0; preset_hidden(ENGINES[e], i) || n--; i++)       /* the n-th shown preset */
         ;
     *k = i;
     return e;
@@ -1008,10 +1038,27 @@ static void eng_list_step(int32_t direction)         /* the next / previous soun
     preset_hinted();
 }
 
+/* GHOULBOX: the selected track's sound is not in the PRESETS list (a retired preset or engine a project holds): its
+ * place there (preset_all_pos) is the kept sound after it */
+static int preset_cur_hidden(void)
+{
+    const engine_t *en = ENGINES[TSEL->eng_req % NENGINES];
+    uint32_t r;
+    if (user_of(TSEL) < UP_SLOTS)
+        return 0;
+    for (r = 0; r < NENG_SHOWN && eng_vis(r) != TSEL->eng_req; r++)
+        ;
+    return r == NENG_SHOWN || preset_hidden(en, TSEL->preset % (en->npresets ? en->npresets : 1u));
+}
+
 static void preset_step(int32_t direction)
 {
     uint32_t total, cur = preset_pos(&total);
     if (!total) { ui_message("NO FAVORITES"); return; }
+    if (!favorites.filter && preset_cur_hidden()) {       /* the kept sound after it, or the one before that */
+        preset_go(direction > 0 ? cur % total : (cur + total - 1u) % total);
+        return;
+    }
     preset_go(cur >= total ? (direction > 0 ? 0 : total - 1) :
               (cur + (direction > 0 ? 1u : total - 1u)) % total);
 }

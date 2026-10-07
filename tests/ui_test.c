@@ -315,19 +315,21 @@ static int test_sound_loads(void)
     t->p[P_LEVEL] = 90;
     before = *t;
     turn(EN_PRESET, 1);                           /* HOME: the next preset */
-    bad += check("PRESETS on HOME loads the sound: steps, LEN, DIV untouched", t->preset == (uint8_t)((before.preset + 1u) % ENGINES[0]->npresets) &&
+    for (i = before.preset + 1u; preset_hidden(ENGINES[0], i % ENGINES[0]->npresets); i++)   /* (GHOULBOX: the next kept) */
+        ;
+    bad += check("PRESETS on HOME loads the sound: steps, LEN, DIV untouched", t->preset == (uint8_t)(i % ENGINES[0]->npresets) &&
                  !memcmp(t->step, before.step, sizeof t->step) && t->p[P_SLEN] == 32 && t->p[P_SDIV] == 1);
     bad += check("..ARP, SCL, the SLICER and the mix stay the track's", t->p[P_AMODE] == 2 && t->p[P_AOCT] == 3 && t->p[P_SCALE] == 2 &&
                  t->p[P_TRANS] == 5 && t->p[P_SLCR] == SL_GATE && t->p[P_SLPAT] == 4 && t->p[P_LEVEL] == 90);
     bad += check("..and no warning about the sequence", !msg_is("T1 SEQ REPLACED"));
     for (i = 0; i < ENGINES[0]->npresets; i++)
-        if (str_eq(ENGINES[0]->presets[i].name, "RAVE"))
+        if (str_eq(ENGINES[0]->presets[i].name, "CRYPT PAD"))   /* (GHOULBOX: RAVE, the ARP preset, is retired) */
             break;
     t->p[P_AMODE] = 0;
     t->preset = (uint8_t)(i - 1u);
     turn(EN_PRESET, 1);
-    bad += check("RAVE (an ARP preset) leaves the arp off; it suggests pattern 13 ARP", t->preset == i && t->p[P_AMODE] == 0 &&
-                 preset_pat_hint() == 12 && ui.ppick == 12 && str_eq(PATTERNS[12].name, "ARP"));
+    bad += check("CRYPT PAD leaves the arp off; it suggests pattern 5 PAD", t->preset == i && t->p[P_AMODE] == 0 &&
+                 preset_pat_hint() == 4 && ui.ppick == 4 && str_eq(PATTERNS[4].name, "PAD"));
     t->p[P_AMODE] = 2;
     before = *t;
     for (i = t->preset; i < ENGINES[0]->npresets; i++)   /* several loads, into the next engine */
@@ -398,7 +400,7 @@ static int test_sound_loads(void)
         apply_preset_to(TSEL, 1);
         bad += check("SAMPLE: old SET 1 / preset 1 (TRANH) play PIANO; browsing and knobs skip them",
                      SMP_SETS[1].z0 == SMP_SETS[0].z0 && SMP_SETS[1].nz == SMP_SETS[0].nz && pos == pos0 &&
-                     shown == 3u && e == 4u && k == 2u && TSEL->preset == 0u && TSEL->p[P_E0] == 0 &&
+                     shown == 0u && TSEL->preset == 0u && TSEL->p[P_E0] == 0 &&   /* (GHOULBOX: SAMPLE not browsed) */
                      str_eq(sd->names[1], "PIANO") && enum_step(sd, 0, 1) == 2 && enum_step(sd, 2, 1) == 0 &&
                      enum_step(sd, 1, 2) == 2 && enum_orig(sd, 1) == 0 && enum_orig(sd, 5) == 5 &&
                      enum_orig(&ENGINES[8]->edit[0], 1) == 0);
@@ -1273,6 +1275,7 @@ static int test_favorites(void)
     uint32_t total, pos;
     track_t before;
     ui_power_on();
+    select_engine(0);                             /* (GHOULBOX: a kept sound, SOFT PAD; the fixture's ACID is retired) */
     my_steps(TSEL);
     TSEL->p[P_AMODE] = 2;
     go_page(GR_BROWSE);
@@ -1285,13 +1288,13 @@ static int test_favorites(void)
                  !memcmp(TSEL, &before, sizeof before));
     bad += check("one favorite occupies one display row, without repeated copies",
                  preset_visible(pos, total, 0) == 0 && preset_visible(pos, total, 1) == total);
-    select_engine(ENGI_DRUM);
+    select_engine(ENGI_GURDY);
     before = *TSEL;
     turn(EN_K3, 1);
-    bad += check("a DRUM sound can be a favorite on any track", preset_favorite() &&
-                 favorite_has(ENGI_DRUM, 0) && !memcmp(TSEL, &before, sizeof before));
+    bad += check("a GURDY sound can be a favorite on any track", preset_favorite() &&
+                 favorite_has(ENGI_GURDY, 0) && !memcmp(TSEL, &before, sizeof before));
     turn(EN_PRESET, 1);
-    bad += check("filtered browsing crosses DRUM and synth sounds while retaining the track's pattern and ARP",
+    bad += check("filtered browsing crosses engines while retaining the track's pattern and ARP",
                  TSEL->eng_req == 0 && preset_favorite() && !memcmp(TSEL->step, before.step, sizeof before.step) &&
                  TSEL->p[P_AMODE] == 2);
     turn(EN_K3, -1);
@@ -1299,7 +1302,7 @@ static int test_favorites(void)
     bad += check("unmarking the current sound leaves it loaded even when outside the filtered list",
                  !preset_favorite() && total == 1 && pos == total && TSEL->eng_req == 0);
     turn(EN_PRESET, -1);
-    bad += check("browsing from a nonfavorite selects the last favorite", TSEL->eng_req == ENGI_DRUM);
+    bad += check("browsing from a nonfavorite selects the last favorite", TSEL->eng_req == ENGI_GURDY);
     turn(EN_K3, -1);
     before = *TSEL;
     turn(EN_PRESET, 1);
@@ -2927,16 +2930,16 @@ static int test_quick_layers(void)
     before = *TSEL;
     sync_reload = 0;
     lay_combo(B_EDIT, white(eng_rank(2)));             /* (the keys: the engines one can pick, engines.c eng_vis) */
-    ok = TSEL->eng_req == 2u && TSEL->preset == 0u && ui.layer == LAYER_EDIT && sync_reload && !gates();
+    ok = TSEL->eng_req == 2u && TSEL->preset == preset_first(ENGINES[2]) && ui.layer == LAYER_EDIT && sync_reload && !gates();
     key_up(white(eng_rank(2))); frame();
     key_down(white(1)); key_up(white(1)); frame();
     ok &= TSEL->eng_req == ENGI_FM6;                    /* (G3: FM6, second in ENGINE_ORDER) */
     key_down(white(NENG_SHOWN - 1u)); key_up(white(NENG_SHOWN - 1u)); frame();
-    ok &= TSEL->eng_req == ENGI_DRUM;                   /* (the last key: DRUM) */
+    ok &= TSEL->eng_req == 11u;                         /* (the last key: NOISE; GHOULBOX offers no DRUM) */
     ok &= !memcmp(TSEL->step, before.step, sizeof before.step) && TSEL->p[P_SLEN] == before.p[P_SLEN] &&
           TSEL->p[P_SLCR] == SL_STUT;
     btn_up(B_EDIT); frame();
-    bad += check("EDIT + white key n: the n-th engine shown (FM6 2nd, DRUM last), while playing; steps, LEN, SLICER stay", ok);
+    bad += check("EDIT + white key n: the n-th engine shown (FM6 2nd, NOISE last), while playing; steps, LEN, SLICER stay", ok);
     hold(B_SAVE);
     bad += check("  SAVE held: UNDO back to before the layer's loads, the steps untouched",
                  TSEL->eng_req == 0u && TSEL->preset == before.preset && !memcmp(TSEL->step, before.step, sizeof before.step));
@@ -2954,7 +2957,9 @@ static int test_quick_layers(void)
     set_engine_of(TSEL, 0);
     lay_combo(B_EDIT, white(eng_rank(3))); key_up(white(eng_rank(3))); frame();
     turn(EN_K2, 1);
-    ok = TSEL->eng_req == 3u && TSEL->preset == 1u;
+    for (i = preset_first(ENGINES[3]) + 1u; preset_hidden(ENGINES[3], i); i++)   /* (the next kept LOFI sound) */
+        ;
+    ok = TSEL->eng_req == 3u && TSEL->preset == i;
     turn(EN_K3, 1);
     ok &= preset_favorite();
     oct_back();
@@ -3650,7 +3655,9 @@ static int test_fm4_retired(void)
         if (e < NENGINES)
             seen |= 1u << e;
     }
-    bad += check("PRESETS: the list holds every engine's presets but DIGITAL's", seen == all && NENG_SHOWN == NENGINES - 1u);
+    all &= ~(1u << ENGI_SAMPLE | 1u << ENGI_DRUM | 1u << ENGI_SLICE);   /* (GHOULBOX: not offered) */
+    bad += check("PRESETS: the list holds every engine's presets but DIGITAL's, SAMPLE's, DRUM's and SLICE's",
+                 seen == all && NENG_SHOWN == NENGINES - 4u);
     go_page(GR_BROWSE);
     set_engine_of(TSEL, 0);
     for (i = 0, seen = 0; i < NENG_SHOWN; i++) {
@@ -3659,10 +3666,10 @@ static int test_fm4_retired(void)
     }
     bad += check("PRESETS KNOB 2: the engines in order, DIGITAL skipped, back to the first",
                  seen == all && TSEL->eng_req == 0u && eng_step(0, 1) == ENGI_FM6 && eng_step(ENGI_FM6, 1) == 2u &&
-                 eng_step(ENGI_FM6, -1) == 0u && eng_step(0, -1) == ENGI_DRUM);
+                 eng_step(ENGI_FM6, -1) == 0u && eng_step(0, -1) == 11u);
     {   /* the display order (engines.c ENGINE_ORDER): every engine one can pick once; the PRESETS list follows it */
-        static const char *const ORDER[] = {"ANALOG", "FM6", "PHASE", "LOFI", "SAMPLE", "VOICE", "TRIO", "WHEEL", "GRAIN",
-                                            "PHYS", "GURDY", "NOISE", "SLICE", "DRUM"};
+        static const char *const ORDER[] = {"ANALOG", "FM6", "PHASE", "LOFI", "VOICE", "TRIO", "WHEEL", "GRAIN",
+                                            "PHYS", "GURDY", "NOISE"};
         uint32_t last = 0xFFu, r = 0, n = 0;
         ok = NENG_SHOWN == NELEM(ORDER);
         for (i = 0; ok && i < NENG_SHOWN; i++)
@@ -3677,7 +3684,7 @@ static int test_fm4_retired(void)
             last = e;
             r++;
         }
-        bad += check("engines shown ANALOG FM6 PHASE ... NOISE SLICE DRUM (ENGINE_ORDER); PRESETS lists them so",
+        bad += check("engines shown ANALOG FM6 PHASE ... GURDY NOISE (ENGINE_ORDER); PRESETS lists them so",
                      ok && r == NENG_SHOWN);
     }
     /* a user preset stored with engine 1: kept as it is, it loads as FM6 with the converted patch */
@@ -5142,6 +5149,59 @@ static int test_boot_intro(void)
     return bad;
 }
 
+/* GHOULBOX: the presets the owner retired (engines.c GB_HIDDEN, by name) and the engines left without any (SAMPLE,
+ * DRUM, SLICE): not browsed, not picked, but every stored number still loads its sound */
+static int test_hidden_presets(void)
+{
+    static const char *const KEEP[] = {"CRYPT PAD", "MONKS", "HURDY GURDY", "FRENCH HORN", "SOFT PAD", "FULL ORGAN",
+                                       "CLOUD PAD", "LUTE", "CAVE WIND", "PAD", "BELL"};
+    int bad = 0, ok = 1;
+    uint32_t i, k, e, total, shown = 0;
+    ui_power_on();
+    for (i = 0; i < NELEM(GB_HIDDEN); i++) {               /* every name is a preset of its engine */
+        const engine_t *en = ENGINES[GB_HIDDEN[i].e];
+        for (k = 0; k < en->npresets && !str_eq(en->presets[k].name, GB_HIDDEN[i].name); k++)
+            ;
+        if (k == en->npresets) { printf("  no %s preset %s\n", en->name, GB_HIDDEN[i].name); ok = 0; }
+    }
+    bad += check("hidden presets: 54 names (PIANO covers SAMPLE's two), each one a real preset",
+                 ok && NELEM(GB_HIDDEN) == 54u);
+    preset_all_pos(&total);
+    ok = total == 50u + (FELUCCA_FM4 ? ENGINES[ENGI_DIGITAL]->npresets : 0u);   /* (+ DIGITAL's, built in) */
+    for (i = 0; i < total; i++) {
+        e = preset_all_at(i, &k);
+        ok &= e < NENGINES && !preset_hidden(ENGINES[e], k);
+        for (uint32_t j = 0; j < NELEM(KEEP); j++)
+            shown += str_eq(ENGINES[e]->presets[k].name, KEEP[j]);
+    }
+    bad += check("hidden presets: the PRESETS list holds the 50 kept, none hidden", ok && shown >= NELEM(KEEP));
+    ok = NENG_SHOWN == 11u + FELUCCA_FM4 && eng_ok(ENGI_DRUM) && eng_ok(ENGI_SAMPLE);
+    for (i = 0; i < NENG_SHOWN; i++)
+        ok &= eng_vis(i) != ENGI_DRUM && eng_vis(i) != ENGI_SAMPLE && eng_vis(i) != ENGI_SLICE;
+    bad += check("hidden engines: SAMPLE, DRUM, SLICE not offered (11 engines), still playable", ok);
+    select_engine(0);
+    ok = TSEL->eng_req == 0u && str_eq(ENGINES[0]->presets[TSEL->preset].name, "SOFT PAD");
+    select_engine(ENGI_FM6);
+    ok &= str_eq(ENGINES[ENGI_FM6]->presets[TSEL->preset].name, "BELL");
+    bad += check("hidden presets: picking an engine loads its first kept preset (ANALOG SOFT PAD, FM6 BELL)", ok);
+    set_engine(0);
+    apply_preset(0);                                        /* (a stored ANALOG 0: an old project, a user preset) */
+    bad += check("hidden presets: a stored hidden preset still loads its sound (ANALOG 0 SAW LEAD)",
+                 TSEL->eng_req == 0u && TSEL->preset == 0u && TSEL->p[P_E0] == ENGINES[0]->presets[0].e[0]);
+    apply_preset(4);                                        /* ACID (retired): browsing goes to its kept neighbours */
+    turn(EN_PRESET, -1);
+    ok = TSEL->preset == 3u;                                /* PWM STR */
+    apply_preset(4);
+    turn(EN_PRESET, 1);
+    ok &= TSEL->preset == 7u;                               /* SUB BASS */
+    set_engine_of(TSEL, ENGI_DRUM);                         /* (an old project's DRUM track) */
+    turn(EN_PRESET, 1);
+    ok &= TSEL->eng_req == 0u && str_eq(ENGINES[0]->presets[TSEL->preset].name, "SOFT PAD");
+    bad += check("hidden presets: from a retired sound or engine, browsing steps to the kept one beside it", ok);
+    ui_power_on();
+    return bad;
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -5149,6 +5209,7 @@ int main(void)
     bad += test_large_face();
     bad += test_sound_loads();
     bad += test_boot_intro();
+    bad += test_hidden_presets();
     bad += test_patterns();
     bad += test_rec();
     bad += test_midi();

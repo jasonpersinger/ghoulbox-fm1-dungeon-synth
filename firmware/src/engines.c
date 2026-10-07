@@ -63,13 +63,30 @@ static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {
 #if FELUCCA_FM4
     1,                           /* DIGITAL */
 #endif
-    2, 3, 4, 5, 6, 7, 8, 9,      /* PHASE LOFI SAMPLE VOICE TRIO WHEEL GRAIN PHYS */
+    2, 3, 5, 6, 7, 8, 9,         /* PHASE LOFI VOICE TRIO WHEEL GRAIN PHYS */
     14,                          /* GURDY (GHOULBOX) */
     11,                          /* NOISE */
-#if FELUCCA_SLICE
-    13,                          /* SLICE */
-#endif
-    10,                          /* DRUM */
+};                               /* GHOULBOX: SAMPLE, SLICE and DRUM not offered (every preset retired, GB_HIDDEN);
+                                  * they still play what a project or a user preset holds (eng_ok) */
+
+/* GHOULBOX: factory presets the owner retired. Kept in their engines (a stored preset number - a project, a user
+ * preset, an old format - still loads its sound) but not browsed: PRESETS, the knob, favourites, the editor
+ * (ui.c preset_hidden). By name; every preset of that name in that engine. ui_test checks each name exists */
+static const struct { uint8_t e; const char *name; } GB_HIDDEN[] = {
+    {0, "SAW LEAD"}, {0, "SQR BASS"}, {0, "ACID"}, {0, "SINE KEY"}, {0, "RAVE"}, {0, "PLUCK"}, {0, "BRASS"},
+    {2, "BRASS"}, {2, "ORGAN"}, {2, "RESO"}, {2, "BELL"}, {2, "WIRE"},
+    {3, "PULSE LD"}, {3, "WAVE BASS"}, {3, "ARP 8BIT"}, {3, "WAVE LEAD"}, {3, "STEP LEAD"},
+    {4, "PIANO"}, {4, "FLUTE"}, {4, "SAX"},
+    {5, "VOX LEAD"}, {5, "WOW BASS"}, {5, "WHISPER"},
+    {6, "FAT BASS"}, {6, "ARP LEAD"}, {6, "SYNC LEAD"}, {6, "RING BELL"},
+    {7, "JAZZ PERC"}, {7, "GOSPEL"}, {7, "ROCK DRIVE"},
+    {8, "GLITCH"}, {8, "SHIMMER"},
+    {9, "BELL TREE"}, {9, "MARIMBA"}, {9, "PLUCK"}, {9, "BOWED METAL"}, {9, "KALIMBA"}, {9, "HAND DRUM"}, {9, "TOMS"},
+    {9, "DRONE STRING"}, {9, "HARP"},
+    {10, "DRUM KIT"},
+    {11, "WIND"}, {11, "RAIN"}, {11, "ARCADE"}, {11, "METAL"},
+    {12, "TINE EP"}, {12, "FM BASS"}, {12, "BRASS"}, {12, "MARIMBA"}, {12, "ORGAN"}, {12, "PLUCK"},
+    {13, "CHOP"}, {13, "STUTTER"},
 };
 
 /* the engines one can pick (engine 1 only with FELUCCA_FM4), in ENGINE_ORDER: eng_ok(e), the n-th of them

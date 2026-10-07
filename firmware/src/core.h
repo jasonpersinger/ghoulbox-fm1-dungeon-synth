@@ -21,14 +21,15 @@
                                   * by default; replaced by FM6, its sounds convert (fm4_convert.c) */
 #endif
 #ifndef GHOULBOX_VERSION
-#define GHOULBOX_VERSION "0.6"   /* GHOULBOX's own: the ABOUT screen; the editor's version string ends " GB" it */
+#define GHOULBOX_VERSION "0.7"   /* GHOULBOX's own: the ABOUT screen; the editor's version string ends " GB" it */
 #endif
 #define NENGINES 15u             /* SLICE 13 (reserved without FELUCCA_SLICE: never offered), GURDY 14 (GHOULBOX):
                                   * every engine keeps its number in every build */
 #define ENGI_SLICE 13u
 #define ENGI_GURDY 14u
 #define ENGI_DIGITAL 1u          /* reserved without FELUCCA_FM4: never selectable (eng_ok), its sounds load as FM6 */
-#define NENG_SHOWN (NENGINES - !FELUCCA_FM4 - !FELUCCA_SLICE)   /* the engines one can pick: PRESETS, the EDIT layer, the editor,
+#define NENG_SHOWN (NENGINES - !FELUCCA_FM4 - 3u)   /* the engines one can pick: PRESETS, the EDIT layer, the editor
+                                                * (GHOULBOX: not SAMPLE, DRUM, SLICE: engines.c ENGINE_ORDER),
                                                 * in the display order of engines.c ENGINE_ORDER */
 #define UP_SLOTS 32u             /* user presets (upreset.c) */
 #define NELEM(a) (sizeof(a) / sizeof((a)[0]))

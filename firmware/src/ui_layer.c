@@ -614,7 +614,8 @@ static void layer_scl(void)                             /* KNOB 2's scales, 4 x 
 }
 static void layer_edit(void)                            /* the engines from F3, INIT next (LY_INIT), the sound under them */
 {                                                        /* (cells show the engine's icon, not the key's note) */
-    uint32_t n = NENG_SHOWN < LY_INIT ? NENG_SHOWN : LY_INIT, cells = n + 1u, i, h = cells > 12u ? 22u : 28u;
+    uint32_t n = NENG_SHOWN < LY_INIT ? NENG_SHOWN : LY_INIT, cells = n + 1u, i, h = cells > 8u ? 22u : 28u;   /* (GHOULBOX: its
+                                                     * 12 cells keep the compact rows the alignment is tuned on) */
     for (i = 0; i < cells; i++) {
         int32_t x = LC_X(i % 4u), y = 4 + (int32_t)(h + 4u) * (int32_t)(i / 4u);
         const engine_t *en = ENGINES[eng_vis(i) % NENGINES];

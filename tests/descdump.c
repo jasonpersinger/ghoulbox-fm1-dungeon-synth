@@ -102,6 +102,14 @@ int main(void)
         }
         printf("]}");
     }
+    printf("],\n\"HIDDEN\":[");                     /* GHOULBOX: the retired presets (engines.c GB_HIDDEN), by name */
+    for (k = 0; k < NELEM(GB_HIDDEN); k++) {
+        printf("%s[", k ? "," : "");
+        js_str(ENGINES[GB_HIDDEN[k].e]->name);
+        putchar(',');
+        js_str(GB_HIDDEN[k].name);
+        putchar(']');
+    }
     printf("],\n\"ORDER\":[");                      /* the engines as shown (engines.c ENGINE_ORDER), by name */
     for (k = 0; k < NENG_SHOWN; k++) {
         if (k)

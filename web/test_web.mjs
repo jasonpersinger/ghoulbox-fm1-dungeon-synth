@@ -37,7 +37,7 @@ const proto = html.slice(html.indexOf("/*PROTO-BEGIN*/"), html.indexOf("/*PROTO-
 const E = vm.runInNewContext(proto + `
 ;({ frame, unframe, parse, req, Link, parseWav, resample, normalize, takeSample, autoTrim, zoomView, rootFromName, buildSlot, makeMockDevice, CMD, SMP,
    UP, bank, capturePatch, auditionPatch, startWatch, libraryFile, readLibraryFile, paramKeys, patternFromSteps, stepsFromPattern, upName,
-   mixer, parseNotes, parseHits, hitsText, gridFromSteps, LANE_NOTE, LANE_OF, readDevicePreferences, devicePresetRows, engineOrder, ENGINE_ORDER, aliasOf, fmtValue, FM6, enumShown, F,
+   mixer, parseNotes, parseHits, hitsText, gridFromSteps, LANE_NOTE, LANE_OF, readDevicePreferences, devicePresetRows, engineOrder, ENGINE_ORDER, ENGINE_HIDDEN, PRESET_HIDDEN, aliasOf, fmtValue, FM6, enumShown, F,
    FM4, fromDigital, fromPerc, DRUM_KIT_E })`,
 { setTimeout, clearTimeout, setInterval, clearInterval, console });
 
@@ -122,13 +122,13 @@ async function editorMock() {
   ok(E.parse[E.CMD.UI_SET](await rq(E.req.uiSet(0, 10))).rc === 1, "editor: out-of-range palette refused");
   ok(E.parse[E.CMD.UI_SET](await rq(E.req.uiSet(1, 1))).rc === 2, "editor: the retired font weight answers not supported");
   ok(E.parse[E.CMD.FAV_SET](await rq(E.req.favSet(info.nengines, 31, true))).rc === 1, "editor: empty user slot cannot be favorited");
-  await rq(E.req.favSet(0, 0, true));
+  await rq(E.req.favSet(0, 1, true));            /* (ANALOG SOFT PAD: GHOULBOX retired SAW LEAD, preset 0) */
   await rq(E.req.uiSet(3, 1));
   prefs = await E.readDevicePreferences(rq, info, names, prefs);
-  ok(E.devicePresetRows(info, names, prefs).length === 1 && prefs.favorites[0][0], "editor: favorites filter follows device state");
-  m.state.favorites[0][0] = false; m.state.favorites[2][0] = true;
+  ok(E.devicePresetRows(info, names, prefs).length === 1 && prefs.favorites[0][1], "editor: favorites filter follows device state");
+  m.state.favorites[0][1] = false; m.state.favorites[2][0] = true;
   prefs = await E.readDevicePreferences(rq, info, names, prefs);
-  ok(!prefs.favorites[0][0] && prefs.favorites[2][0], "editor: panel-side favorite changes refresh");
+  ok(!prefs.favorites[0][1] && prefs.favorites[2][0], "editor: panel-side favorite changes refresh");
   await rq(E.req.upStore(31, "FAVORITE"));
   await rq(E.req.favSet(info.nengines, 31, true));
   prefs = await E.readDevicePreferences(rq, info, names, prefs);
@@ -141,15 +141,17 @@ async function editorMock() {
   ok(!prefs.favorites[info.nengines][31] && !E.devicePresetRows(info, names, prefs).some((r) => r.user), "editor: erased slot disappears and loses star");
   {   /* the lists in the device's order (engines.c ENGINE_ORDER): FM6 second, DRUM last, "-" never; the numbers stay */
     const shown = E.engineOrder(info.engines).map((i) => info.engines[i]);
-    ok(shown.join() === "ANALOG,FM6,PHASE,LOFI,SAMPLE,VOICE,TRIO,WHEEL,GRAIN,PHYS,GURDY,NOISE,SLICE,DRUM" &&
-       E.engineOrder(info.engines)[1] === 12 && E.engineOrder(info.engines)[10] === 14 && E.engineOrder(info.engines)[13] === 10,
-       "editor: engines listed FM6 second, DRUM last (indices kept)");
-    ok(E.engineOrder(["ANALOG", "X", "-", "DRUM", "FM6"]).join() === "0,4,3,1", "editor: an unknown engine follows the known ones");
+    ok(shown.join() === "ANALOG,FM6,PHASE,LOFI,VOICE,TRIO,WHEEL,GRAIN,PHYS,GURDY,NOISE" &&
+       E.engineOrder(info.engines)[1] === 12 && E.engineOrder(info.engines)[9] === 14 && E.engineOrder(info.engines)[10] === 11,
+       "editor: engines listed FM6 second, NOISE last; SAMPLE, SLICE, DRUM not offered (indices kept)");
+    ok(E.engineOrder(["ANALOG", "X", "-", "NOISE", "FM6"]).join() === "0,4,3,1", "editor: an unknown engine follows the known ones");
+    ok(E.engineOrder(["ANALOG", "DRUM", "SAMPLE", "SLICE"]).join() === "0", "editor: the engines GHOULBOX retired are not listed");
     m.state.favorites[10][0] = m.state.favorites[12][0] = true;
     await rq(E.req.uiSet(3, 0));
     prefs = await E.readDevicePreferences(rq, info, names, prefs);
     const rows = E.devicePresetRows(info, names, prefs).filter((r) => !r.user), eng = [...new Set(rows.map((r) => r.engine))];
-    ok(eng[0] === 0 && eng[1] === 12 && eng[eng.length - 1] === 10, "editor: device presets in the device's engine order");
+    ok(eng[0] === 0 && eng[1] === 12 && eng[eng.length - 1] === 11 && !rows.some((r) => (E.PRESET_HIDDEN[info.engines[r.engine]] || []).includes(r.name)),
+       "editor: device presets in the device's engine order, the retired ones left out");
   }
   const none = await E.readDevicePreferences(() => { throw new Error("unexpected request"); }, { uiCaps: 0 }, []);
   ok(none === null, "editor: old firmware receives no unsupported preference requests");
@@ -272,6 +274,8 @@ function mockTables() {
   fw.GP.forEach((d, i) => cmp(`GP[${i}]`, T.GP[i] && norm(T.GP[i]), d));
   cmp("engines", T.ENG.map((e) => e.name), fw.ENG.map((e) => e.name));
   cmp("engine order (ENGINE_ORDER)", E.ENGINE_ORDER.filter((n) => fw.ENG.some((e) => e.name === n)), fw.ORDER);
+  cmp("retired presets (GB_HIDDEN)", Object.entries(E.PRESET_HIDDEN).flatMap(([e, ns]) => ns.map((n) => [e, n])), fw.HIDDEN);
+  cmp("retired engines", E.ENGINE_HIDDEN.slice().sort(), fw.ENG.map((e) => e.name).filter((n) => n !== "-" && !fw.ORDER.includes(n) && n !== "DIGITAL").sort());
   fw.ENG.forEach((fe, i) => {
     const me = T.ENG[i];
     if (!me) return;
