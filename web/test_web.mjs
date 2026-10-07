@@ -1488,6 +1488,18 @@ async function updater() {
   const e4 = await new Updater(dev4.access).install(image, "FM-1_900").then(() => null, (x) => x);
   ok(e4 && e4.code === "reload" && Date.now() - t4 < 15000,
      `fm1ota.js: the loader's output without its input -> 'reload' (${e4 && e4.code}, ${Math.round((Date.now() - t4) / 1000)} s)`);
+  /* GHOULBOX: the page reloaded for that resumes, but its MIDI ports can list the loader a moment later: the resume waits
+   * for it (a single look fell through to install's 'FM-1 not found' while the FM-1 sat in its loader) */
+  const dev5 = new FakeFM1(image);
+  for (const m of [dev5.access.inputs, dev5.access.outputs]) m.clear();   /* (nothing listed yet) */
+  setTimeout(() => dev5.boot("ota-FM-1_900", "Felucca Update"), 3000);
+  const r5 = await new Updater(dev5.access).resume(image, null, "FM-1_900", 15000).then((x) => x, (x) => x);
+  ok(r5 === true && dev5.bad === 0, `fm1ota.js: resume after a reload waits for a loader that is listed late (${r5 && r5.code || r5})`);
+  const dev6 = new FakeFM1(image, { halfLoader: true });
+  dev6.boot("ota-FM-1_900", "Felucca Update");
+  const t6 = Date.now();
+  const r6 = await new Updater(dev6.access).resume(image, null, "FM-1_900", 4000).then((x) => x, (x) => x);
+  ok(r6 === false && Date.now() - t6 < 8000, `fm1ota.js: a loader still half seen -> resume gives up in its time, no reload loop (${r6 && r6.code || r6})`);
 }
 
 await editorMock();

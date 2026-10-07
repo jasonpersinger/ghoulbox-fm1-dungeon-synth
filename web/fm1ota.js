@@ -225,9 +225,11 @@ export class Updater {
   }
 
   // resume: the device is already in update mode (loader) -> true when the write finished
-  async resume(image, onStep, product = null) {
+  // waitMs (GHOULBOX): look for the loader that long (a page reloaded to reach it can list it a moment late); 0: once
+  async resume(image, onStep, product = null, waitMs = 0) {
     const model = product && product.split("_")[0];
-    const ota = await this.find((id) => model ? id.model === "ota-" + model : IS_OTA(id));
+    const isOta = (id) => model ? id.model === "ota-" + model : IS_OTA(id);
+    const ota = waitMs ? await this.waitFor(isOta, waitMs) : await this.find(isOta);
     if (!ota) return false;
     const step = onStep || (() => {});
     const result = await this.write(ota, image, step);

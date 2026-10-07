@@ -145,7 +145,7 @@ const log = (t) => { $("log").textContent += t + "\n"; };
 let image = null;
 const meta = /*META*/;
 
-let writing = false, stock = null, stockFileEpoch = 0;
+let writing = false, stock = null, stockFileEpoch = 0, resumed = false;   // resumed: GHOULBOX, the page came back from a "reload"
 const lockInstaller = (on) => { writing = on; $("go").disabled = on || !image; $("stock-go").disabled = on || !stock; $("stock-file").disabled = on; $("stock-recovery").disabled = on; };
 window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault(); e.returnValue = t("leave"); } });
 
@@ -161,7 +161,7 @@ window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault
     $("go").disabled = false;
     let resume = null;
     try { resume = sessionStorage.getItem("ghoulbox-resume"); sessionStorage.removeItem("ghoulbox-resume"); } catch (_) {}
-    if (resume) { sayK("resuming"); $("go").click(); }   // (GHOULBOX: back from the "reload" below: the loader is found now)
+    if (resume) { resumed = true; sayK("resuming"); $("go").click(); }   // (GHOULBOX: back from the "reload" below)
   } catch (e) { sayK("loadfail", e.message); }
 })();
 
@@ -183,6 +183,14 @@ $("go").addEventListener("click", async () => {
       if (k === "reboot") sayK("reboot");
       if (k === "done") { $("bar").value = 100; sayK("done"); }
     };
+    if (resumed) {                                   // GHOULBOX: reloaded to reach the loader: wait for it (its ports can be
+      resumed = false;                               // listed a moment late), never fall back to looking for a running FM-1
+      const ok = await up.resume(image, step, meta.product, 15000);
+      if (ok) { try { sessionStorage.removeItem("ghoulbox-reloads"); } catch (_) {} }
+      sayK(ok ? "done" : "noloader");
+      lockInstaller(false);
+      return;
+    }
     const ota = await up.find((id) => /^ota-/i.test(id.model));
     if (ota) {
       ota.link.close();
@@ -191,9 +199,18 @@ $("go").addEventListener("click", async () => {
       await up.install(image, meta.product, step);
     }
   } catch (e) {
+    let reloads = 0;
+    try { reloads = +(sessionStorage.getItem("ghoulbox-reloads") || 0); } catch (_) {}
+    if (e && e.code === "reload" && reloads >= 2) {   // GHOULBOX: two reloads did not reach it: the cable, not the page
+      try { sessionStorage.removeItem("ghoulbox-reloads"); } catch (_) {}
+      sayK("noloader");
+      log(String(e && e.stack || e));
+      lockInstaller(false);
+      return;
+    }
     if (e && e.code === "reload") {                    // GHOULBOX: Chrome on Linux hides the loader's input from this page;
       sayK("reload");                                  // a reloaded page sees it and resumes (the loader waits for us)
-      try { sessionStorage.setItem("ghoulbox-resume", "1"); } catch (_) {}
+      try { sessionStorage.setItem("ghoulbox-resume", "1"); sessionStorage.setItem("ghoulbox-reloads", String(reloads + 1)); } catch (_) {}
       writing = false;                                 // (no "leave this page?" prompt)
       setTimeout(() => location.reload(), 500);
       return;
