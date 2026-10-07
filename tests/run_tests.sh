@@ -202,6 +202,7 @@ if [ -f build/gen/felucca_tables.h ]; then
     run "SLICER: no clicks, timing, sync with the sequencer, STUT, cost, demos" "$OUT/slicer_test" build/slicer_demo
     $CC -O2 -w -Ibuild/gen -Ifirmware/src -Itests -o "$OUT/sample_sets_test" tests/sample_sets_test.c -lm
     run "SAMPLE: the GHOULBOX CC0 sets (zones, loops, decay, flash)" "$OUT/sample_sets_test"
+    run "SAMPLE: a missing CC0 set stops gen_samples.py (no set moves down a place)" python3 tests/gen_samples_missing_test.py
     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/swing_test" tests/swing_test.c -lm
     run "SWING: track + global at most 100, sequencer and SLICER step lengths, the SWG display" "$OUT/swing_test"
     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/perform_test" tests/perform_test.c -lm

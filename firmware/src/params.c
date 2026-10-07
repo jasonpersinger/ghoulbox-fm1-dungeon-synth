@@ -215,6 +215,13 @@ static int32_t param_turn(const param_desc_t *d, int32_t v, int32_t steps)
         while (steps) {
             for (w = r + dir; w >= 0 && w <= n && enum_orig(d, o[w] + d->min) != o[w] + d->min; w += dir)
                 ;
+            if ((w < 0 || w > n) && enum_orig(d, o[r] + d->min) != o[r] + d->min) {
+                for (w = r - dir; w >= 0 && w <= n && enum_orig(d, o[w] + d->min) != o[w] + d->min; w -= dir)
+                    ;                                /* on an alias at the end (an old GRAIN SRC 1 / 4): the nearest */
+                if (w >= 0 && w <= n)                /* real value the other way, rather than not moving */
+                    r = w;
+                break;
+            }
             if (w < 0 || w > n)
                 break;                               /* (the end holds) */
             r = w;

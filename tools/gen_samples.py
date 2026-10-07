@@ -309,7 +309,11 @@ class Builder:
 
     def cc0_set(self, name, kind):
         entries = []
-        for k, (_, s, loop, root) in enumerate(cc0_entries(name, kind)):
+        found = cc0_entries(name, kind)
+        if not found:                                # GHOULBOX: never skip one (the sets after it would move down a place
+            raise SystemExit(f"samples: CC0 set {name} has no recordings in {CC0 / name} "   # and stored SET values
+                             "(tools/fetch_cc0.py fetches it)")                                # play another sound)
+        for k, (_, s, loop, root) in enumerate(found):
             ls, le = loop if loop else (len(s), len(s))
             off, st = self.add(s, ls)
             entries.append(dict(off=off, n=len(s), ls=ls, le=le, looped=bool(loop), sr=TR,

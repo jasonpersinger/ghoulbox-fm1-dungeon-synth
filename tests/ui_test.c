@@ -6109,6 +6109,12 @@ static int test_hidden_presets(void)
         for (k = 0; k < ENGINES[ENGI_GURDY]->npresets && !str_eq(ENGINES[ENGI_GURDY]->presets[k].name, "BAGPIPE"); k++)
             ;
         bad += check("1.1: GURDY has BAGPIPE, browsable", k < ENGINES[ENGI_GURDY]->npresets && !preset_hidden(ENGINES[ENGI_GURDY], k));
+        {   /* review: an old GRAIN sound on SRC 1 or 4 (aliases, at the order's end): a turn either way leaves it */
+            const param_desc_t *gd = &ENGINES[8]->edit[0];
+            bad += check("1.1: GRAIN SRC on an alias (1, 4): turning right or left moves to a real set",
+                         param_turn(gd, 1, 1) == 3 && param_turn(gd, 4, 1) == 3 && param_turn(gd, 1, -1) == 3 &&
+                         param_turn(gd, 4, -1) == 3);
+        }
         bad += check("1.1: the SET knob never stops on an alias (1, 4)", param_turn(sd, 3, 1) == 3 && param_turn(sd, 3, 2) == 3 &&
                      param_turn(sd, 0, 1) == 2 && param_turn(sd, 2, -1) == 0);
     }
