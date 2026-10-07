@@ -129,6 +129,15 @@ static const struct {
      * now that the arpeggiator is the track's and a preset no longer switches it on */
     {"ARP", {48, 51, 55, 60, 63, 67, 72, 75, 48, 51, 55, 60, 63, 67, 72, 75},       /* 13 */
      {1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0}},
+    /* GHOULBOX: the power-on scene in D minor (TRK_DEF; played in 1/8 steps). Chords D, Bb, C, A, a bar each */
+    {"DIRGE", {62, 0, 0, 0, 58, 0, 0, 0, 60, 0, 0, 0, 57, 0, 0, 0},                 /* 14 the pad's roots */
+     {0, T_, T_, T_, 0, T_, T_, T_, 0, T_, T_, T_, 0, T_, T_, T_}},
+    {"BALLAD", {62, 0, 65, 69, 67, 0, 65, 64, 62, 0, 0, 0, 57, 58, 60, 0},          /* 15 the melody */
+     {1, T_, 0, 0, 1, T_, 0, 2, 1, T_, T_, 0, 0, 0, 2, T_}},
+    {"CHANT", {50, 0, 0, 0, 0, 0, 53, 0, 48, 0, 0, 0, 45, 0, 0, 0},                 /* 16 low voices */
+     {1, T_, T_, 0, 0, 0, 1, T_, 0, T_, T_, 0, 0, T_, T_, T_}},
+    {"PEDAL", {38, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},                    /* 17 one D, held */
+     {1, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_}},
 };
 #undef T_
 #define NPATTERNS (sizeof PATTERNS / sizeof PATTERNS[0])
@@ -136,4 +145,8 @@ static const struct {
 /* the parts at power-on (engine, preset, PATTERNS[n - 1] in the sequencer, 0 = empty: all are): bass, pad, lead, drums */
 static const uint8_t TRK_DEF[NPART][3] = {{0, 4, 0}, {ENGI_FM6, 4, 0}, {3, 0, 0}, {ENGI_DRUM, 0, 0}}; /* ANALOG ACID,
                                                                        * FM6 PAD (was DIGITAL PAD), LOFI PULSE LD, DRUM KIT */
+/* GHOULBOX: what felucca_init plays instead (TRK_DEF stays Felucca's: an old project's missing parts are those):
+ * melody, pad, choir, drone, in D minor; felucca_init also sets 72 BPM, HALL, TAPE 40 and 1/8 steps */
+static const uint8_t GB_SCENE[NPART][3] = {{ENGI_GURDY, 0, 15}, {0, 12, 14}, {5, 4, 16}, {ENGI_GURDY, 1, 17}}; /* GURDY
+                                                * HURDY GURDY, ANALOG CRYPT PAD, VOICE MONKS, GURDY DRONE WHEEL */
 static uint32_t trk_def_engine(uint32_t i) { return TRK_DEF[i % NPART][0]; }

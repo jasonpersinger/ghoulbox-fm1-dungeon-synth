@@ -106,18 +106,22 @@ static void felucca_init(void)
     for (i = 0; i < NTRK; i++) {
         track_t *t = &trk[i];
         track_defaults(t);
-        set_engine_of(t, TRK_DEF[i][0]);
-        apply_preset_to(t, TRK_DEF[i][1]);    /* with its sends */
+        set_engine_of(t, GB_SCENE[i][0]);
+        apply_preset_to(t, GB_SCENE[i][1]);   /* with its sends */
         t->engine = t->eng_req;
         track_defaults_steps(t);              /* (a sound load never touches them) */
-        if (TRK_DEF[i][2])
-            load_pat16(t, PATTERNS[TRK_DEF[i][2] - 1u].note, PATTERNS[TRK_DEF[i][2] - 1u].flags);
+        if (GB_SCENE[i][2])
+            load_pat16(t, PATTERNS[GB_SCENE[i][2] - 1u].note, PATTERNS[GB_SCENE[i][2] - 1u].flags);
         pat_sig[i] = steps_sig(t);            /* a default pattern, not the user's */
-        pat_last[i] = TRK_DEF[i][2];
+        pat_last[i] = GB_SCENE[i][2];
+        t->p[P_SDIV] = 1;                     /* GHOULBOX: 1/8, a slow scene */
     }
     undo_depth--;
     song.sel = 0;
     song.master_q12 = 2048;
+    song.g[G_BPM] = 72;                       /* GHOULBOX: the power-on scene's tempo and room */
+    song.g[G_RTYPE] = 2;                      /* HALL */
+    song.g[G_TAPE] = 40;
     ui.home = 1;
     ui.force = 1;
 }

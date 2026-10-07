@@ -1794,6 +1794,10 @@ function makeMockDevice(opt = {}) {
     [[60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]],
     [[36, 42, 42, 42, 38, 42, 36, 42, 36, 42, 42, 36, 38, 42, 46, 42], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]],   /* 12 BEAT (DRUM) */
     [[48, 51, 55, 60, 63, 67, 72, 75, 48, 51, 55, 60, 63, 67, 72, 75], [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]],   /* 13 ARP */
+    [[62, 0, 0, 0, 58, 0, 0, 0, 60, 0, 0, 0, 57, 0, 0, 0], [0, T_, T_, T_, 0, T_, T_, T_, 0, T_, T_, T_, 0, T_, T_, T_]],   /* 14 DIRGE (GHOULBOX) */
+    [[62, 0, 65, 69, 67, 0, 65, 64, 62, 0, 0, 0, 57, 58, 60, 0], [1, T_, 0, 0, 1, T_, 0, 2, 1, T_, T_, 0, 0, 0, 2, T_]],   /* 15 BALLAD */
+    [[50, 0, 0, 0, 0, 0, 53, 0, 48, 0, 0, 0, 45, 0, 0, 0], [1, T_, T_, 0, 0, 0, 1, T_, 0, T_, T_, 0, 0, T_, T_, T_]],   /* 16 CHANT */
+    [[38, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [1, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_]],   /* 17 PEDAL */
   ];
   for (let op = 0; op < 4; op++) TP.push(D("ATK", F.TIME, 0, 127, 0), D("DEC", F.TIME, 0, 127, 0), D("SUS", F.PCT, 0, 127, 127), D("REL", F.TIME, 0, 127, 0), D("LVL", F.PCT, 0, 127, 127));
   TP.push(E("CHRD", ["OFF", "DIA3", "DIA7", "MAJ", "MIN", "DOM7", "MAJ7", "MIN7", "SUS4", "POW"], 0),   /* the chord keys 81, 82 */
@@ -1911,13 +1915,16 @@ function makeMockDevice(opt = {}) {
     st.bank[slot] = snapshot(name);
     clearSteps(); st.p[29] = 16;
   });
-  /* the power-on sounds (engines.c TRK_DEF): ACID, PAD, PULSE LD, DRUM KIT */
-  [[1, FM6_E, 4], [2, 3, 0], [3, 10, 0], [0, 0, 4]].forEach(([i, e, p]) => { st.sel = i; setEngine(e); applyPreset(p); });
-  /* the device powers on with its sequencers empty; the mock starts as a little demo to look at: track 1 with
-     the ACID pattern, track 4 with BEAT (as SEQ > PATTERNS would load them), pads left, lead right */
-  st.sel = 3; loadPattern(11);
-  st.sel = 0; loadPattern(0);
-  st.tracks[1].p[39] = -24; st.tracks[2].p[39] = 20; st.tracks[2].p[0] = 92;
+  /* the power-on scene (engines.c TRK_DEF, main.c felucca_init): GURDY HURDY GURDY on BALLAD, ANALOG CRYPT PAD on
+     DIRGE, VOICE MONKS on CHANT, GURDY DRONE WHEEL on PEDAL; every part in 1/8 steps; 72 BPM, HALL, TAPE 40 */
+  /* opt.parts (tests): [track, engine name, preset, PATTERNS index or -1] in place of the scene, at 1/16 and the
+     global defaults (the protocol tests' fixture: Felucca's ACID, FM6 PAD, PULSE LD, DRUM KIT on BEAT) */
+  const engI = (n) => ENG.findIndex((e) => e.name === n);
+  (opt.parts || [[3, "GURDY", 1, 16], [2, "VOICE", 4, 15], [1, "ANALOG", 12, 13], [0, "GURDY", 0, 14]]).forEach(([i, e, p, k]) => {
+    st.sel = i; setEngine(engI(e)); applyPreset(p); if (k >= 0) loadPattern(k); if (!opt.parts) st.tracks[i].p[30] = 1;
+  });
+  if (!opt.parts) { st.g[0] = 72; st.g[24] = 2; st.g[25] = 40; }
+  st.tracks[1].p[39] = -24; st.tracks[2].p[39] = 20;
   const project = () => JSON.parse(JSON.stringify({ tracks: st.tracks, sel: st.sel, g: st.g, songRows: st.songRows }));
   st.slots[0] = project();
 

@@ -5,6 +5,7 @@
  *                                          OUTDIR/dungeon_hall.wav (clean), OUTDIR/dungeon_room.wav
  *                                          OUTDIR/dungeon_ghoulbox.wav (the passage on GHOULBOX's own sounds),
  *                                          OUTDIR/dungeon_gurdy.wav (the hurdy-gurdy playing the melody),
+ *                                          OUTDIR/power_on_scene.wav (what GHOULBOX plays after power-on + PLAY),
  *                                          OUTDIR/presets/NN_NAME.wav (each GHOULBOX preset alone, HALL + TAPE)
  * Not a test: an ear check of the sounds while the dungeon presets are made. */
 #define main hostsim_main
@@ -96,6 +97,52 @@ static void render(const char *dir, const char *name, int rtype, int tape, int c
     printf("dungeon demo: %s\n", path);
 }
 
+/* the power-on scene as felucca_init (main.c) sets it up: GB_SCENE's sounds and patterns, 1/8 steps, 72 BPM, HALL,
+ * TAPE 40, the other globals at their defaults; four passes and the tail */
+static void scene(const char *dir)
+{
+    char path[512];
+    FILE *f;
+    uint32_t t, i, frames = 34u * FS;
+    int32_t o[2 * CTL];
+    memset(trk, 0, sizeof trk);
+    host_tracks_init();
+    for (i = 0; i < G_COUNT; i++)
+        song.g[i] = GP[i].def;
+    song.g[G_BPM] = 72;
+    song.g[G_RTYPE] = 2;
+    song.g[G_TAPE] = 40;
+    rev_clear();
+    hall_clear();
+    fx.rtype = 2;
+    for (i = 0; i < NPART; i++) {
+        host_preset(&trk[i], GB_SCENE[i][0], GB_SCENE[i][1]);
+        for (t = 0; t < 16u; t++) {                    /* as ui.c load_pat16 (not in the host build) */
+            uint8_t n = PATTERNS[GB_SCENE[i][2] - 1u].note[t], fl = PATTERNS[GB_SCENE[i][2] - 1u].flags[t];
+            put_step(&trk[i], t, n ? 1u : 0u, &n, (fl & 4u) ? ST_TIE : n ? ST_NOTE : ST_REST, n ? fl & 3u : 0u);
+            trk[i].step[t].vel = n ? 96 : 0;
+        }
+        trk[i].p[P_SLEN] = 16;
+        trk[i].p[P_SDIV] = 1;
+    }
+    snprintf(path, sizeof path, "%s/power_on_scene.wav", dir);
+    if (!(f = fopen(path, "wb"))) {
+        perror(path);
+        return;
+    }
+    wav_hdr(f, frames);
+    transport_req = 1;
+    for (t = 0; t < frames; t += CTL) {
+        if (t == 27u * FS)
+            transport_req = 2;                         /* four 6.7 s passes, then the tail */
+        mix_block(o, CTL);
+        for (i = 0; i < CTL; i++)
+            wav_put(f, o[2 * i], o[2 * i + 1]);
+    }
+    fclose(f);
+    printf("dungeon demo: %s\n", path);
+}
+
 /* one preset alone: a phrase for its kind, 10 s (8 of notes, the tail), HALL SIZE 100, TAPE 60 */
 enum { K_CHORDS, K_MELODY, K_ARP, K_BASS, K_HOLD };
 static void audition(const char *dir, uint32_t n, uint32_t e, const char *name, uint32_t kind)
@@ -166,6 +213,7 @@ int main(int argc, char **argv)
     const char *dir = argc > 1 ? argv[1] : "build/dungeon_demo";
     char sub[512];
     uint32_t k;
+    scene(dir);
     render(dir, "dungeon_ghoulbox", 2, 75, 40, GHOUL);
     render(dir, "dungeon_gurdy", 2, 75, 40, GURDY);
     render(dir, "dungeon_tape", 2, 75, 40, STOCK);

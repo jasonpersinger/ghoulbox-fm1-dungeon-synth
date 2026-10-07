@@ -284,9 +284,9 @@ function mockTables() {
     });
   });
   cmp("PATTERNS", T.PATTERNS, fw.PATTERNS);
-  const m2 = E.makeMockDevice({ auto: false });   /* the mock's power-on sounds: its parts 1..4, track 4's beat */
-  cmp("power-on sounds", m2.state.tracks.map((t) => [t.engine, t.preset]), fw.TRK_DEF.map((x) => x.slice(0, 2)));
-  fw.TRK_DEF.forEach((x, k) => {
+  const m2 = E.makeMockDevice({ auto: false });   /* the mock's power-on scene (GHOULBOX: main.c felucca_init) */
+  cmp("power-on sounds", m2.state.tracks.map((t) => [t.engine, t.preset]), fw.GB_SCENE.map((x) => x.slice(0, 2)));
+  fw.GB_SCENE.forEach((x, k) => {
     if (x[2]) cmp(`power-on pattern of track ${k + 1}`, m2.state.tracks[k].step.slice(0, 16).map((s) => (s.n ? s.notes[0] : 0)),
       fw.PATTERNS[x[2] - 1][0]);
   });
@@ -453,8 +453,11 @@ async function editorFm4() {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const js = (x) => JSON.stringify(x);
 /* a mock + Link pair; counts frames sent per cmd and timeouts reported */
+/* the protocol tests' fixture: Felucca's power-on parts, not GHOULBOX's scene (its engines carry the tests below:
+   FM6's ALG range, the DRUM grid, ANALOG in the library files) */
+const CLASSIC_PARTS = [[3, "DRUM", 0, 11], [2, "LOFI", 0, -1], [1, "FM6", 4, -1], [0, "ANALOG", 4, 0]];
 function attachMock(opt, linkOpt = {}) {
-  const m = E.makeMockDevice({ auto: false, ...opt });
+  const m = E.makeMockDevice({ auto: false, parts: CLASSIC_PARTS, ...opt });
   const inp = [...m.access.inputs.values()][0], out = [...m.access.outputs.values()][0];
   const sent = {}, ev = { timeouts: 0, unknown: [], pushes: [] };
   const link = new E.Link((d) => { sent[d[4]] = (sent[d[4]] || 0) + 1; out.send(d); }, {

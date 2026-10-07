@@ -3632,6 +3632,18 @@ static int test_fm4_retired(void)
     ui_power_on();
     bad += check("power-on: track 2 is FM6 PAD (TRK_DEF, was DIGITAL PAD)", trk[1].eng_req == ENGI_FM6 &&
                  str_eq(ENGINES[ENGI_FM6]->presets[trk[1].preset].name, "PAD"));
+    {   /* GHOULBOX: felucca_init's scene, by name (a preset inserted before these would swap the sound) */
+        static const char *const want[NPART][3] = {{"GURDY", "HURDY GURDY", "BALLAD"}, {"ANALOG", "CRYPT PAD", "DIRGE"},
+                                                    {"VOICE", "MONKS", "CHANT"}, {"GURDY", "DRONE WHEEL", "PEDAL"}};
+        int sc = 1;
+        for (i = 0; i < NPART; i++) {
+            const engine_t *en = ENGINES[GB_SCENE[i][0]];
+            sc &= str_eq(en->name, want[i][0]) && GB_SCENE[i][1] < en->npresets &&
+                  str_eq(en->presets[GB_SCENE[i][1]].name, want[i][1]) &&
+                  GB_SCENE[i][2] >= 1u && GB_SCENE[i][2] <= NPATTERNS && str_eq(PATTERNS[GB_SCENE[i][2] - 1u].name, want[i][2]);
+        }
+        bad += check("power-on (GHOULBOX): HURDY GURDY on BALLAD, CRYPT PAD on DIRGE, MONKS on CHANT, DRONE WHEEL on PEDAL", sc);
+    }
     preset_all_pos(&total);
     for (i = 0; i < total; i++) {
         e = preset_all_at(i, &k);

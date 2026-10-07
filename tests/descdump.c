@@ -123,6 +123,9 @@ int main(void)
     printf("],\n\"TRK_DEF\":[");
     for (k = 0; k < NPART; k++)
         printf("%s[%d,%d,%d]", k ? "," : "", TRK_DEF[k][0], TRK_DEF[k][1], TRK_DEF[k][2]);
+    printf("],\n\"GB_SCENE\":[");
+    for (k = 0; k < NPART; k++)
+        printf("%s[%d,%d,%d]", k ? "," : "", GB_SCENE[k][0], GB_SCENE[k][1], GB_SCENE[k][2]);
     printf("],\n\"FM6\":{\"bank\":0,\"own\":%u,\"init\":", (unsigned)FM6_OWN);   /* FM6: the packed patches (no bank since 1.0.3) */
     for (i = 0; i < FM6_PACKED; i++)
         printf("%s%d", i ? "," : "[", FM6_INIT[i]);
