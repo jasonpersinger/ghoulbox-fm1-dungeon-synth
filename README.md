@@ -29,6 +29,10 @@ Felucca's sequencer, song mode, effects, editor and backups all work as they do 
 
 Version 1.1 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
 
+**[User guide (PDF)](docs/guide/GHOULBOX-User-Guide-1.1.pdf):** installing, a five-minute start, the panel and
+pages, all 55 sounds, the hall and tape, the sequencer, the menu, dungeon recipes and troubleshooting. Also on
+the [Releases](https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/releases) page.
+
 ## Install
 
 In Chrome or Edge on a computer, with the FM-1 on a USB **data** cable and no other music app open:
@@ -40,8 +44,8 @@ anything. If it stops after "update mode", replug the USB cable and press Instal
 update mode until the install is finished.
 
 To go back, install Felucca from [its installer](https://hugelton.github.io/Felucca/) and restore the
-backup in its editor; its "Return to official V15" returns to M-VAVE's firmware. The package is also on
-the [Releases](https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/releases) page.
+backup in its editor; its "Return to official V15" returns to M-VAVE's firmware. The package (and the user
+guide) are also on the [Releases](https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/releases) page.
 
 Something wrong, or a sound you want? [Open an issue](https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/issues/new/choose); plans are in the [roadmap](ROADMAP.md).
 
