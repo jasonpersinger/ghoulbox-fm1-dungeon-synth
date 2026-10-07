@@ -824,7 +824,7 @@ const sayK = (k, arg = "") => { lastKey = k; lastArg = arg; $("status").textCont
 const say = (txt) => { lastKey = null; $("status").textContent = txt; };
 const log = (t) => { $("log").textContent += t + "\n"; };
 let image = null;
-const meta = {"version": "gb1.0", "product": "FM-1_900", "pkg": "../../firmware/felucca-gb1.0.fwsc"};
+const meta = {"version": "gb1.1", "product": "FM-1_900", "pkg": "../../firmware/felucca-gb1.1.fwsc"};
 
 let writing = false, stock = null, stockFileEpoch = 0, resumed = false;   // resumed: GHOULBOX, the page came back from a "reload"
 const lockInstaller = (on) => { writing = on; $("go").disabled = on || !image; $("stock-go").disabled = on || !stock; $("stock-file").disabled = on; $("stock-recovery").disabled = on; };
