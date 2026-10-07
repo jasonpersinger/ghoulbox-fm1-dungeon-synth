@@ -170,9 +170,10 @@ static void fm1_main(void)
     if ((fm1_in.buttons & 3u) == 3u) {
         panel_setup();                        /* OCT- + OCT+ held at power-on */
         settings_save();
-    }
-    fm1_delay_ms(400);
-    lcd_fill(0, 0, 240, 240, T_BG);
+        fm1_delay_ms(400);
+        lcd_fill(0, 0, 240, 240, T_BG);
+    } else
+        intro_start(fm1_ms);                  /* GHOULBOX: the scene under the splash (ui_input.c) */
 
     for (;;) {
         uint32_t m = fm1_ms;
@@ -253,14 +254,17 @@ static void fm1_main(void)
         felucca_dbg.page = ui.page;
         felucca_dbg.home = ui.home;
         felucca_dbg.stage = 1;
-        ui_input();
-        settings_poll();                              /* queued settings save: only while stopped */
-        felucca_dbg.stage = 2;
-        ui_leds();
-        ui_draw();
+        if (!intro_tick(fm1_ms, fm1_in.buttons | fm1_in.notes)) {
+            ui_input();
+            settings_poll();                          /* queued settings save: only while stopped */
+            felucca_dbg.stage = 2;
+            ui_leds();
+            ui_draw();
+        }
         felucca_dbg.stage = 9;
         while (fm1_ms - m < 15u) {                               /* ~60 UI frames/s at most */
-            ui_input();
+            if (!intro_on)
+                ui_input();
 #if FELUCCA_OTA
             ed_service();                       /* editor replies without waiting for the next frame */
 #endif
