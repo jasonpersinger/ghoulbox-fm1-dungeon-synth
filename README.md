@@ -1,51 +1,66 @@
 # GHOULBOX: FM-1 Dungeon Synth
 
-![GHOULBOX 0.3: boot, HOME, PRESETS, ENV](docs/ghoulbox-0.3.png)
+![GHOULBOX 1.0: boot, HOME, PRESETS, MENU](docs/ghoulbox-1.0.png)
 
 **GHOULBOX** is dungeon-synth firmware for the **M-VAVE FM-1**: a fork of
-[Felucca](https://github.com/hugelton/Felucca) by Hügelton Instruments, tuned for dark ambient,
+[Felucca](https://github.com/hugelton/Felucca) by Hügelton Instruments (1.0.5.2), tuned for dark ambient,
 medieval and fantasy synth music, from Old Tower and Hole Dweller to Mortiis-era dungeon synth.
-Everything Felucca does still works; GHOULBOX adds:
+Felucca's sequencer, song mode, effects, editor and backups all work as they do there; GHOULBOX adds:
 
-- **HALL reverb**: a third REVERB TYPE (FX > REVERB, KNOB 1) beside ROOM and SPRING, a Dattorro-style
-  tank. SIZE runs from a 1.5 s stone chamber to a 12 s cathedral, and DAMP darkens the tail. It borrows
-  the delay's buffer, so it needs no extra RAM; with HALL selected, the delay reaches 0.74 s.
-- **TAPE and CRSH** (FX > TAPE page): the whole mix through a worn cassette (wow, flutter, saturation,
-  treble loss, hiss) and a cheap sampler (fewer bits, lower rate). Both off by default.
-- **GURDY**, a hurdy-gurdy engine (after PHYS). It plays one note at a time, like the real instrument:
-  a bowed melody string, a drone and a fifth on a note you choose (DRN), and the trompette's buzzing
-  bridge struck in time with the tempo (BUZZ, COUP).
-- **29 dungeon presets** across 9 engines: crypt pads, string machines, monk and crypt choirs, cathedral
-  and reed organs, lute, harpsichord, harp, tower flutes and recorders, war and mournful horns, cave wind,
-  torch crackle, and five hurdy-gurdies. They come after each engine's own sounds.
-- **An old-RPG screen**: crisp VT323 pixel type, stone windows, a sword cursor, flickering wall torches,
-  and the CRYPT palette (stone, bone, torch amber, blood red). Your saved palette stays; pick CRYPT in
-  HOME (hold) > COLOR.
+- **A dungeon at power-on.** The FM-1 starts in D minor at 72 BPM: a hurdy-gurdy melody, a crypt pad,
+  chanting monks and a drone, a few seconds of it under the skull splash (any key skips it), then ready
+  to play: press PLAY.
+- **HALL reverb**: a third REVERB TYPE beside ROOM and SPRING, 1.5 s stone chamber to 12 s cathedral, on at
+  power-on; it borrows the delay's buffer, so it needs no extra RAM.
+- **TAPE and CRSH** (FX > TAPE): the mix through a worn cassette (wow, flutter, saturation, hiss) and a
+  cheap sampler's bits and rate.
+- **GURDY**, a hurdy-gurdy engine: a bowed melody string, drones you tune, and the trompette's buzzing
+  bridge struck in time.
+- **36 dungeon sounds**: crypt pads, string machines, monk, crypt and glass choirs, cathedral, reed and pipe
+  organs, lute, harpsichord and virginal, a dungeon harp, tower and lo-fi flutes, recorder, French horn, mournful
+  and grim brass, tuba, dark strings, cave wind, torch crackle and five hurdy-gurdies; seven of them are new
+  6-operator FM patches.
+- **A curated list**: 50 sounds across 11 engines. The pop, techno and percussion presets and the SAMPLE,
+  DRUM and SLICE engines are retired from the menus; projects and user presets that use them still load
+  and play them.
+- **An old-RPG screen**: VT323 pixel type, stone windows, a sword cursor, flickering wall torches, and the
+  CRYPT palette (stone, bone, torch amber, blood red), a blackletter wordmark and a skull at boot.
 
-Version 0.3 (shown on HOME held > ABOUT). It is a hobby project tested on one FM-1:
-**install at your own risk.**
+Version 1.0 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
 
 ## Install
 
-GHOULBOX installs exactly as Felucca does, from Felucca's web installer running on your own computer:
+In Chrome or Edge on a computer, with the FM-1 on a USB **data** cable and no other music app open:
+
+**[jasonpersinger.github.io/ghoulbox-fm1-dungeon-synth](https://jasonpersinger.github.io/ghoulbox-fm1-dungeon-synth/)**
+
+Press Install. The installer saves a full backup of your music, sounds and settings before it writes
+anything. If it stops after "update mode", replug the USB cable and press Install again: the FM-1 stays in
+update mode until the install is finished.
+
+To go back, install Felucca from [its installer](https://hugelton.github.io/Felucca/) and restore the
+backup in its editor; its "Return to official V15" returns to M-VAVE's firmware. The package is also on
+the [Releases](https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/releases) page.
+
+To build it yourself (JieLi toolchain and AC79 SDK, see [BUILDING.md](BUILDING.md)):
 
 ```
-./build.sh                         # see BUILDING.md: JieLi toolchain + AC79 SDK
-python3 tools/ghoulbox_serve.py    # http://localhost:8000/webapp/installer/ in Chrome or Edge
+./build.sh
+python3 tools/ghoulbox_serve.py    # http://localhost:8000/webapp/installer/
 ```
-
-The installer saves a full backup of your music, sounds and settings before it writes anything.
-To go back, reinstall Felucca from [its installer](https://hugelton.github.io/Felucca/) and restore the
-backup in the editor; its "Return to official V15" returns to M-VAVE's firmware.
 
 ## Sound auditions
 
-`tests/dungeon_demo.c` renders a passage and every GHOULBOX preset through the firmware's own audio
-code, so you can hear a change before flashing:
+The firmware's own audio and screen code runs on a computer, so a change can be heard and seen before
+flashing:
 
 ```
 gcc -O2 -w -Ibuild/gen -Ifirmware/src -o build/host/dungeon_demo tests/dungeon_demo.c -lm
-build/host/dungeon_demo build/dungeon_demo     # dungeon_*.wav and presets/NN_NAME.wav
+build/host/dungeon_demo build/dungeon_demo     # the power-on scene, passages, every GHOULBOX preset
+gcc -O2 -w -Ibuild/gen -Ifirmware/src -o build/host/preset_preview tests/preset_preview.c -lm
+build/host/preset_preview build/preset_preview # every factory preset on its own pattern
+gcc -O1 -w -Ibuild/gen -Ifirmware/src -Itests -o build/host/ghoulbox_shots tests/ghoulbox_shots.c -lm
+build/host/ghoulbox_shots build/gb_shots       # the screenshots above (PPM)
 ```
 
 ## Credits and licence
