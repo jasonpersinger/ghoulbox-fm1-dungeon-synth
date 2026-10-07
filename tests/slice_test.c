@@ -861,6 +861,15 @@ int main(int argc, char **argv)
     sine_ok("GRAIN on an empty USR3: C5", sine_run(8u, (int16_t)(SMP_USR_V0 + 2), 72), 523.25);
     check("SLICE on USR1 (a sample), SAMPLE on PIANO: not the sine", !sine_run(SLC_ENG, 1, 60).sine &&
           !sine_run(4u, 0, 60).sine, 0);
+    {   /* GHOULBOX 1.1 (review): SET 5 is still USR1 with the 1.1 sets added; GRAIN's SRC 8 takes PSALTERY's grains */
+        sine_run_t u = sine_run(4u, (int16_t)SMP_USR_V0, 60), g = sine_run(8u, 8, 62), p = sine_run(4u, 8, 62);
+        check("1.1: SAMPLE SET 5 plays the loaded USR1 (not a sine, not a new set)", !u.sine && u.peak > 2000u &&
+              smp_set_at(SMP_USR_V0) == SMP_NONE && smp_usr_at(SMP_USR_V0) == 0u, "peak %u%s", u.peak, u.sine ? ", sine" : "");
+        g = sine_run(8u, 8, 62);
+        check("1.1: GRAIN SRC 8 plays PSALTERY's grains (its 3 zones, not the sine), as SAMPLE SET 8 does", !g.sine &&
+              g.peak > 2000u && gr_p[0].nz == 3u && str_eq(SMP_SETS[smp_set_at(8)].name, "PSALTERY") && !p.sine &&
+              p.peak > 2000u, "GRAIN peak %u%s, %u zones, SAMPLE peak %u", g.peak, g.sine ? " sine" : "", gr_p[0].nz, p.peak);
+    }
     printf("slice: %s\n", fails ? "FAILED" : "all checks ok");
     return fails != 0;
 }

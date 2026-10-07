@@ -63,12 +63,16 @@ int main(void)
             free(x);
         }
         check(SET[k].name, ok);
-        if (SET[k].looped) {                                 /* held 5 s: past several loop seams, no click */
-            int32_t *x = render(SET[k].v, 62, 5.0, 0.2, &len);
-            double r = click_ratio(x, FS, 5 * FS);
-            printf("sets:   %s click ratio %.1f\n", SET[k].name, r);
-            check("  held 5 s: no click at the loop seam (ratio < 12)", r < 12.0 && rms(x, 4 * FS, 5 * FS) > 300.0);
-            free(x);
+        if (SET[k].looped) {                                 /* each zone held 5 s: past several loop seams, no click */
+            int okz = 1;
+            for (z = 0; z < set->nz; z++) {
+                int32_t *x = render(SET[k].v, (uint32_t)(SMP_ZONES[set->z0 + z].root16 / 16), 5.0, 0.2, &len);
+                double r = click_ratio(x, FS, 5 * FS);
+                printf("sets:   %s zone %u click ratio %.1f\n", SET[k].name, z, r);
+                okz &= r < 12.0 && rms(x, 4 * FS, 5 * FS) > 300.0;
+                free(x);
+            }
+            check("  every zone held 5 s: no click at the loop seam (ratio < 12)", okz);
         } else {                                             /* plucked: rings, then silence */
             int32_t *x = render(SET[k].v, 62, 3.0, 0.5, &len);
             check("  plucked: decays to silence", rms(x, FS / 20, FS / 5) > 300.0 && rms(x, len - FS / 5, len) < 30.0);
