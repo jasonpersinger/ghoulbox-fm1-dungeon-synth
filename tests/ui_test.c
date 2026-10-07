@@ -3054,7 +3054,7 @@ static int test_sample_alert(void)
                  !snd_missing(&trk[1], &i) && !snd_missing(&trk[2], &i) && !snd_missing(&trk[3], &i) &&
                  !str_eq(ui.msg, nf));
     set_engine_of(TSEL, ENGI_SAMPLE);
-    TSEL->p[P_E0] = (int16_t)(SMP_NSETS + 1u);      /* SET USR2: empty */
+    TSEL->p[P_E0] = (int16_t)(SMP_USR_V0 + 1u);      /* SET USR2: empty */
     frame();
     ok = msg_is(nf);
     frames(1500);
@@ -3064,19 +3064,19 @@ static int test_sample_alert(void)
     frames(100);
     ok &= !ui.msg_t;
     bad += check("SAMPLE on an empty USR2: NO SAMPLE once (not again on a note)", ok);
-    TSEL->p[P_E0] = (int16_t)(SMP_NSETS + 2u);      /* USR3: said for it */
+    TSEL->p[P_E0] = (int16_t)(SMP_USR_V0 + 2u);      /* USR3: said for it */
     frame();
     ok = msg_is(nf);
     TSEL->p[P_E0] = 0;                              /* PIANO: nothing; then USR3 again: said again */
     frames(1500);
     ok &= !ui.msg_t;
-    TSEL->p[P_E0] = (int16_t)(SMP_NSETS + 2u);
+    TSEL->p[P_E0] = (int16_t)(SMP_USR_V0 + 2u);
     frame();
     ok &= msg_is(nf);
     bad += check("SAMPLE: another empty slot is said; back to it after a sample: said again", ok);
     frames(1500);
     set_engine_of(TSEL, 8u);                         /* GRAIN, SRC USR2 */
-    TSEL->p[P_E0] = (int16_t)(SMP_NSETS + 1u);
+    TSEL->p[P_E0] = (int16_t)(SMP_USR_V0 + 1u);
     frame();
     bad += check("GRAIN on an empty USR2: said", msg_is(nf));
     frames(1500);
@@ -3094,7 +3094,7 @@ static int test_sample_alert(void)
 #endif
     /* a project with an empty slot: said after LOADED */
     set_engine_of(TSEL, ENGI_SAMPLE);
-    TSEL->p[P_E0] = (int16_t)(SMP_NSETS + 1u);
+    TSEL->p[P_E0] = (int16_t)(SMP_USR_V0 + 1u);
     frames(1500);
     project_save(2);
     frames(1500);
@@ -6129,6 +6129,21 @@ static int test_hidden_presets(void)
     return bad;
 }
 
+/* GHOULBOX 1.1: a SET / SRC value -> what it plays. 0..4 the 1.0 sets, 5..7 USR1..3 (fixed), 8.. the sets added since */
+static int test_sample_values(void)
+{
+    int ok = 1;
+    uint32_t v;
+    for (v = 0; v < SMP_NALL; v++) {
+        uint32_t s = smp_set_at(v);
+        if (v < 5u) ok &= s == v;
+        else if (v < 8u) ok &= s == SMP_NONE && smp_usr_at(v) == v - 5u;
+        else ok &= s == v - 3u && s < SMP_NSETS;
+    }
+    ok &= SMP_USR_V0 == 5u && SMP_NALL == SMP_NSETS + 3u && str_eq(SMP_ALL_NAMES[5], "USR1") && str_eq(SMP_ALL_NAMES[7], "USR3");
+    return check("SAMPLE SET values: 0..4 the 1.0 sets, USR1..3 at 5..7, later sets after them", ok);
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -6137,6 +6152,7 @@ int main(void)
     bad += test_sound_loads();
     bad += test_boot_intro();
     bad += test_hidden_presets();
+    bad += test_sample_values();
     bad += test_patterns();
     bad += test_rec();
     bad += test_rec_hold_clear();

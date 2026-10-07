@@ -857,8 +857,8 @@ int main(int argc, char **argv)
           str_eq(N_SLC_SRC[3], "USR3") && str_eq(N_SLC_SRC[4], "PIANO") && SLC_BREAK.len != 0u, 0);
     sine_ok("SLICE on an empty USR2: A4", sine_run(SLC_ENG, 2, 69), 440.0);
     sine_ok("SLICE on an empty USR2: A3", sine_run(SLC_ENG, 2, 57), 220.0);
-    sine_ok("SAMPLE on an empty USR2: A4", sine_run(4u, (int16_t)(SMP_NSETS + 1), 69), 440.0);
-    sine_ok("GRAIN on an empty USR3: C5", sine_run(8u, (int16_t)(SMP_NSETS + 2), 72), 523.25);
+    sine_ok("SAMPLE on an empty USR2: A4", sine_run(4u, (int16_t)(SMP_USR_V0 + 1), 69), 440.0);
+    sine_ok("GRAIN on an empty USR3: C5", sine_run(8u, (int16_t)(SMP_USR_V0 + 2), 72), 523.25);
     check("SLICE on USR1 (a sample), SAMPLE on PIANO: not the sine", !sine_run(SLC_ENG, 1, 60).sine &&
           !sine_run(4u, 0, 60).sine, 0);
     printf("slice: %s\n", fails ? "FAILED" : "all checks ok");

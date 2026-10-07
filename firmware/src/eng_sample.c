@@ -48,6 +48,16 @@ static uint32_t pow2_q16(int32_t d16)
 #define SMP_USER_DATA 512u
 #define SMP_USER_MAGIC 0x504D5346u                  /* "FSMP" */
 #define SMP_NALL (SMP_NSETS + SMP_USER_SLOTS)
+#define SMP_USR_V0 5u                                /* SET / SRC value of USR1: 1.0's, fixed; sets added later come after USR3 */
+#define SMP_NONE 0xFFFFFFFFu
+_Static_assert(SMP_NSETS >= SMP_USR_V0, "the 1.0 sets (assets/samples-cc0) are needed: USR1 stays at value 5");
+/* GHOULBOX: the built-in set SET / SRC value v plays (SMP_SETS index), SMP_NONE for a user slot */
+static uint32_t smp_set_at(uint32_t v)
+{
+    v %= SMP_NALL;
+    return v < SMP_USR_V0 ? v : v < SMP_USR_V0 + SMP_USER_SLOTS ? SMP_NONE : v - SMP_USER_SLOTS;
+}
+static uint32_t smp_usr_at(uint32_t v) { return (v % SMP_NALL - SMP_USR_V0) % SMP_USER_SLOTS; }   /* (a user slot's v) */
 typedef struct {
     uint32_t magic;
     uint16_t version;
@@ -115,9 +125,10 @@ static void smp_sine(int32_t *out, uint32_t n, const vmod_t *m, int32_t d16, int
 /* SET / SRC si (0..SMP_NALL - 1) has no sample data: an empty or invalid user slot, a built-in set without data */
 static int smp_set_missing(uint32_t si)
 {
-    if (si < SMP_NSETS)
-        return !SMP_ZONES[SMP_SETS[si].z0].n;
-    return !usr_nz[(si - SMP_NSETS) % SMP_USER_SLOTS];
+    uint32_t s = smp_set_at(si);
+    if (s != SMP_NONE)
+        return !SMP_ZONES[SMP_SETS[s].z0].n;
+    return !usr_nz[smp_usr_at(si)];
 }
 
 /* zone index in a voice: < 0x8000 built-in, else 0x8000 | slot << 5 | zone */
@@ -153,9 +164,9 @@ static inline int32_t sample_next(const smp_zone_t *z, voice_t *v, int loop)
 
 static void sample_note_on(track_t *t, voice_t *v)
 {
-    uint32_t si = (uint32_t)t->p[P_E0] % SMP_NALL, i, zi = 0xFFFFu, width = 128u;
-    if (si < SMP_NSETS) {                           /* a built-in set: its zones split the keyboard */
-        const smp_set_t *set = &SMP_SETS[si];
+    uint32_t si = (uint32_t)t->p[P_E0] % SMP_NALL, s = smp_set_at(si), i, zi = 0xFFFFu, width = 128u;
+    if (s != SMP_NONE) {                            /* a built-in set: its zones split the keyboard */
+        const smp_set_t *set = &SMP_SETS[s];
         for (i = 0; i < set->nz; i++)
             if (v->note >= SMP_ZONES[set->z0 + i].lo && v->note <= SMP_ZONES[set->z0 + i].hi) {
                 zi = set->z0 + i;
@@ -163,7 +174,7 @@ static void sample_note_on(track_t *t, voice_t *v)
             }
         v->s[4] = (int32_t)(zi == 0xFFFFu ? set->z0 : zi);
     } else {                                        /* user slot: silent if empty; the narrowest zone plays */
-        uint32_t k = si - SMP_NSETS;
+        uint32_t k = smp_usr_at(si);
         for (i = 0; i < usr_nz[k]; i++) {
             const smp_zone_t *z = &usr_zone[k][i];
             if (v->note >= z->lo && v->note <= z->hi && z->hi - z->lo <= width) {

@@ -798,7 +798,7 @@ static void setup(int s)
     case S_MESSAGE: ui_say("LOADED ", "07 A VERY LONG PATTERN NAME"); break;
     case S_MESSAGE_KEY: ui_message("[SAVE] HOLD TO UNDO"); break;            /* a message with a keycap */
     case S_MESSAGE_NOFILE:                          /* a missing sample (ui_input.c sample_notice): USR2 */
-        eng(ENGI_SAMPLE); TSEL->p[P_E0] = (int16_t)(SMP_NSETS + 1); memset(snd_said, 0, sizeof snd_said); sample_notice(); break;
+        eng(ENGI_SAMPLE); TSEL->p[P_E0] = (int16_t)(SMP_USR_V0 + 1); memset(snd_said, 0, sizeof snd_said); sample_notice(); break;
     case S_PRESETS: favorite_set(0, 4, 1); favorite_set(0, 5, 1); go_page(GR_BROWSE); break;
     case S_PRESETS_NOFAV: favorites.filter = 1; go_page(GR_BROWSE); break;
     case S_USER: song.playing = 0; up_store(3, "MY LONG BASS NAME"); up_store(4, "PAD"); ui.uslot = 3; go_page(GR_USER); break;
