@@ -5,13 +5,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Felucca</title>
+<title>GHOULBOX</title>
 <style>
-  :root { --bg: #fff; --fg: #000; --dim: #777; }
+  :root { --bg: #F2EAD8; --fg: #1E140C; --dim: #6E604C; --theme: #9A5A0C; }   /* GHOULBOX: parchment / CRYPT */
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) { --bg: #000; --fg: #fff; --dim: #888; }
+    :root:not([data-theme="light"]) { --bg: #0E0B08; --fg: #E8DCC4; --dim: #A0927C; --theme: #E89A2C; }
   }
-  :root[data-theme="dark"] { --bg: #000; --fg: #fff; --dim: #888; }
+  :root[data-theme="dark"] { --bg: #0E0B08; --fg: #E8DCC4; --dim: #A0927C; --theme: #E89A2C; }
+  h1 { color: var(--theme); }
   body { margin: 0; background: var(--bg); color: var(--fg);
          font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; }
   main { max-width: 520px; margin: 0 auto; padding: 48px 16px; }
@@ -29,7 +30,7 @@
 <body>
 <main>
   <button class="lang" id="lang"></button>
-  <h1>Felucca</h1>
+  <h1>GHOULBOX <span class="small" style="color:var(--dim)">on Felucca</span></h1>
   <p data-t="intro"></p>
   <p data-t="warn"></p>
   <p class="small" data-t="direct"></p>
@@ -447,14 +448,30 @@ class Updater {
     return null;
   }
 
-  async waitFor(filter, ms) {
+  // halfReload (GHOULBOX): Chrome on Linux gives an open page only the output of a port that came back (the FM-1
+  // rebooted into its loader); the input never appears there, though the system has it and a new page sees both.
+  // When an FM-1 output stays without its input for 3 tries, stop with "reload": the page reloads and resumes.
+  async waitFor(filter, ms, halfReload = false) {
     const end = Date.now() + ms;
+    let half = 0;
     while (Date.now() < end) {
       const dev = await this.find(filter);
       if (dev) return dev;
+      if (halfReload && this.halfPort()) {
+        if (++half >= 3) throw fail("reload", "the update loader is there, but this page cannot hear it: reloading to continue");
+      } else {
+        half = 0;
+      }
       await sleep(1000);
     }
     return null;
+  }
+
+  // an FM-1 port listed as an output with no input of its name (GHOULBOX: waitFor's halfReload)
+  halfPort() {
+    const ins = new Set([...this.access.inputs.values()].filter((p) => p.state !== "disconnected").map((p) => p.name));
+    return [...this.access.outputs.values()].some((o) => o.state !== "disconnected" &&
+      /fm-1|felucca|ota|composite|sinco|usb-midi/i.test(o.name || "") && !ins.has(o.name));
   }
 
   // serve read requests until the device asks for one of the finish addresses; stops early
@@ -501,7 +518,7 @@ class Updater {
     if (!s1.finished) throw fail(s1.lost ? "lost" : "stopped", `the device ${s1.lost ? "was disconnected" : "stopped"} after ${s1.served} requests: nothing was written`);
     step("loader");
     await sleep(3000);
-    const ota = await this.waitFor((id) => id.model === "ota-" + model, 30000);
+    const ota = await this.waitFor((id) => id.model === "ota-" + model, 30000, true);
     if (!ota) throw fail("noloader", "the update loader did not appear. Replug the USB cable and press Install again: the device stays in update mode until it is finished.");
     const s2 = await this.write(ota, image, step);
     if (!s2.finished) throw fail(s2.lost ? "lost" : "stopped", `the loader ${s2.lost ? "was disconnected" : "stopped"} after ${s2.served} requests. Replug and press Install again to resume.`);
@@ -525,9 +542,11 @@ class Updater {
   }
 
   // resume: the device is already in update mode (loader) -> true when the write finished
-  async resume(image, onStep, product = null) {
+  // waitMs (GHOULBOX): look for the loader that long (a page reloaded to reach it can list it a moment late); 0: once
+  async resume(image, onStep, product = null, waitMs = 0) {
     const model = product && product.split("_")[0];
-    const ota = await this.find((id) => model ? id.model === "ota-" + model : IS_OTA(id));
+    const isOta = (id) => model ? id.model === "ota-" + model : IS_OTA(id);
+    const ota = waitMs ? await this.waitFor(isOta, waitMs) : await this.find(isOta);
     if (!ota) return false;
     const step = onStep || (() => {});
     const result = await this.write(ota, image, step);
@@ -747,6 +766,8 @@ const TEXT = {
     notfound: "FM-1 が見つかりません。USB ケーブル（データ通信用か）を確かめ、MIDI を使う他のアプリを閉じてから、もう一度押してください。",
     model: "接続されている機器は FM-1 ではありません。",
     lost: "USB の接続が切れました。挿し直してもう一度押してください。",
+    reload: "書き込みモードの FM-1 に接続するためページを再読み込みします…",
+    resuming: "書き込みを続けます…",
     noloader: "書き込みモードの FM-1 が見つかりません。USB を挿し直してもう一度押してください（終わるまで書き込みモードのままです）。",
     noreturn: "FM-1 が戻ってきません。電源を入れ直してください。",
     mismatch: "書き込みは終わりましたが、FM-1 が別のバージョンを報告しています: ",
@@ -778,6 +799,8 @@ const TEXT = {
     notfound: "FM-1 not found. Check the USB cable (a data cable), close other apps that use MIDI, and press Install again.",
     model: "The connected device is not an FM-1.",
     lost: "The USB connection was lost. Replug it and press Install again.",
+    reload: "Reloading the page to reach the FM-1 in update mode…",
+    resuming: "Continuing the update…",
     noloader: "The FM-1 in update mode was not found. Replug the USB cable and press Install again (it stays in update mode until it is finished).",
     noreturn: "The FM-1 did not come back. Power-cycle it.",
     mismatch: "Written, but the FM-1 reports another version: ",
@@ -801,9 +824,9 @@ const sayK = (k, arg = "") => { lastKey = k; lastArg = arg; $("status").textCont
 const say = (txt) => { lastKey = null; $("status").textContent = txt; };
 const log = (t) => { $("log").textContent += t + "\n"; };
 let image = null;
-const meta = {"version": "1.0.3", "product": "FM-1_910", "pkg": "../../firmware/felucca-1.0.3.fwsc"};
+const meta = {"version": "gb1.0", "product": "FM-1_900", "pkg": "../../firmware/felucca-gb1.0.fwsc"};
 
-let writing = false, stock = null, stockFileEpoch = 0;
+let writing = false, stock = null, stockFileEpoch = 0, resumed = false;   // resumed: GHOULBOX, the page came back from a "reload"
 const lockInstaller = (on) => { writing = on; $("go").disabled = on || !image; $("stock-go").disabled = on || !stock; $("stock-file").disabled = on; $("stock-recovery").disabled = on; };
 window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault(); e.returnValue = t("leave"); } });
 
@@ -815,8 +838,11 @@ window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault
     const pkg = new Uint8Array(await r.arrayBuffer());
     if (productOf(pkg) !== meta.product) { sayK("badpkg"); return; }
     image = logicalImage(pkg);
-    say(`Felucca ${meta.version}`);
+    say(`GHOULBOX ${meta.version}`);
     $("go").disabled = false;
+    let resume = null;
+    try { resume = sessionStorage.getItem("ghoulbox-resume"); sessionStorage.removeItem("ghoulbox-resume"); } catch (_) {}
+    if (resume) { resumed = true; sayK("resuming"); $("go").click(); }   // (GHOULBOX: back from the "reload" below)
   } catch (e) { sayK("loadfail", e.message); }
 })();
 
@@ -838,6 +864,14 @@ $("go").addEventListener("click", async () => {
       if (k === "reboot") sayK("reboot");
       if (k === "done") { $("bar").value = 100; sayK("done"); }
     };
+    if (resumed) {                                   // GHOULBOX: reloaded to reach the loader: wait for it (its ports can be
+      resumed = false;                               // listed a moment late), never fall back to looking for a running FM-1
+      const ok = await up.resume(image, step, meta.product, 15000);
+      if (ok) { try { sessionStorage.removeItem("ghoulbox-reloads"); } catch (_) {} }
+      sayK(ok ? "done" : "noloader");
+      lockInstaller(false);
+      return;
+    }
     const ota = await up.find((id) => /^ota-/i.test(id.model));
     if (ota) {
       ota.link.close();
@@ -846,6 +880,22 @@ $("go").addEventListener("click", async () => {
       await up.install(image, meta.product, step);
     }
   } catch (e) {
+    let reloads = 0;
+    try { reloads = +(sessionStorage.getItem("ghoulbox-reloads") || 0); } catch (_) {}
+    if (e && e.code === "reload" && reloads >= 2) {   // GHOULBOX: two reloads did not reach it: the cable, not the page
+      try { sessionStorage.removeItem("ghoulbox-reloads"); } catch (_) {}
+      sayK("noloader");
+      log(String(e && e.stack || e));
+      lockInstaller(false);
+      return;
+    }
+    if (e && e.code === "reload") {                    // GHOULBOX: Chrome on Linux hides the loader's input from this page;
+      sayK("reload");                                  // a reloaded page sees it and resumes (the loader waits for us)
+      try { sessionStorage.setItem("ghoulbox-resume", "1"); sessionStorage.setItem("ghoulbox-reloads", String(reloads + 1)); } catch (_) {}
+      writing = false;                                 // (no "leave this page?" prompt)
+      setTimeout(() => location.reload(), 500);
+      return;
+    }
     if (e && e.code && TEXT[lang][e.code]) sayK(e.code, e.detail || "");
     else sayK("error", e && e.message);
     log(String(e && e.stack || e));
@@ -865,7 +915,7 @@ $("stock-file").addEventListener("change", async () => {
 });
 function saveArchive(archive) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(archive)], {type:"application/json"}));
-  const a = document.createElement("a"); a.href = url; a.download = `Felucca-backup-${new Date().toISOString().slice(0,10)}.json`;
+  const a = document.createElement("a"); a.href = url; a.download = `GHOULBOX-backup-${new Date().toISOString().slice(0,10)}.json`;
   document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function archiveInfo(a) {
