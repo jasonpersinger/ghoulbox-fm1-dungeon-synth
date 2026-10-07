@@ -1,0 +1,20 @@
+name: Sound or feature request
+description: An instrument, preset, pattern or feature you'd like in GHOULBOX
+labels: [request]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Requests are welcome; there's no promise every one will be added. Check the [roadmap](https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/blob/ghoulbox/ROADMAP.md) first.
+  - type: textarea
+    id: what
+    attributes:
+      label: What you'd like
+      description: The sound or feature, and what you'd use it for
+    validations:
+      required: true
+  - type: input
+    id: reference
+    attributes:
+      label: A reference (optional)
+      description: A song, album or video that has the sound

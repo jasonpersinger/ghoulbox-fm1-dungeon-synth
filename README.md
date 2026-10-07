@@ -42,6 +42,8 @@ To go back, install Felucca from [its installer](https://hugelton.github.io/Felu
 backup in its editor; its "Return to official V15" returns to M-VAVE's firmware. The package is also on
 the [Releases](https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/releases) page.
 
+Something wrong, or a sound you want? [Open an issue](https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/issues/new/choose); plans are in the [roadmap](ROADMAP.md).
+
 To build it yourself (JieLi toolchain and AC79 SDK, see [BUILDING.md](BUILDING.md)):
 
 ```
