@@ -1,3 +1,67 @@
+# GHOULBOX: FM-1 Dungeon Synth
+
+![GHOULBOX 0.3: boot, HOME, PRESETS, ENV](docs/ghoulbox-0.3.png)
+
+**GHOULBOX** is dungeon-synth firmware for the **M-VAVE FM-1**: a fork of
+[Felucca](https://github.com/hugelton/Felucca) by Hügelton Instruments, tuned for dark ambient,
+medieval and fantasy synth music, from Old Tower and Hole Dweller to Mortiis-era dungeon synth.
+Everything Felucca does still works; GHOULBOX adds:
+
+- **HALL reverb**: a third REVERB TYPE (FX > REVERB, KNOB 1) beside ROOM and SPRING, a Dattorro-style
+  tank. SIZE runs from a 1.5 s stone chamber to a 12 s cathedral, and DAMP darkens the tail. It borrows
+  the delay's buffer, so it needs no extra RAM; with HALL selected, the delay reaches 0.74 s.
+- **TAPE and CRSH** (FX > TAPE page): the whole mix through a worn cassette (wow, flutter, saturation,
+  treble loss, hiss) and a cheap sampler (fewer bits, lower rate). Both off by default.
+- **GURDY**, a hurdy-gurdy engine (after PHYS). It plays one note at a time, like the real instrument:
+  a bowed melody string, a drone and a fifth on a note you choose (DRN), and the trompette's buzzing
+  bridge struck in time with the tempo (BUZZ, COUP).
+- **29 dungeon presets** across 9 engines: crypt pads, string machines, monk and crypt choirs, cathedral
+  and reed organs, lute, harpsichord, harp, tower flutes and recorders, war and mournful horns, cave wind,
+  torch crackle, and five hurdy-gurdies. They come after each engine's own sounds.
+- **An old-RPG screen**: crisp VT323 pixel type, stone windows, a sword cursor, flickering wall torches,
+  and the CRYPT palette (stone, bone, torch amber, blood red). Your saved palette stays; pick CRYPT in
+  HOME (hold) > COLOR.
+
+Version 0.3 (shown on HOME held > ABOUT). It is a hobby project tested on one FM-1:
+**install at your own risk.**
+
+## Install
+
+GHOULBOX installs exactly as Felucca does, from Felucca's web installer running on your own computer:
+
+```
+./build.sh                         # see BUILDING.md: JieLi toolchain + AC79 SDK
+python3 tools/ghoulbox_serve.py    # http://localhost:8000/webapp/installer/ in Chrome or Edge
+```
+
+The installer saves a full backup of your music, sounds and settings before it writes anything.
+To go back, reinstall Felucca from [its installer](https://hugelton.github.io/Felucca/) and restore the
+backup in the editor; its "Return to official V15" returns to M-VAVE's firmware.
+
+## Sound auditions
+
+`tests/dungeon_demo.c` renders a passage and every GHOULBOX preset through the firmware's own audio
+code, so you can hear a change before flashing:
+
+```
+gcc -O2 -w -Ibuild/gen -Ifirmware/src -o build/host/dungeon_demo tests/dungeon_demo.c -lm
+build/host/dungeon_demo build/dungeon_demo     # dungeon_*.wav and presets/NN_NAME.wav
+```
+
+## Credits and licence
+
+GHOULBOX changes © 2026 Jason Persinger ([@jasonpersinger](https://github.com/jasonpersinger)),
+GPL-3.0-only, like Felucca. It is built entirely on **Felucca** by Leo Kuroshita / Hügelton Instruments
+(GPL-3.0-only); please support the original ([GitHub Sponsors](https://github.com/sponsors/hugelton),
+[itch.io](https://hugelton.itch.io/felucca)). GHOULBOX adds the VT323 font (Peter Hull, SIL OFL 1.1) and
+the Pirata One font (Rodrigo Fuenzalida, Nicolas Massi; SIL OFL 1.1); see [LICENSING.md](LICENSING.md).
+M-VAVE and FM-1 are trademarks of their owners; GHOULBOX is not affiliated with or endorsed by them or by
+Hügelton Instruments.
+
+Felucca's own README follows.
+
+---
+
 # Felucca
 
 [![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
