@@ -16,17 +16,19 @@ Felucca's sequencer, song mode, effects, editor and backups all work as they do 
   cheap sampler's bits and rate.
 - **GURDY**, a hurdy-gurdy engine: a bowed melody string, drones you tune, and the trompette's buzzing
   bridge struck in time.
-- **36 dungeon sounds**: crypt pads, string machines, monk, crypt and glass choirs, cathedral, reed and pipe
+- **Real recordings** (1.1): a bowed psaltery, a Renaissance chamber organ, a baroque tenor recorder and a folk
+  harp, sampled from public-domain (CC0) libraries, on the SAMPLE engine.
+- **41 dungeon sounds**: crypt pads, string machines, monk, crypt and glass choirs, cathedral, reed and pipe
   organs, lute, harpsichord and virginal, a dungeon harp, tower and lo-fi flutes, recorder, French horn, mournful
-  and grim brass, tuba, dark strings, cave wind, torch crackle and five hurdy-gurdies; seven of them are new
-  6-operator FM patches.
-- **A curated list**: 50 sounds across 11 engines. The pop, techno and percussion presets and the SAMPLE,
-  DRUM and SLICE engines are retired from the menus; projects and user presets that use them still load
-  and play them.
+  and grim brass, tuba, dark strings, cave wind, torch crackle, a bagpipe and five hurdy-gurdies, plus the four
+  recordings; seven of them are new 6-operator FM patches.
+- **A curated list**: 55 sounds across 12 engines. The pop, techno and percussion presets and the DRUM and
+  SLICE engines are retired from the menus; projects and user presets that use them still load and play
+  them.
 - **An old-RPG screen**: VT323 pixel type, stone windows, a sword cursor, flickering wall torches, and the
   CRYPT palette (stone, bone, torch amber, blood red), a blackletter wordmark and a skull at boot.
 
-Version 1.0 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
+Version 1.1 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
 
 ## Install
 

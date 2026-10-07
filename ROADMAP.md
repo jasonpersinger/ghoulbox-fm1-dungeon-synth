@@ -3,19 +3,20 @@
 What's planned for GHOULBOX, the dungeon-synth firmware for the M-VAVE FM-1. Plans change; nothing here is a promise.
 Have an idea? [Open a sound or feature request](https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/issues/new/choose).
 
-## Now: 1.0.x
+## Now: install fixes
 
 - Fixing install problems on systems beyond the one GHOULBOX was tested on. If the installer fails for you, please
   [report it](https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/issues/new/choose) with your OS, your browser
   and the text from the installer's log box.
 
-## Next: 1.1, sampled instruments
+## Done: 1.1, sampled instruments
 
-Real recordings alongside the synthesized sounds, from public-domain (CC0) sample libraries, taking the place of the
-retired piano, flute and sax. Candidates being considered include a choir, a recorder, and a dulcimer or psaltery.
+Real recordings from public-domain (CC0) libraries: a bowed psaltery, a Renaissance chamber organ, a baroque tenor
+recorder and a folk harp; and a BAGPIPE preset. (Neither of the CC0 libraries used has a choir, so the choirs stay synthesized.)
 
-Also planned:
-- more dungeon presets: bowed psaltery, a low drone voice, a shawm or bagpipe
+## Next
+
+- more dungeon presets: a low drone voice, a shawm
 - more dungeon patterns beyond the four in the power-on scene
 
 ## Later
