@@ -38,6 +38,15 @@ PICK = {
     "FLUTE": (VSCO, "Woodwinds/Flute/susvib", [r"_C4_v1_1", r"_C5_v1_1", r"_C6_v1_1"]),
     "SAX": (VCSL, "Aerophones/Reed Aerophones/Tenor Saxophone/Non-Vibrato",
             [r"_A#1_vl2_rr1", r"_A#2_vl2_rr1", r"_A#3_vl2_rr1"]),
+    # GHOULBOX 1.1 (VCSL, CC0): fetched with `tools/fetch_cc0.py PSALTERY RENORGAN RECORDER FOLKHARP`
+    "PSALTERY": (VCSL, "Chordophones/Zithers/Psaltery, Bowed and Plucked/LongBow",
+                 [r"_A#3_Main_LongBow", r"_E4_Main_LongBow", r"_D5_Main_LongBow"]),
+    "RENORGAN": (VCSL, "Aerophones/Edge-blown Aerophones/Renaissance Organ/8'",
+                 [r"_C2_rr1", r"_C3_rr1", r"_C4_rr1", r"_C5_rr1"]),
+    "RECORDER": (VCSL, "Aerophones/Edge-blown Aerophones/Baroque Tenor Recorder/Sustain",
+                 [r"_Sus_C3_", r"_Sus_C4_", r"_Sus_C5_"]),
+    "FOLKHARP": (VCSL, "Chordophones/Composite Chordophones/Folk Harp",
+                 [r"_C2_v2_RR1", r"_C3_v2_RR1", r"_C4_v2_RR1", r"_C5_v2_RR1"]),
     "KIT": (VCSL, None, [
         ("Idiophones/Struck Idiophones/Tambourine 1", r"Tamb1_Hit_v2"),
         ("Idiophones/Struck Idiophones/Shaker, Small", r"ShakerDouble_Down_rr1"),
@@ -69,8 +78,18 @@ def fetch(repo, path, dest):
 
 
 def main():
+    """with set names (GHOULBOX): fetch only those, keeping the other sets' ATTRIBUTION / CREDITS lines"""
+    only = set(sys.argv[1:])
+    unknown = only - set(PICK)
+    if unknown:
+        raise SystemExit(f"no such set: {', '.join(sorted(unknown))}")
     total, credits = 0, []
+    if only:                                            # the lines of the sets this run does not fetch
+        old = (DEST / "ATTRIBUTION.txt").read_text().splitlines() if (DEST / "ATTRIBUTION.txt").exists() else []
+        credits = [l for l in old if "  <-  " in l and l.split("/", 1)[0] not in only]
     for name, (repo, folder, pats) in PICK.items():
+        if only and name not in only:
+            continue
         files = tree(repo)
         for k, p in enumerate(pats):
             d, rx = (folder, p) if folder else p

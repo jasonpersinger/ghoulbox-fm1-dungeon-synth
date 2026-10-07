@@ -59,7 +59,13 @@ TR = 22050                                   # stored sample rate
 # from the web editor). TRANH was removed (66 KB of flash); its index 1 stays, an alias of PIANO
 # ("alias": the set named). PERC (the GM kit) was removed (66 KB); its index 4 stays, an alias of
 # PIANO too (PERC_SLOT; its sounds load as the DRUM engine)
-CC0_SETS = [("PIANO", "oneshot"), ("PIANO", "alias"), ("FLUTE", "sus"), ("SAX", "sus"), ("PIANO", "alias")]
+CC0_SETS = [("PIANO", "oneshot"), ("PIANO", "alias"), ("FLUTE", "sus"), ("SAX", "sus"), ("PIANO", "alias"),
+            # GHOULBOX 1.1: appended (data sets 5..8); their SET values follow USR1..3 (8..11: eng_sample.c smp_set_at)
+            ("PSALTERY", "sus"), ("RENORGAN", "sus"), ("RECORDER", "sus"), ("FOLKHARP", "oneshot")]
+USR_V0 = 5                                   # eng_sample.c SMP_USR_V0: the SET value of USR1 (1.0's, fixed)
+NUSR = 3                                     # the user slots USR1..3
+PRESET_NAME = {"PSALTERY": "BOWED PSALT", "RENORGAN": "REN ORGAN", "RECORDER": "TENOR RECORD", "FOLKHARP": "FOLK HARP"}
+GB_FX = "FX(0, 20, 15, 95)"                  # GHOULBOX presets' sends (the HALL)
 PERC_SLOT = 4                                # core.h SMP_SET_PERC: SAMPLE's factory presets end before it
 MEASURED_TUNING = ()                         # sets whose recordings are not at A440 (was TRANH, ~+35 ct)
 
@@ -88,8 +94,9 @@ ENV = {"wave":(5, 80, 100, 50), "kit": (0, 127, 127, 60), "multi": (0, 85, 0, 75
        "oneshot": (0, 127, 127, 70), "sus": (12, 80, 120, 60)}
 
 # PIANO's notes cut to 0.75 s (saves flash), faded out over the last SET_FADE s
-SET_KEEP = {"PIANO": 0.75}
-SET_FADE = {"PIANO": 0.15}
+SET_KEEP = {"PIANO": 0.75,
+            "PSALTERY": 0.80, "RENORGAN": 0.70, "RECORDER": 0.60, "FOLKHARP": 1.10}   # GHOULBOX: <= 130 KB, the four
+SET_FADE = {"PIANO": 0.15, "FOLKHARP": 0.50}
 
 _wavs = {}
 
@@ -337,7 +344,8 @@ class Builder:
         L.append(f"#define SMP_NSETS {max(1, len(sets))}")
         named = sets or [("NONE", 0, 0)]
         perc = PERC_SLOT if len(named) > PERC_SLOT else len(named)
-        L.append(f"#define SMP_NPRESETS {perc}")
+        L.append(f"#define SMP_NPRESETS {len(named) if len(named) > PERC_SLOT + 1 else perc}"
+                 "   /* GHOULBOX: the sets after PERC's alias have presets too (it stays hidden: SMP_SET_ORIG) */")
         if len(named) > PERC_SLOT:
             L.append(f"#define SMP_PERC_SLOT {PERC_SLOT}   /* once PERC (the GM kit): an alias, its sounds load as DRUM */")
         L.append("/* the initializers from SMP_NPRESETS on (the retired PERC's alias) are outside factory browsing */")
@@ -348,7 +356,9 @@ class Builder:
             loop = 0 if k == "kit" else 1
             pat = ", PAT(12)" if k == "kit" else ""     # a kit: engines.c PATTERNS[11] BEAT
             si = self.alias.get(i, i)                   # an alias: the original's preset (hidden by its name)
-            L.append(f'    {{"{name}", {{{si}, 0, 0, {loop}, 127, 0, 0, 0}}, {{{a}, {d}, {s_}, {r}}}, 0, 0{pat}}},')
+            val = si if si < USR_V0 else si + NUSR      # its SET value (GHOULBOX: after USR1..3 from set 5 on)
+            fx = ", " + GB_FX if name in PRESET_NAME else ""
+            L.append(f'    {{"{PRESET_NAME.get(name, name)}", {{{val}, 0, 0, {loop}, 127, 0, 0, 0}}, {{{a}, {d}, {s_}, {r}}}, 0, 0{fx}{pat}}},')
         L.append("};")
         orig = [self.alias.get(i, i) for i in range(len(named))]
         L.append("/* SET i plays SMP_SET_ORIG[i]: != i for a retired set kept as an alias (its preset i too) */")
@@ -356,6 +366,9 @@ class Builder:
         L.append(f"#define SMP_NALIAS {sum(1 for i, o in enumerate(orig) if o != i and i < perc)}   /* among the presets */")
         names = ", ".join(f'"{n}"' for n, _, _ in named)
         L.append("#define SMP_SET_NAMES_INIT " + names)
+        L.append("/* GHOULBOX: SET / SRC values 0..4 are the 1.0 sets, then USR1..3, then the sets added since */")
+        L.append("#define SMP_SET_NAMES_V1 " + ", ".join(f'"{n}"' for n, _, _ in named[:USR_V0]))
+        L.append("#define SMP_SET_NAMES_NEW " + ", ".join(f'"{n}"' for n, _, _ in named[USR_V0:]))
         L.append("static const char *const SMP_SET_NAMES[] = {" + names + "};")
         L += self.break_header()
         L += self.piano_header()

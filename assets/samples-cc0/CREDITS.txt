@@ -13,3 +13,17 @@ FLUTE/02_LDFlute_susvib_C6_v1_1.wav  <-  sgossner/VSCO-2-CE: Woodwinds/Flute/sus
 SAX/00_BrettTenor_NV_Main_A#1_vl2_rr1.wav  <-  sgossner/VCSL: Aerophones/Reed Aerophones/Tenor Saxophone/Non-Vibrato/BrettTenor_NV_Main_A#1_vl2_rr1.wav
 SAX/01_BrettTenor_NV_Main_A#2_vl2_rr1.wav  <-  sgossner/VCSL: Aerophones/Reed Aerophones/Tenor Saxophone/Non-Vibrato/BrettTenor_NV_Main_A#2_vl2_rr1.wav
 SAX/02_BrettTenor_NV_Main_A#3_vl2_rr1.wav  <-  sgossner/VCSL: Aerophones/Reed Aerophones/Tenor Saxophone/Non-Vibrato/BrettTenor_NV_Main_A#3_vl2_rr1.wav
+PSALTERY/00_BowedPsaltery_A#3_Main_LongBow_rr2.wav  <-  sgossner/VCSL: Chordophones/Zithers/Psaltery, Bowed and Plucked/LongBow/BowedPsaltery_A#3_Main_LongBow_rr2.wav
+PSALTERY/01_BowedPsaltery_E4_Main_LongBow_rr2.wav  <-  sgossner/VCSL: Chordophones/Zithers/Psaltery, Bowed and Plucked/LongBow/BowedPsaltery_E4_Main_LongBow_rr2.wav
+PSALTERY/02_BowedPsaltery_D5_Main_LongBow_rr2.wav  <-  sgossner/VCSL: Chordophones/Zithers/Psaltery, Bowed and Plucked/LongBow/BowedPsaltery_D5_Main_LongBow_rr2.wav
+RENORGAN/00_RenOrgan_8foot_Room_C2_rr1.wav  <-  sgossner/VCSL: Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_C2_rr1.wav
+RENORGAN/01_RenOrgan_8foot_Room_C3_rr1.wav  <-  sgossner/VCSL: Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_C3_rr1.wav
+RENORGAN/02_RenOrgan_8foot_Room_C4_rr1.wav  <-  sgossner/VCSL: Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_C4_rr1.wav
+RENORGAN/03_RenOrgan_8foot_Room_C5_rr1.wav  <-  sgossner/VCSL: Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_C5_rr1.wav
+RECORDER/00_TenRecorder_Sus_C3_rr1_Main.wav  <-  sgossner/VCSL: Aerophones/Edge-blown Aerophones/Baroque Tenor Recorder/Sustain/TenRecorder_Sus_C3_rr1_Main.wav
+RECORDER/01_TenRecorder_Sus_C4_rr1_Main.wav  <-  sgossner/VCSL: Aerophones/Edge-blown Aerophones/Baroque Tenor Recorder/Sustain/TenRecorder_Sus_C4_rr1_Main.wav
+RECORDER/02_TenRecorder_Sus_C5_rr1_Main.wav  <-  sgossner/VCSL: Aerophones/Edge-blown Aerophones/Baroque Tenor Recorder/Sustain/TenRecorder_Sus_C5_rr1_Main.wav
+FOLKHARP/00_EWHarp_Normal_C2_v2_RR1.wav  <-  sgossner/VCSL: Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_C2_v2_RR1.wav
+FOLKHARP/01_EWHarp_Normal_C3_v2_RR1.wav  <-  sgossner/VCSL: Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_C3_v2_RR1.wav
+FOLKHARP/02_EWHarp_Normal_C4_v2_RR1.wav  <-  sgossner/VCSL: Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_C4_v2_RR1.wav
+FOLKHARP/03_EWHarp_Normal_C5_v2_RR1.wav  <-  sgossner/VCSL: Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_C5_v2_RR1.wav
