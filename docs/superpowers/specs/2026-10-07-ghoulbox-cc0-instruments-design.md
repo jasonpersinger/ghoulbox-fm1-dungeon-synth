@@ -1,12 +1,12 @@
 # GHOULBOX 1.1: sampled instruments — design
 
-Date: 2026-10-07. Status: draft for the owner's review.
+Date: 2026-10-07. Status: approved 2026-10-07 (folk harp chosen).
 
 ## Intent
 
 GHOULBOX 1.0's sounds are all synthesized. 1.1 adds real recordings of four dungeon instruments, from public-domain
 (CC0) libraries, so the FM-1 can play a bowed psaltery, a Renaissance organ, a recorder and a plucked instrument
-(harpsichord or harp) as themselves. A bagpipe, which neither library has, comes as a synthesized preset. Success:
+(a folk harp) as themselves. A bagpipe, which neither library has, comes as a synthesized preset. Success:
 each instrument sounds like itself on the device, sustained ones hold without clicks, and nothing a 1.0 owner saved
 plays differently.
 
@@ -14,7 +14,7 @@ plays differently.
 
 | Question | Choice |
 |---|---|
-| Instruments | Bowed psaltery, Renaissance organ, recorder, harpsichord or harp (one; see open question) |
+| Instruments | Bowed psaltery, Renaissance organ, recorder, folk harp |
 | Retired samples (piano, flute, sax) | Kept: 1.0 projects and user presets that use them play as before |
 | Bagpipe | A synthesized preset (no CC0 bagpipe exists in either library) |
 
@@ -25,7 +25,7 @@ plays differently.
 | Bowed psaltery | `Chordophones/Zithers/Psaltery, Bowed and Plucked/LongBow/` | looped sustain |
 | Renaissance organ | `Aerophones/Edge-blown Aerophones/Renaissance Organ/` (one stop, chosen by ear) | looped sustain |
 | Recorder | `Aerophones/Edge-blown Aerophones/Baroque Tenor Recorder/` (a sustained articulation if present, else the longest) | looped sustain |
-| Harpsichord *or* harp | `Chordophones/Zithers/Harpsichord, Flemish/` *or* `Chordophones/Composite Chordophones/Folk Harp/` | one-shot |
+| Folk harp | `Chordophones/Composite Chordophones/Folk Harp/` | one-shot |
 
 Each set: 3–4 zones (pitches) across the keyboard, the way the current piano / flute / sax are built, through the
 existing `tools/gen_samples.py` path (22.05 kHz, IMA ADPCM, crossfaded loops for "sus"). Provenance lines go into
@@ -62,10 +62,9 @@ engines; stored values stay as they are. GRAIN, which plays the same sets, gains
 - Goldens updated only for the new presets; every existing render unchanged.
 - Auditions rendered (`tests/preset_preview.c`) for the owner to approve before flashing; then an install on the device.
 
-## Open question for the owner
+## Decided
 
-- **Harpsichord or folk harp?** GHOULBOX already has synthesized versions of both (VIRGINAL / HARPSICHORD, DUNGEON
-  HARP). A real Flemish harpsichord is the more striking upgrade; a real folk harp is the more medieval one.
+- **Folk harp** over a harpsichord: the more medieval of the two (the synthesized VIRGINAL / HARPSICHORD stay).
 
 ## Out of scope
 
