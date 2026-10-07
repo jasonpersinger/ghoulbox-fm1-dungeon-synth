@@ -6050,14 +6050,14 @@ static int test_hidden_presets(void)
     bad += check("hidden presets: 54 names (PIANO covers SAMPLE's two), each one a real preset",
                  ok && NELEM(GB_HIDDEN) == 54u);
     preset_all_pos(&total);
-    ok = total == 55u + (FELUCCA_FM4 ? ENGINES[ENGI_DIGITAL]->npresets : 0u);   /* (+ DIGITAL's, built in; 1.1: + 4 CC0, BAGPIPE) */
+    ok = total == 57u + (FELUCCA_FM4 ? ENGINES[ENGI_DIGITAL]->npresets : 0u);   /* (+ DIGITAL's, built in; 1.1: + 4 CC0, BAGPIPE) */
     for (i = 0; i < total; i++) {
         e = preset_all_at(i, &k);
         ok &= e < NENGINES && !preset_hidden(ENGINES[e], k);
         for (uint32_t j = 0; j < NELEM(KEEP); j++)
             shown += str_eq(ENGINES[e]->presets[k].name, KEEP[j]);
     }
-    bad += check("hidden presets: the PRESETS list holds the 55 kept, none hidden", ok && shown >= NELEM(KEEP));
+    bad += check("hidden presets: the PRESETS list holds the 57 kept, none hidden", ok && shown >= NELEM(KEEP));
     ok = NENG_SHOWN == 12u + FELUCCA_FM4 && eng_ok(ENGI_DRUM) && eng_ok(ENGI_SLICE);
     for (i = 0, k = 0; i < NENG_SHOWN; i++) {
         ok &= eng_vis(i) != ENGI_DRUM && eng_vis(i) != ENGI_SLICE;
@@ -6081,6 +6081,15 @@ static int test_hidden_presets(void)
             bad += check("1.1: GRAIN SRC on an alias (1, 4): turning right or left moves to a real set",
                          param_turn(gd, 1, 1) == 3 && param_turn(gd, 4, 1) == 3 && param_turn(gd, 1, -1) == 3 &&
                          param_turn(gd, 4, -1) == 3);
+        }
+        {   /* 1.2: LOW DRONE (VOICE) and SHAWM (TRIO), browsable */
+            uint32_t a2, b2;
+            for (a2 = 0; a2 < ENGINES[5]->npresets && !str_eq(ENGINES[5]->presets[a2].name, "LOW DRONE"); a2++)
+                ;
+            for (b2 = 0; b2 < ENGINES[6]->npresets && !str_eq(ENGINES[6]->presets[b2].name, "SHAWM"); b2++)
+                ;
+            bad += check("1.2: VOICE has LOW DRONE, TRIO has SHAWM, both browsable", a2 < ENGINES[5]->npresets &&
+                         b2 < ENGINES[6]->npresets && !preset_hidden(ENGINES[5], a2) && !preset_hidden(ENGINES[6], b2));
         }
         bad += check("1.2: patterns 18..21 MARCH LAMENT ARPEGGIO ANTIPHON, after 1.0's (none renumbered)", NPATTERNS == 21u &&
                      str_eq(PATTERNS[13].name, "DIRGE") && str_eq(PATTERNS[16].name, "PEDAL") && str_eq(PATTERNS[17].name, "MARCH") &&
