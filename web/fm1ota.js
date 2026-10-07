@@ -131,14 +131,30 @@ export class Updater {
     return null;
   }
 
-  async waitFor(filter, ms) {
+  // halfReload (GHOULBOX): Chrome on Linux gives an open page only the output of a port that came back (the FM-1
+  // rebooted into its loader); the input never appears there, though the system has it and a new page sees both.
+  // When an FM-1 output stays without its input for 3 tries, stop with "reload": the page reloads and resumes.
+  async waitFor(filter, ms, halfReload = false) {
     const end = Date.now() + ms;
+    let half = 0;
     while (Date.now() < end) {
       const dev = await this.find(filter);
       if (dev) return dev;
+      if (halfReload && this.halfPort()) {
+        if (++half >= 3) throw fail("reload", "the update loader is there, but this page cannot hear it: reloading to continue");
+      } else {
+        half = 0;
+      }
       await sleep(1000);
     }
     return null;
+  }
+
+  // an FM-1 port listed as an output with no input of its name (GHOULBOX: waitFor's halfReload)
+  halfPort() {
+    const ins = new Set([...this.access.inputs.values()].filter((p) => p.state !== "disconnected").map((p) => p.name));
+    return [...this.access.outputs.values()].some((o) => o.state !== "disconnected" &&
+      /fm-1|felucca|ota|composite|sinco|usb-midi/i.test(o.name || "") && !ins.has(o.name));
   }
 
   // serve read requests until the device asks for one of the finish addresses; stops early
@@ -185,7 +201,7 @@ export class Updater {
     if (!s1.finished) throw fail(s1.lost ? "lost" : "stopped", `the device ${s1.lost ? "was disconnected" : "stopped"} after ${s1.served} requests: nothing was written`);
     step("loader");
     await sleep(3000);
-    const ota = await this.waitFor((id) => id.model === "ota-" + model, 30000);
+    const ota = await this.waitFor((id) => id.model === "ota-" + model, 30000, true);
     if (!ota) throw fail("noloader", "the update loader did not appear. Replug the USB cable and press Install again: the device stays in update mode until it is finished.");
     const s2 = await this.write(ota, image, step);
     if (!s2.finished) throw fail(s2.lost ? "lost" : "stopped", `the loader ${s2.lost ? "was disconnected" : "stopped"} after ${s2.served} requests. Replug and press Install again to resume.`);

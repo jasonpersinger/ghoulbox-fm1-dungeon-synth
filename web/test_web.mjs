@@ -1309,8 +1309,9 @@ const UPGRADE = [0xF0, 0x22, 0x24, 0x35, 0x7F, 0xF7];
 
 /* an FM-1 on WebMIDI: identity, then "device asks, host answers" reads of the image */
 class FakeFM1 {
-  constructor(image, { unplugAfter = Infinity } = {}) {
+  constructor(image, { unplugAfter = Infinity, halfLoader = false } = {}) {
     this.image = image; this.unplugAfter = unplugAfter; this.served = 0; this.bad = 0;
+    this.halfLoader = halfLoader;   // GHOULBOX: Chrome on Linux shows the open page the loader's output, not its input
     this.access = { inputs: new Map(), outputs: new Map() };
     this.boot("FM-1_015", "FM-1");
   }
@@ -1323,7 +1324,8 @@ class FakeFM1 {
       if (this.output.state !== "connected") throw new Error("InvalidStateError");
       setTimeout(() => this.rx(Array.from(d)), 1);
     } };
-    this.access.inputs.set(this.input.id, this.input);
+    if (!(this.halfLoader && identity.startsWith("ota-")))
+      this.access.inputs.set(this.input.id, this.input);
     this.access.outputs.set(this.output.id, this.output);
   }
   tx(bytes) { const i = this.input; setTimeout(() => { if (i.state === "connected" && i.onmidimessage) i.onmidimessage({ data: Uint8Array.from(bytes) }); }, 1); }
@@ -1383,6 +1385,13 @@ async function updater() {
   ok(e && e.code === "lost", "fm1ota.js: unplugged in step 1 -> error code 'lost'");
   const e2 = await new Updater({ inputs: new Map(), outputs: new Map() }).install(image, "FM-1_900").then(() => null, (x) => x);
   ok(e2 && e2.code === "notfound", "fm1ota.js: no device -> error code 'notfound'");
+  /* GHOULBOX: Chrome on Linux gives the open page the rebooted loader's output only: stop soon with 'reload' (the page
+   * reloads and resumes: a new page sees both), not after the 30 s wait for a loader that never answers */
+  const dev4 = new FakeFM1(image, { halfLoader: true });
+  const t4 = Date.now();
+  const e4 = await new Updater(dev4.access).install(image, "FM-1_900").then(() => null, (x) => x);
+  ok(e4 && e4.code === "reload" && Date.now() - t4 < 15000,
+     `fm1ota.js: the loader's output without its input -> 'reload' (${e4 && e4.code}, ${Math.round((Date.now() - t4) / 1000)} s)`);
 }
 
 await editorMock();

@@ -85,6 +85,8 @@ const TEXT = {
     notfound: "FM-1 が見つかりません。USB ケーブル（データ通信用か）を確かめ、MIDI を使う他のアプリを閉じてから、もう一度押してください。",
     model: "接続されている機器は FM-1 ではありません。",
     lost: "USB の接続が切れました。挿し直してもう一度押してください。",
+    reload: "書き込みモードの FM-1 に接続するためページを再読み込みします…",
+    resuming: "書き込みを続けます…",
     noloader: "書き込みモードの FM-1 が見つかりません。USB を挿し直してもう一度押してください（終わるまで書き込みモードのままです）。",
     noreturn: "FM-1 が戻ってきません。電源を入れ直してください。",
     mismatch: "書き込みは終わりましたが、FM-1 が別のバージョンを報告しています: ",
@@ -116,6 +118,8 @@ const TEXT = {
     notfound: "FM-1 not found. Check the USB cable (a data cable), close other apps that use MIDI, and press Install again.",
     model: "The connected device is not an FM-1.",
     lost: "The USB connection was lost. Replug it and press Install again.",
+    reload: "Reloading the page to reach the FM-1 in update mode…",
+    resuming: "Continuing the update…",
     noloader: "The FM-1 in update mode was not found. Replug the USB cable and press Install again (it stays in update mode until it is finished).",
     noreturn: "The FM-1 did not come back. Power-cycle it.",
     mismatch: "Written, but the FM-1 reports another version: ",
@@ -155,6 +159,9 @@ window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault
     image = logicalImage(pkg);
     say(`GHOULBOX ${meta.version}`);
     $("go").disabled = false;
+    let resume = null;
+    try { resume = sessionStorage.getItem("ghoulbox-resume"); sessionStorage.removeItem("ghoulbox-resume"); } catch (_) {}
+    if (resume) { sayK("resuming"); $("go").click(); }   // (GHOULBOX: back from the "reload" below: the loader is found now)
   } catch (e) { sayK("loadfail", e.message); }
 })();
 
@@ -184,6 +191,13 @@ $("go").addEventListener("click", async () => {
       await up.install(image, meta.product, step);
     }
   } catch (e) {
+    if (e && e.code === "reload") {                    // GHOULBOX: Chrome on Linux hides the loader's input from this page;
+      sayK("reload");                                  // a reloaded page sees it and resumes (the loader waits for us)
+      try { sessionStorage.setItem("ghoulbox-resume", "1"); } catch (_) {}
+      writing = false;                                 // (no "leave this page?" prompt)
+      setTimeout(() => location.reload(), 500);
+      return;
+    }
     if (e && e.code && TEXT[lang][e.code]) sayK(e.code, e.detail || "");
     else sayK("error", e && e.message);
     log(String(e && e.stack || e));
