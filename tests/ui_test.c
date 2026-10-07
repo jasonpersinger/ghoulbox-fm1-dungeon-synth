@@ -6083,14 +6083,14 @@ static int test_hidden_presets(void)
     bad += check("hidden presets: 54 names (PIANO covers SAMPLE's two), each one a real preset",
                  ok && NELEM(GB_HIDDEN) == 54u);
     preset_all_pos(&total);
-    ok = total == 54u + (FELUCCA_FM4 ? ENGINES[ENGI_DIGITAL]->npresets : 0u);   /* (+ DIGITAL's, built in; 1.1: + 4 CC0) */
+    ok = total == 55u + (FELUCCA_FM4 ? ENGINES[ENGI_DIGITAL]->npresets : 0u);   /* (+ DIGITAL's, built in; 1.1: + 4 CC0, BAGPIPE) */
     for (i = 0; i < total; i++) {
         e = preset_all_at(i, &k);
         ok &= e < NENGINES && !preset_hidden(ENGINES[e], k);
         for (uint32_t j = 0; j < NELEM(KEEP); j++)
             shown += str_eq(ENGINES[e]->presets[k].name, KEEP[j]);
     }
-    bad += check("hidden presets: the PRESETS list holds the 54 kept, none hidden", ok && shown >= NELEM(KEEP));
+    bad += check("hidden presets: the PRESETS list holds the 55 kept, none hidden", ok && shown >= NELEM(KEEP));
     ok = NENG_SHOWN == 12u + FELUCCA_FM4 && eng_ok(ENGI_DRUM) && eng_ok(ENGI_SLICE);
     for (i = 0, k = 0; i < NENG_SHOWN; i++) {
         ok &= eng_vis(i) != ENGI_DRUM && eng_vis(i) != ENGI_SLICE;
@@ -6106,6 +6106,9 @@ static int test_hidden_presets(void)
         for (n = 0; n < 6; n++) { v = param_turn(sd, v, 1); seen[n] = v; }   /* (params.c: one detent, in the shown order) */
         bad += check("1.1: the SET knob from PSALTERY: RENORGAN RECORDER FOLKHARP USR1 USR2 USR3",
                      seen[0] == 9 && seen[1] == 10 && seen[2] == 11 && seen[3] == 5 && seen[4] == 6 && seen[5] == 7);
+        for (k = 0; k < ENGINES[ENGI_GURDY]->npresets && !str_eq(ENGINES[ENGI_GURDY]->presets[k].name, "BAGPIPE"); k++)
+            ;
+        bad += check("1.1: GURDY has BAGPIPE, browsable", k < ENGINES[ENGI_GURDY]->npresets && !preset_hidden(ENGINES[ENGI_GURDY], k));
         bad += check("1.1: the SET knob never stops on an alias (1, 4)", param_turn(sd, 3, 1) == 3 && param_turn(sd, 3, 2) == 3 &&
                      param_turn(sd, 0, 1) == 2 && param_turn(sd, 2, -1) == 0);
     }

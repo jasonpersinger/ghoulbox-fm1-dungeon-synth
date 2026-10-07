@@ -74,6 +74,7 @@ PRESETS = {
         ("DANCE GURDY", [2, 80, 40, 100, 110, 3, 60, 25], [4, 64, 127, 30], 0, 1, (10, 0, 10, 75), 3),
         ("TROMPETTE", [2, 70, 30, 90, 95, 1, 65, 35], [6, 64, 127, 50], 0, 1, (8, 0, 0, 90), 4),
         ("VIELLE", [2, 0, 0, 85, 0, 0, 80, 30], [20, 64, 120, 60], 0, 1, (0, 15, 10, 95), 4),
+        ("BAGPIPE", [2, 115, 70, 120, 0, 0, 40, 10], [4, 64, 127, 30], 0, 1, (15, 0, 0, 80), 15),   # 1.1: a chanter over its drones
     ],
 }
 
@@ -95,7 +96,7 @@ def check(eng, p):
     name, e, env, fenv, mono, fx, pat = p
     assert len(name) <= 12 and name == name.upper(), (eng, name)
     assert len(e) == 8 and len(env) == 4 and len(fx) == 4, (eng, name)
-    assert all(0 <= v <= 127 for v in env + list(fx)) and mono in (0, 1) and 1 <= pat <= 13, (eng, name)
+    assert all(0 <= v <= 127 for v in env + list(fx)) and mono in (0, 1) and 1 <= pat <= 17, (eng, name)   # (engines.c PATTERNS: 17 with GHOULBOX's 14..17)
 
 
 def strip_block(s, open_c, close_c):
