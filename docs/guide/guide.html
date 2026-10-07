@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GHOULBOX User Guide</title>
+<style>
+@font-face { font-family: "Pirata One"; src: url("../../assets/fonts/PirataOne-Regular.ttf"); }
+@font-face { font-family: "VT323"; src: url("../../assets/fonts/VT323-Regular.ttf"); }
+@page { size: Letter; margin: 0.7in 0.75in 0.75in; }
+@page :first { margin: 0; }
+:root { --ink: #1d1914; --soft: #5d554a; --rule: #d9d0bf; --ember: #b8621f; --blood: #9e2b23; --stone: #15120e; --bone: #ebdfc6; --card: #f6f1e7; }
+* { box-sizing: border-box; }
+body { font-family: "Georgia", "Times New Roman", serif; color: var(--ink); font-size: 10.5pt; line-height: 1.5; margin: 0; }
+h1, h2, h3 { font-weight: normal; break-after: avoid; }
+h2 { font-family: "Pirata One", serif; font-size: 25pt; color: var(--blood); margin: 0 0 6pt; line-height: 1.1; }
+h3 { font-family: "VT323", monospace; font-size: 16pt; letter-spacing: .04em; color: var(--ember); margin: 16pt 0 3pt; }
+p { margin: 0 0 7pt; }
+section { break-before: page; }
+.lede { font-size: 11.5pt; color: var(--soft); margin-bottom: 12pt; }
+.k { font-family: "VT323", monospace; font-size: 12.5pt; background: #ece4d3; border: 1px solid #cdbf a6; border: 1px solid #cdbfa6; border-radius: 2px; padding: 0 4px; white-space: nowrap; }
+.path { font-family: "VT323", monospace; font-size: 12.5pt; color: var(--ember); white-space: nowrap; }
+ul, ol { margin: 0 0 8pt; padding-left: 16pt; }
+li { margin-bottom: 3pt; }
+table { border-collapse: collapse; width: 100%; margin: 4pt 0 10pt; font-size: 9.8pt; break-inside: auto; }
+th { text-align: left; font-family: "VT323", monospace; font-size: 12.5pt; font-weight: normal; color: var(--soft); border-bottom: 1.5px solid var(--ink); padding: 3pt 6pt 2pt 0; }
+td { border-bottom: 1px solid var(--rule); padding: 4pt 8pt 4pt 0; vertical-align: top; }
+tr { break-inside: avoid; }
+.note { background: var(--card); border-left: 3px solid var(--ember); padding: 7pt 10pt; margin: 8pt 0 10pt; font-size: 10pt; break-inside: avoid; }
+.warn { border-left-color: var(--blood); }
+.shots { display: flex; gap: 12pt; margin: 8pt 0 10pt; break-inside: avoid; }
+.shots figure { margin: 0; flex: 1; text-align: center; }
+.shots img { width: 100%; image-rendering: pixelated; border: 1px solid #000; }
+figcaption { font-size: 8.5pt; color: var(--soft); margin-top: 3pt; }
+.gb { color: var(--blood); font-family: "VT323", monospace; font-size: 11pt; }
+.cover { height: 11in; background: var(--stone); color: var(--bone); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1in; }
+.cover img { width: 3.2in; image-rendering: pixelated; }
+.cover .t { font-family: "VT323", monospace; font-size: 22pt; letter-spacing: .12em; color: #ee8a3c; margin-top: 20pt; }
+.cover .s { font-family: "VT323", monospace; font-size: 14pt; color: #a4967e; margin-top: 6pt; }
+.cover .f { font-size: 9pt; color: #a4967e; margin-top: 40pt; max-width: 4.5in; }
+.toc { columns: 2; column-gap: 24pt; padding-left: 16pt; }
+.panel img { display: block; max-width: 100%; max-height: 6.1in; margin: 0 auto; }
+.two { columns: 2; column-gap: 20pt; }
+.small { font-size: 9pt; color: var(--soft); }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <img src="boot.png" alt="The GHOULBOX boot screen: a skull and the blackletter wordmark">
+  <div class="t">USER GUIDE</div>
+  <div class="s">firmware 1.1 for the M-VAVE FM-1</div>
+  <div class="f">GHOULBOX is built on Felucca by Hügelton Instruments. M-VAVE and FM-1 are trademarks of their owners; GHOULBOX is not affiliated with or endorsed by them or by Hügelton Instruments.</div>
+</div>
+
+<section style="break-before: auto; padding-top: 0.2in;">
+<h2>Welcome to the dungeon</h2>
+<p class="lede">GHOULBOX turns the M-VAVE FM-1 into a dungeon-synth instrument: hurdy-gurdies and drones, crypt pads and monk choirs, organs, harps and recorders, all through a cathedral reverb and a worn cassette.</p>
+<p>It is a fork of <b>Felucca</b>, the open-source FM-1 firmware by Hügelton Instruments. Everything Felucca does still works here: four tracks, a 64-step sequencer, songs, the arpeggiator, chord keys, effects, the web editor and backups. GHOULBOX adds the sounds, the reverb and tape, a hurdy-gurdy engine and an old-RPG look, and leaves out the sounds that don't fit the genre.</p>
+<h3>In this guide</h3>
+<ol class="toc">
+  <li>Install, back up, go back</li>
+  <li>Five-minute start</li>
+  <li>The panel</li>
+  <li>The screen</li>
+  <li>Pages</li>
+  <li>The sounds</li>
+  <li>Effects: hall and tape</li>
+  <li>Sequencer and patterns</li>
+  <li>Saving your work</li>
+  <li>The menu</li>
+  <li>Dungeon recipes</li>
+  <li>Troubleshooting</li>
+  <li>Credits and licence</li>
+</ol>
+<div class="note">GHOULBOX is a hobby project, tested on one FM-1. Install it at your own risk. The installer backs up your FM-1 first, and you can always go back to Felucca or M-VAVE's own firmware.</div>
+</section>
+
+<section>
+<h2>1 · Install, back up, go back</h2>
+<h3>What you need</h3>
+<ul>
+  <li>A computer with <b>Chrome or Edge</b> (other browsers can't talk MIDI to the FM-1)</li>
+  <li>A USB <b>data</b> cable (some cables only charge)</li>
+  <li>No other music software open (it can hold on to the FM-1's MIDI port)</li>
+</ul>
+<h3>Install</h3>
+<ol>
+  <li>Open <span class="path">jasonpersinger.github.io/ghoulbox-fm1-dungeon-synth</span> (it opens the installer at its https address).</li>
+  <li>Connect the FM-1 and press <b>Install</b>. Allow MIDI access when the browser asks.</li>
+  <li>The installer saves a <b>backup</b> of your music, sounds and settings first, then switches the FM-1 to update mode and writes GHOULBOX.</li>
+  <li>When it says done, the FM-1 restarts with the GHOULBOX skull. Hold <span class="k">HOME</span> › SYSTEM › ABOUT shows the version.</li>
+</ol>
+<div class="note">If the installer stops after it says "update mode", unplug the USB cable, plug it back in, and press Install again. The FM-1 stays in update mode until the install is finished, so nothing is lost.</div>
+<h3>Going back</h3>
+<p>To return to Felucca, install it from <span class="path">hugelton.github.io/Felucca</span> and restore your backup in its editor. Its <b>Return to official V15</b> button puts back M-VAVE's own firmware.</p>
+<h3>Your old music</h3>
+<p>Projects and user presets from Felucca load in GHOULBOX. Sounds GHOULBOX no longer lists (for example the techno presets or the drum kit) still load and play inside an old project; they are only missing from the menus.</p>
+</section>
+
+<section>
+<h2>2 · Five-minute start</h2>
+<p class="lede">GHOULBOX powers on ready to play a small dungeon piece.</p>
+<ol>
+  <li><b>Press <span class="k">PLAY</span>.</b> Four tracks play a scene in D minor at 72 BPM: a hurdy-gurdy melody (track 1), a crypt pad (2), chanting monks (3) and a drone (4), through the hall reverb. Press PLAY again to stop.</li>
+  <li><b>Turn <span class="k">MASTER</span></b> for volume. Headphones in the jack silence the speaker.</li>
+  <li><b>Turn <span class="k">ALGORITHM</span></b> to choose the track (T1–T4). Everything you do applies to that track.</li>
+  <li><b>Turn <span class="k">PRESETS</span></b> to change the track's sound while it plays. Your pattern stays.</li>
+  <li><b>Play the keys</b> to play the selected track. <span class="k">OCT−</span> / <span class="k">OCT+</span> shift the octave.</li>
+  <li><b>Turn <span class="k">SELECT</span></b> to change the tempo.</li>
+  <li><b>Turn <span class="k">KNOB 1–4</span></b> to shape the sound: on HOME they are the engine's four main controls.</li>
+</ol>
+<div class="note">Made a mess? Hold <span class="k">SAVE</span> to undo the last sound or pattern load.</div>
+<div class="shots">
+  <figure><img src="home.png" alt="HOME screen"><figcaption>HOME: four knob cards, the scope between the torches, the track's steps and sound at the bottom</figcaption></figure>
+  <figure><img src="roll.png" alt="STEP page"><figcaption>SEQ › STEP: the piano roll of the selected track</figcaption></figure>
+</div>
+</section>
+
+<section class="panel">
+<h2>3 · The panel</h2>
+<p>The FM-1's controls, as Felucca (and GHOULBOX) use them. Tap a page button for its page, tap again for the next page in its group, and <b>hold</b> some of them for quick layers.</p>
+<img src="../controls.jpg" alt="FM-1 controls: knobs, page buttons, keys, transport and octave buttons">
+<p class="small">Panel diagram from Felucca's documentation (Hügelton Instruments, GPL-3.0). The screen in it shows Felucca's look; GHOULBOX's is on the next page.</p>
+<h3>Quick layers</h3>
+<p>Hold <span class="k">FX</span>, <span class="k">GLO</span>, <span class="k">SCL</span> or <span class="k">EDIT</span> to put shortcuts on the keys and knobs; the screen shows the map. Double-tap one to keep its layer open; tap again to close it. In the <b>EDIT</b> layer, each white key picks an engine. <span class="k">OCT+</span> confirms and <span class="k">OCT−</span> goes back, on every action page and dialog.</p>
+</section>
+
+<section>
+<h2>4 · The screen</h2>
+<p>GHOULBOX draws Felucca's pages as an old role-playing game would: stone windows, a pixel font, flickering wall torches beside the scope, and a <b>sword</b> that points at what is selected.</p>
+<div class="shots">
+  <figure><img src="presets.png" alt="PRESETS list"><figcaption>PRESETS: the sword marks the current sound</figcaption></figure>
+  <figure><img src="menu.png" alt="MENU"><figcaption>The MENU (hold HOME) in four tabs</figcaption></figure>
+</div>
+<ul>
+  <li><b>Colours:</b> a new FM-1 starts in <b>CRYPT</b> (stone, bone, torch amber, blood red). If you came from Felucca, your saved palette stays: hold <span class="k">HOME</span> and pick COLOR › CRYPT.</li>
+  <li><b>The header</b> shows play state, tempo, the track number and battery.</li>
+  <li><b>Knob cards</b> show the four values the knobs change; the one you just turned is drawn in the accent colour.</li>
+  <li><b>Messages</b> (for example SOUND INIT or NO SAMPLE) appear in the header for a moment.</li>
+</ul>
+</section>
+
+<section>
+<h2>5 · Pages</h2>
+<p>Each page button opens a group of pages; tap it again for the next. On every page, <span class="k">KNOB 1–4</span> change the four values shown.</p>
+<table>
+  <tr><th>Button</th><th>Pages (tap again for the next)</th></tr>
+  <tr><td><span class="k">HOME</span></td><td>HOME: the engine's four main controls and the scope</td></tr>
+  <tr><td><span class="k">ENV</span></td><td>ENV (attack, decay, sustain, release) · ENV DEST</td></tr>
+  <tr><td><span class="k">LFO</span></td><td>LFO · LFO DEST · MOD (the modulation matrix)</td></tr>
+  <tr><td><span class="k">FX</span></td><td>FX (the track's sends: distortion, chorus, delay, reverb) · SLICER · DLY · REVERB · CHORUS · TAPE</td></tr>
+  <tr><td><span class="k">SCL</span></td><td>SCL (root, scale, white-key mode, transpose) · CHORD</td></tr>
+  <tr><td><span class="k">EDIT</span></td><td>The engine's own parameters (two pages of four) · VOICE (poly, mono, legato, unison, glide) · SLICES (on the SLICE engine)</td></tr>
+  <tr><td><span class="k">GLO</span></td><td>MIXER · GLOBAL (tempo, swing, clock, tune) · SYSTEM (MIDI and sync)</td></tr>
+  <tr><td><span class="k">SAVE</span></td><td>PRESETS · USER (your 32 sounds) · PROJECT (4 projects) · TOOLS</td></tr>
+  <tr><td><span class="k">ARP</span></td><td>ARP (arpeggiator)</td></tr>
+  <tr><td><span class="k">SEQ</span></td><td>STEP (piano roll) · PATTERN · PHRASES (load a factory pattern) · CHANCE · AUTOMATION; hold SEQ for SONG</td></tr>
+</table>
+<div class="note">The PRESETS knob changes the sound on every page that is not a list, so you can audition sounds from anywhere. On the SEQ pages it moves the step cursor instead.</div>
+</section>
+
+<section>
+<h2>6 · The sounds</h2>
+<p class="lede">55 sounds across 12 engines. <span class="gb">GB</span> marks GHOULBOX's own; the rest are Felucca's that fit the genre.</p>
+{{SOUNDS}}
+<h3>Real recordings</h3>
+<p>The SAMPLE engine plays four real instruments, recorded by Versilian Studios and released into the public domain (CC0): a <b>bowed psaltery</b> (a medieval zither played with a bow), a <b>Renaissance chamber organ</b>, a <b>baroque tenor recorder</b> and a <b>folk harp</b>. Held notes on the first three sustain for as long as you hold the key. SAMPLE's SET knob lists them first, then your own samples (USR1–USR3, uploaded from the web editor).</p>
+<h3>The hurdy-gurdy (GURDY)</h3>
+<p>A hurdy-gurdy plays one melody note at a time over drones that never stop. Its eight controls (<span class="k">EDIT</span>):</p>
+<table>
+  <tr><th>Control</th><th>What it does</th></tr>
+  <tr><td><span class="k">DRN</span></td><td>The drone's note (C–B): set it to your song's key</td></tr>
+  <tr><td><span class="k">DLVL</span></td><td>Drone level</td></tr>
+  <tr><td><span class="k">5TH</span></td><td>A second drone a fifth above, and its level</td></tr>
+  <tr><td><span class="k">WHL</span></td><td>Wheel pressure: darker when low, brighter and rougher when high</td></tr>
+  <tr><td><span class="k">BUZZ</span></td><td>The trompette, a buzzing bridge: how hard it rattles</td></tr>
+  <tr><td><span class="k">COUP</span></td><td>When it buzzes: always (HOLD) or rhythmic strokes in time (1/4, 1/8, 1/8T, 1/16)</td></tr>
+  <tr><td><span class="k">BODY</span></td><td>The wooden body's resonance</td></tr>
+  <tr><td><span class="k">WOBL</span></td><td>The wheel's unevenness: a slow wander in pitch and loudness</td></tr>
+</table>
+</section>
+
+<section>
+<h2>7 · Effects: hall and tape</h2>
+<p>Each track sends to shared effects; their amounts are on the <span class="k">FX</span> page (KNOB 1–4: distortion, chorus, delay, reverb). Tap <span class="k">FX</span> again to reach the effects themselves.</p>
+<h3>REVERB</h3>
+<ul>
+  <li><b>TYPE</b> (KNOB 1): ROOM, SPRING or <b>HALL</b>. GHOULBOX starts in HALL.</li>
+  <li><b>SIZE</b>: from a 1.5-second stone chamber to a 12-second cathedral.</li>
+  <li><b>DAMP</b>: darkens the tail.</li>
+</ul>
+<h3>TAPE</h3>
+<ul>
+  <li><b>TAPE</b>: the whole mix through a worn cassette: wow and flutter (wavering pitch), saturation, treble loss and hiss. GHOULBOX starts at 40.</li>
+  <li><b>CRSH</b>: a cheap sampler: fewer bits and a lower sample rate. Off by default; a little adds grit, a lot turns to crunch.</li>
+</ul>
+<h3>DLY and CHORUS</h3>
+<p>A delay (time, feedback, colour, mix) and a chorus (rate, depth). With HALL selected, the delay is limited to 0.74 s, because the hall borrows part of its memory.</p>
+<h3>The FX layer</h3>
+<p>Hold <span class="k">FX</span> to play performance effects from the keys (repeat, reverse, filter sweeps, tape stop, freeze, a harmonizer) and mute tracks with the black keys. With MENU › FX LATCH on, they toggle instead of needing to be held.</p>
+</section>
+
+<section>
+<h2>8 · Sequencer and patterns</h2>
+<p>Each track has its own sequence of up to 64 steps, with chords, ties, accents, slides, per-step chance and ratchets.</p>
+<h3>Load a factory pattern</h3>
+<p><span class="k">SEQ</span> › PHRASES lists ready-made patterns to load into the selected track. GHOULBOX adds four in D minor, the ones the power-on scene uses: <b>DIRGE</b> (slow pad chords), <b>BALLAD</b> (a melody), <b>CHANT</b> (low voices) and <b>PEDAL</b> (one held low D). Loading a sound never changes your pattern, and loading a pattern never changes your sound.</p>
+<h3>Write your own</h3>
+<ul>
+  <li><b>Step entry:</b> on <span class="k">SEQ</span> › STEP, move the cursor with PRESETS and play a key to write it into the step.</li>
+  <li><b>Live recording:</b> press <span class="k">REC</span> to arm the track (from any page), then play while the sequence runs; it loops and overdubs.</li>
+  <li><b>Length and speed:</b> SEQ › PATTERN sets the length (LEN) and step size (DIV, from 4 bars down to 1/32). The power-on scene uses 1/8 steps for its slow pace.</li>
+  <li><b>Clear:</b> hold <span class="k">REC</span> on a SEQ page; <span class="k">OCT+</span> clears, <span class="k">OCT−</span> cancels.</li>
+</ul>
+<h3>Scales and chords</h3>
+<p>On <span class="k">SCL</span>, set QNT to WHITE to play the chosen scale on the white keys only. For dungeon synth, natural minor (MIN), Dorian (DOR), Phrygian (PHRY) and harmonic minor (HARM) are all at home. Tap SCL again for CHORD: one finger then plays a chord of the scale.</p>
+<h3>Songs</h3>
+<p>Hold <span class="k">SEQ</span> for SONG, to chain patterns A–D into a longer piece.</p>
+</section>
+
+<section>
+<h2>9 · Saving your work</h2>
+<ul>
+  <li><b>Save a sound</b> (32 user slots): stop, tap <span class="k">SAVE</span>, pick a slot with KNOB 1, press <span class="k">OCT+</span>, name it with the keys, and press <span class="k">OCT+</span> again.</li>
+  <li><b>Projects</b> (4): <span class="k">SAVE</span> › PROJECT keeps the whole session: all four tracks, their sounds and sequences, songs and settings.</li>
+  <li><b>Undo:</b> hold <span class="k">SAVE</span> to go back before the last sound or pattern load (hold again to redo).</li>
+  <li><b>Backups:</b> the web editor (on the installer site) makes a full backup to your computer and restores it.</li>
+</ul>
+<div class="note">The FM-1 always starts with the dungeon scene. Your saved projects stay in their slots; load one from SAVE › PROJECT.</div>
+</section>
+
+<section>
+<h2>10 · The menu</h2>
+<p>Hold <span class="k">HOME</span> for the menu. <span class="k">ALGORITHM</span> moves between its four tabs, <span class="k">PRESETS</span> through the rows, and any knob or <span class="k">OCT−</span> / <span class="k">OCT+</span> changes a value. Press <span class="k">HOME</span> to close it.</p>
+<table>
+  <tr><th>Tab</th><th>Settings</th></tr>
+  <tr><td>DISPLAY</td><td><b>COLOR</b> (palette; GHOULBOX's is CRYPT) · <b>STYLE</b> (FLAT or LINE) · <b>LARGE</b> (bigger knob cards) · <b>ANIM</b> (rolling digits on or off) · <b>LEDS</b> (OFF, DIM LO, DIM HI, INV)</td></tr>
+  <tr><td>CONTROL</td><td><b>HOLD</b> (how long a quick layer takes to open) · <b>KNOB ACCEL</b> · <b>FX LATCH</b> · <b>BPM LOCK</b> (SELECT stops changing the tempo)</td></tr>
+  <tr><td>AUDIO</td><td><b>SPEAKER EQ</b> (FLAT, LOWCUT, BASS+; keep FLAT when recording) · <b>USB LEVEL</b> (MASTER or FIXED)</td></tr>
+  <tr><td>SYSTEM</td><td><b>USB SERIAL</b> (turn OFF on macOS 13–15 so the USB audio input appears) · HARDWARE CALIBRATION · ABOUT (the version)</td></tr>
+</table>
+<h3>Recording to a computer</h3>
+<p>The FM-1 appears on a computer as a USB audio input named "Felucca", carrying the master output at 44.1 kHz with no driver. Set SPEAKER EQ to FLAT, and USB LEVEL to FIXED if you want a level that doesn't follow the MASTER knob.</p>
+</section>
+
+<section>
+<h2>11 · Dungeon recipes</h2>
+<p class="lede">Starting points. Load the sound with PRESETS, then adjust.</p>
+<h3>Old Tower-style pad</h3>
+<p>CRYPT PAD or DARK STRINGS on a track, the DIRGE pattern from SEQ › PHRASES, REVERB SIZE high, TAPE around 60. Slow everything down: tempo 60–70, DIV 1/4 or 1/2.</p>
+<h3>Lone hurdy-gurdy</h3>
+<p>HURDY GURDY with DRN set to your key. Use COUP 1/8 for rhythmic buzz strokes on a dance tune, or BUZZ at zero for a sad, plain drone.</p>
+<h3>Monastery</h3>
+<p>MONKS on one track and CRYPT CHOIR an octave above on another, the CHANT pattern, REVERB HALL with SIZE at maximum. Add PIPE ORGAN or REN ORGAN holding the root.</p>
+<h3>Tavern ballad</h3>
+<p>FOLK HARP or LUTE on an arpeggio (ARP), TENOR RECORD or LOFI FLUTE for the tune, BAGPIPE for a reedy lead over its drones.</p>
+<h3>Lo-fi cassette demo</h3>
+<p>Any of the above with TAPE 80–100 and CRSH 30–50: the sound of a 1990s dungeon-synth tape.</p>
+</section>
+
+<section>
+<h2>12 · Troubleshooting</h2>
+<table>
+  <tr><th>Problem</th><th>What to try</th></tr>
+  <tr><td>No sound</td><td>Turn up MASTER; check the track isn't muted (GLO › MIXER); headphones in the jack silence the speaker.</td></tr>
+  <tr><td>The installer can't find the FM-1</td><td>Use a USB data cable, close other music software, use Chrome or Edge.</td></tr>
+  <tr><td>The installer stops after "update mode"</td><td>Unplug and replug the USB cable and press Install again. The FM-1 waits in update mode until finished.</td></tr>
+  <tr><td>"NO SAMPLE" and a plain tone</td><td>The SAMPLE or GRAIN source is an empty user slot (USR1–3). Pick a built-in set or upload a sample in the web editor.</td></tr>
+  <tr><td>No USB audio on a Mac</td><td>MENU › SYSTEM › USB SERIAL OFF (macOS 13–15).</td></tr>
+  <tr><td>The screen is black after an interrupted update</td><td>If the computer sees a device named WL80UBOOT, the FM-1 is in its boot mode and can be recovered: try another cable and run the installer again. Felucca's README describes further recovery.</td></tr>
+  <tr><td>Something else</td><td>Report it at <span class="path">github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/issues</span> with your OS, browser and the installer's log text.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>13 · Credits and licence</h2>
+<p>GHOULBOX © 2026 Jason Persinger. Free software under the <b>GPL-3.0-only</b> licence; the source is at <span class="path">github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth</span>.</p>
+<p>Built entirely on <b>Felucca</b> by Leo Kuroshita / Hügelton Instruments (GPL-3.0-only). Please support the original: GitHub Sponsors (hugelton) or itch.io (hugelton.itch.io/felucca).</p>
+<ul>
+  <li>Samples: Versilian Studios, VSCO-2 Community Edition and VCSL (CC0 1.0)</li>
+  <li>Fonts: VT323 by Peter Hull and Pirata One by Rodrigo Fuenzalida and Nicolas Massi (SIL OFL 1.1)</li>
+  <li>Felucca's engines draw on Dexed (FM6), DaisySP and Mutable Instruments' code (PHYS), klattsch (VOICE) and CrispyZebra (PHASE); see Felucca's README for the full credits</li>
+</ul>
+<p class="small">M-VAVE and FM-1 are trademarks of their respective owners. GHOULBOX is not affiliated with or endorsed by them or by Hügelton Instruments.</p>
+</section>
+
+</body>
+</html>
