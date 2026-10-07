@@ -176,6 +176,15 @@ static const struct {
      {1, T_, T_, 0, 0, 0, 1, T_, 0, T_, T_, 0, 0, T_, T_, T_}},
     {"PEDAL", {38, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},                    /* 17 one D, held */
      {1, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_}},
+    /* GHOULBOX 1.2: more in D minor over the scene's chords (Dm Bb C A), appended (18..21) */
+    {"MARCH", {38, 0, 45, 0, 34, 0, 41, 0, 36, 0, 43, 0, 33, 0, 40, 0},             /* 18 the bass's march: root, fifth, a chord a bar */
+     {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0}},
+    {"LAMENT", {69, 0, 67, 65, 64, 0, 62, 0, 65, 64, 62, 61, 62, 0, 0, 0},          /* 19 a falling line, A down to D */
+     {1, T_, 0, 0, 0, T_, 0, T_, 0, 0, 0, 0, 1, T_, T_, T_}},
+    {"ARPEGGIO", {50, 53, 57, 62, 46, 50, 53, 58, 48, 52, 55, 60, 45, 49, 52, 57},  /* 20 each chord broken upward (harp, lute) */
+     {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0}},
+    {"ANTIPHON", {62, 0, 65, 64, 62, 0, 0, 0, 50, 0, 53, 52, 50, 0, 0, 0},          /* 21 a call, answered an octave down */
+     {1, T_, 0, 0, 0, T_, T_, 0, 1, T_, 0, 0, 0, T_, T_, 0}},
 };
 #undef T_
 #define NPATTERNS (sizeof PATTERNS / sizeof PATTERNS[0])

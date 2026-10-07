@@ -6082,6 +6082,9 @@ static int test_hidden_presets(void)
                          param_turn(gd, 1, 1) == 3 && param_turn(gd, 4, 1) == 3 && param_turn(gd, 1, -1) == 3 &&
                          param_turn(gd, 4, -1) == 3);
         }
+        bad += check("1.2: patterns 18..21 MARCH LAMENT ARPEGGIO ANTIPHON, after 1.0's (none renumbered)", NPATTERNS == 21u &&
+                     str_eq(PATTERNS[13].name, "DIRGE") && str_eq(PATTERNS[16].name, "PEDAL") && str_eq(PATTERNS[17].name, "MARCH") &&
+                     str_eq(PATTERNS[18].name, "LAMENT") && str_eq(PATTERNS[19].name, "ARPEGGIO") && str_eq(PATTERNS[20].name, "ANTIPHON"));
         bad += check("1.1: the SET knob never stops on an alias (1, 4)", param_turn(sd, 3, 1) == 3 && param_turn(sd, 3, 2) == 3 &&
                      param_turn(sd, 0, 1) == 2 && param_turn(sd, 2, -1) == 0);
     }
