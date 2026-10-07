@@ -369,6 +369,11 @@ class Builder:
         L.append("/* GHOULBOX: SET / SRC values 0..4 are the 1.0 sets, then USR1..3, then the sets added since */")
         L.append("#define SMP_SET_NAMES_V1 " + ", ".join(f'"{n}"' for n, _, _ in named[:USR_V0]))
         L.append("#define SMP_SET_NAMES_NEW " + ", ".join(f'"{n}"' for n, _, _ in named[USR_V0:]))
+        new = list(range(USR_V0 + NUSR, len(named) + NUSR))           # the sets added since, by value
+        old = [v for v in range(USR_V0) if self.alias.get(v, v) == v] + [v for v in range(USR_V0) if self.alias.get(v, v) != v]
+        L.append("/* GHOULBOX: the SET / SRC knob's order (params.c enum_order): the sets added since, USR1..3, the 1.0 sets,"
+                 " their aliases last (every value once) */")
+        L.append("static const uint8_t SMP_SET_ORDER[] = {" + ", ".join(map(str, new + list(range(USR_V0, USR_V0 + NUSR)) + old)) + "};")
         L.append("static const char *const SMP_SET_NAMES[] = {" + names + "};")
         L += self.break_header()
         L += self.piano_header()

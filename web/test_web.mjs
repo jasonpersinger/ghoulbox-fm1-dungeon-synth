@@ -143,11 +143,11 @@ async function editorMock() {
   ok(!prefs.favorites[info.nengines][31] && !E.devicePresetRows(info, names, prefs).some((r) => r.user), "editor: erased slot disappears and loses star");
   {   /* the lists in the device's order (engines.c ENGINE_ORDER): FM6 second, DRUM last, "-" never; the numbers stay */
     const shown = E.engineOrder(info.engines).map((i) => info.engines[i]);
-    ok(shown.join() === "ANALOG,FM6,PHASE,LOFI,VOICE,TRIO,WHEEL,GRAIN,PHYS,GURDY,NOISE" &&
-       E.engineOrder(info.engines)[1] === 12 && E.engineOrder(info.engines)[9] === 14 && E.engineOrder(info.engines)[10] === 11,
-       "editor: engines listed FM6 second, NOISE last; SAMPLE, SLICE, DRUM not offered (indices kept)");
+    ok(shown.join() === "ANALOG,FM6,PHASE,LOFI,SAMPLE,VOICE,TRIO,WHEEL,GRAIN,PHYS,GURDY,NOISE" &&
+       E.engineOrder(info.engines)[1] === 12 && E.engineOrder(info.engines)[10] === 14 && E.engineOrder(info.engines)[11] === 11,
+       "editor: engines listed FM6 second, NOISE last; SLICE, DRUM not offered (indices kept)");
     ok(E.engineOrder(["ANALOG", "X", "-", "NOISE", "FM6"]).join() === "0,4,3,1", "editor: an unknown engine follows the known ones");
-    ok(E.engineOrder(["ANALOG", "DRUM", "SAMPLE", "SLICE"]).join() === "0", "editor: the engines GHOULBOX retired are not listed");
+    ok(E.engineOrder(["ANALOG", "DRUM", "SAMPLE", "SLICE"]).join() === "0,2", "editor: the engines GHOULBOX retired are not listed (SAMPLE is back)");
     m.state.favorites[10][0] = m.state.favorites[12][0] = true;
     await rq(E.req.uiSet(3, 0));
     prefs = await E.readDevicePreferences(rq, info, names, prefs);
@@ -248,9 +248,10 @@ async function editorSamplePresets() {
   const names = E.parse[C.NAMES](await rq(E.req.names(4)));
   await rq(E.req.preset(4, 0));
   const set = E.parse[C.DESC](await rq(E.req.desc(0, info.pe0)));
-  ok(eq(names.names, ["PIANO", "PIANO", "FLUTE", "SAX"]) && eq(set.names.slice(0, 4), ["PIANO", "PIANO", "FLUTE", "SAX"])
-    && set.names[4] === "PIANO" && eq(set.names.slice(5), ["USR1", "USR2", "USR3"]),
-    "SAMPLE: TRANH and PERC removed, SET 1 and 4 kept as PIANO aliases, indices unchanged");
+  ok(eq(names.names, ["PIANO", "PIANO", "FLUTE", "SAX", "PIANO", "BOWED PSALT", "REN ORGAN", "TENOR RECORD", "FOLK HARP"])
+    && eq(set.names.slice(0, 4), ["PIANO", "PIANO", "FLUTE", "SAX"]) && set.names[4] === "PIANO"
+    && eq(set.names.slice(5, 8), ["USR1", "USR2", "USR3"]) && eq(set.names.slice(8), ["PSALTERY", "RENORGAN", "RECORDER", "FOLKHARP"]),
+    "SAMPLE: TRANH and PERC removed, SET 1 and 4 kept as PIANO aliases, USR1..3 at 5..7; GHOULBOX 1.1's sets after them");
   ok(E.aliasOf(names.names, 1) === 0 && E.aliasOf(names.names, 2) === 2 && E.aliasOf(set.names, 5) === 5 &&
      E.aliasOf(set.names, 4) === 0, "SAMPLE: an entry named like an earlier one is an alias of it");
   const alias = E.parse[C.PRESET](await rq(E.req.preset(4, 1)));

@@ -84,11 +84,11 @@ static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {
 #if FELUCCA_FM4
     1,                           /* DIGITAL */
 #endif
-    2, 3, 5, 6, 7, 8, 9,         /* PHASE LOFI VOICE TRIO WHEEL GRAIN PHYS */
+    2, 3, 4, 5, 6, 7, 8, 9,      /* PHASE LOFI SAMPLE VOICE TRIO WHEEL GRAIN PHYS (SAMPLE: GHOULBOX 1.1's CC0 sets) */
     14,                          /* GURDY (GHOULBOX) */
     11,                          /* NOISE */
-};                               /* GHOULBOX: SAMPLE, SLICE and DRUM not offered (every preset retired, GB_HIDDEN);
-                                  * they still play what a project or a user preset holds (eng_ok) */
+};                               /* GHOULBOX: SLICE and DRUM not offered (every preset retired, GB_HIDDEN); they
+                                  * still play what a project or a user preset holds (eng_ok) */
 
 /* GHOULBOX: factory presets the owner retired. Kept in their engines (a stored preset number - a project, a user
  * preset, an old format - still loads its sound) but not browsed: PRESETS, the knob, favourites, the editor

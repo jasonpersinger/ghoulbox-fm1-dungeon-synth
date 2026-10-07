@@ -395,9 +395,10 @@ static int test_sound_loads(void)
     project_load(1);
     bad += check("a project load drops the copy and takes none", undo.trk == 0 && undo_depth == 0);
     ui_power_on();
-    bad += check("SAMPLE factory browsing has four melodic presets and no PERC",
-                 ENGINES[4]->npresets == 4u && str_eq(ENGINES[4]->presets[0].name, "PIANO") &&
-                 str_eq(ENGINES[4]->presets[3].name, "SAX"));
+    bad += check("SAMPLE factory presets: 1.0's four (PIANO .. SAX), PERC's alias, then GHOULBOX's four (BOWED PSALT .. FOLK HARP)",
+                 ENGINES[4]->npresets == 9u && str_eq(ENGINES[4]->presets[0].name, "PIANO") &&
+                 str_eq(ENGINES[4]->presets[3].name, "SAX") && str_eq(ENGINES[4]->presets[5].name, "BOWED PSALT") &&
+                 str_eq(ENGINES[4]->presets[8].name, "FOLK HARP") && preset_hidden(ENGINES[4], 4));
     {   /* TRANH (SET 1, preset 1) is gone: both are PIANO aliases, kept for old data, never offered */
         const param_desc_t *sd = &ENGINES[4]->edit[0];
         uint32_t all, pos, k, e, pos0, shown = 0;
@@ -413,14 +414,14 @@ static int test_sound_loads(void)
         apply_preset_to(TSEL, 1);
         bad += check("SAMPLE: old SET 1 / preset 1 (TRANH) play PIANO; browsing and knobs skip them",
                      SMP_SETS[1].z0 == SMP_SETS[0].z0 && SMP_SETS[1].nz == SMP_SETS[0].nz && pos == pos0 &&
-                     shown == 0u && TSEL->preset == 0u && TSEL->p[P_E0] == 0 &&   /* (GHOULBOX: SAMPLE not browsed) */
+                     shown == 4u && TSEL->preset == 0u && TSEL->p[P_E0] == 0 &&   /* (GHOULBOX 1.1: its four CC0 presets) */
                      str_eq(sd->names[1], "PIANO") && enum_step(sd, 0, 1) == 2 && enum_step(sd, 2, 1) == 0 &&
                      enum_step(sd, 1, 2) == 2 && enum_orig(sd, 1) == 0 && enum_orig(sd, 5) == 5 &&
                      enum_orig(&ENGINES[8]->edit[0], 1) == 0);
         bad += check("SAMPLE / GRAIN SET 4 (PERC, retired): a PIANO alias, knobs skip it, USR1..3 stay 5..7",
                      str_eq(sd->names[SMP_SET_PERC], "PIANO") && enum_orig(sd, SMP_SET_PERC) == 0 &&
                      enum_step(sd, 3, 4) == 5 && enum_step(sd, 5, 4) == 3 && str_eq(sd->names[5], "USR1") &&
-                     str_eq(sd->names[7], "USR3") && sd->max == 7 &&
+                     str_eq(sd->names[7], "USR3") && sd->max == 11 &&
                      enum_orig(&ENGINES[8]->edit[0], SMP_SET_PERC) == 0 && SMP_SETS[SMP_SET_PERC].z0 == SMP_SETS[0].z0);
     }
     host_legacy_sample_perc(t);                /* SAMPLE PERC (SET 4, retired after 1.0.2): every load gives DRUM */
@@ -3470,17 +3471,17 @@ static int test_quick_layers(void)
         set_engine_of(TSEL, ENGI_SAMPLE); go_home(); frame();
         eng_list_pos(&tot);
         btn_down(B_EDIT); frame();
-        c0 = eng_list_pos(&tot);                        /* (GHOULBOX: SAMPLE's presets are all retired) */
-        ok = c0 == 0u && tot == 0u && TSEL->preset == 0u;
-        for (n = 0; n < 6u; n++) {                      /* both ways: no stop, the alias never, the sound stays */
-            turn(EN_K2, n < 3u ? 1 : -1);
-            alias |= TSEL->preset == 1u;
-            ok &= TSEL->eng_req == ENGI_SAMPLE && TSEL->preset == 0u;
+        c0 = eng_list_pos(&tot);                        /* (GHOULBOX 1.1: SAMPLE's kept presets are its four CC0 sets) */
+        ok = c0 == 0u && tot == 4u && TSEL->preset == 5u;
+        for (n = 0; n < 8u; n++) {                      /* round both ways: the four, never the aliases (1, 4) */
+            turn(EN_K2, n < 4u ? 1 : -1);
+            seen |= 1u << TSEL->preset;
+            alias |= TSEL->preset == 1u || TSEL->preset == 4u;
         }
-        (void)c1; (void)c2; (void)seen;
-        ok &= !alias;
+        (void)c1; (void)c2;
+        ok &= !alias && seen == (0xFu << 5) && TSEL->eng_req == ENGI_SAMPLE;
         btn_up(B_EDIT); frame();
-        bad += check("  #124 SAMPLE (GHOULBOX: retired): KNOB 2 offers none of its presets, never the alias; the sound stays", ok);
+        bad += check("  #124 SAMPLE (GHOULBOX 1.1): KNOB 2 steps its four CC0 presets both ways, never an alias", ok);
     }
     song.playing = 0;
     lay_combo(B_EDIT, white(LY_INIT));
@@ -3492,7 +3493,8 @@ static int test_quick_layers(void)
     TSEL->p[P_E0] = (int16_t)(TSEL->p[P_E0] + 5);
     press(B_OCTUP);
     bad += check("EDIT + the key after the engines: INITIALIZE SOUND? dialog (closes the layer, no tap); OCT+ inits", ok && !ui.confirm &&
-                 msg_is("SOUND INIT") && TSEL->p[P_E0] == ENGINES[eng_step(0, 1)]->presets[0].e[0]);
+                 msg_is("SOUND INIT") && TSEL->p[P_E0] ==   /* (the track's engine, its first kept preset: SAMPLE's BOWED PSALT) */
+                 ENGINES[TSEL->eng_req % NENGINES]->presets[preset_first(ENGINES[TSEL->eng_req % NENGINES])].e[0]);
 
     /* no layer in the menu or a dialog: GLO + a key plays */
     ui_power_on(); hold(B_HOME);
@@ -4167,9 +4169,9 @@ static int test_fm4_retired(void)
         if (e < NENGINES)
             seen |= 1u << e;
     }
-    all &= ~(1u << ENGI_SAMPLE | 1u << ENGI_DRUM | 1u << ENGI_SLICE);   /* (GHOULBOX: not offered) */
-    bad += check("PRESETS: the list holds every engine's presets but DIGITAL's, SAMPLE's, DRUM's and SLICE's",
-                 seen == all && NENG_SHOWN == NENGINES - 4u);
+    all &= ~(1u << ENGI_DRUM | 1u << ENGI_SLICE);   /* (GHOULBOX: not offered) */
+    bad += check("PRESETS: the list holds every engine's presets but DIGITAL's, DRUM's and SLICE's",
+                 seen == all && NENG_SHOWN == NENGINES - 3u);
     go_page(GR_BROWSE);
     set_engine_of(TSEL, 0);
     for (i = 0, seen = 0; i < NENG_SHOWN; i++) {
@@ -4180,7 +4182,7 @@ static int test_fm4_retired(void)
                  seen == all && TSEL->eng_req == 0u && eng_step(0, 1) == ENGI_FM6 && eng_step(ENGI_FM6, 1) == 2u &&
                  eng_step(ENGI_FM6, -1) == 0u && eng_step(0, -1) == 11u);
     {   /* the display order (engines.c ENGINE_ORDER): every engine one can pick once; the PRESETS list follows it */
-        static const char *const ORDER[] = {"ANALOG", "FM6", "PHASE", "LOFI", "VOICE", "TRIO", "WHEEL", "GRAIN",
+        static const char *const ORDER[] = {"ANALOG", "FM6", "PHASE", "LOFI", "SAMPLE", "VOICE", "TRIO", "WHEEL", "GRAIN",
                                             "PHYS", "GURDY", "NOISE"};
         uint32_t last = 0xFFu, r = 0, n = 0;
         ok = NENG_SHOWN == NELEM(ORDER);
@@ -6081,18 +6083,32 @@ static int test_hidden_presets(void)
     bad += check("hidden presets: 54 names (PIANO covers SAMPLE's two), each one a real preset",
                  ok && NELEM(GB_HIDDEN) == 54u);
     preset_all_pos(&total);
-    ok = total == 50u + (FELUCCA_FM4 ? ENGINES[ENGI_DIGITAL]->npresets : 0u);   /* (+ DIGITAL's, built in) */
+    ok = total == 54u + (FELUCCA_FM4 ? ENGINES[ENGI_DIGITAL]->npresets : 0u);   /* (+ DIGITAL's, built in; 1.1: + 4 CC0) */
     for (i = 0; i < total; i++) {
         e = preset_all_at(i, &k);
         ok &= e < NENGINES && !preset_hidden(ENGINES[e], k);
         for (uint32_t j = 0; j < NELEM(KEEP); j++)
             shown += str_eq(ENGINES[e]->presets[k].name, KEEP[j]);
     }
-    bad += check("hidden presets: the PRESETS list holds the 50 kept, none hidden", ok && shown >= NELEM(KEEP));
-    ok = NENG_SHOWN == 11u + FELUCCA_FM4 && eng_ok(ENGI_DRUM) && eng_ok(ENGI_SAMPLE);
-    for (i = 0; i < NENG_SHOWN; i++)
-        ok &= eng_vis(i) != ENGI_DRUM && eng_vis(i) != ENGI_SAMPLE && eng_vis(i) != ENGI_SLICE;
-    bad += check("hidden engines: SAMPLE, DRUM, SLICE not offered (11 engines), still playable", ok);
+    bad += check("hidden presets: the PRESETS list holds the 54 kept, none hidden", ok && shown >= NELEM(KEEP));
+    ok = NENG_SHOWN == 12u + FELUCCA_FM4 && eng_ok(ENGI_DRUM) && eng_ok(ENGI_SLICE);
+    for (i = 0, k = 0; i < NENG_SHOWN; i++) {
+        ok &= eng_vis(i) != ENGI_DRUM && eng_vis(i) != ENGI_SLICE;
+        k |= eng_vis(i) == ENGI_SAMPLE;
+    }
+    bad += check("hidden engines: DRUM, SLICE not offered, still playable; 1.1: SAMPLE offered again (12 engines)", ok && k);
+    select_engine(ENGI_SAMPLE);
+    bad += check("1.1: picking SAMPLE loads BOWED PSALT (its first kept preset), SET 8",
+                 str_eq(ENGINES[ENGI_SAMPLE]->presets[TSEL->preset].name, "BOWED PSALT") && TSEL->p[P_E0] == 8);
+    {
+        const param_desc_t *sd = &ENGINES[ENGI_SAMPLE]->edit[0];
+        int32_t v = 8, seen[6], n;
+        for (n = 0; n < 6; n++) { v = param_turn(sd, v, 1); seen[n] = v; }   /* (params.c: one detent, in the shown order) */
+        bad += check("1.1: the SET knob from PSALTERY: RENORGAN RECORDER FOLKHARP USR1 USR2 USR3",
+                     seen[0] == 9 && seen[1] == 10 && seen[2] == 11 && seen[3] == 5 && seen[4] == 6 && seen[5] == 7);
+        bad += check("1.1: the SET knob never stops on an alias (1, 4)", param_turn(sd, 3, 1) == 3 && param_turn(sd, 3, 2) == 3 &&
+                     param_turn(sd, 0, 1) == 2 && param_turn(sd, 2, -1) == 0);
+    }
     select_engine(0);
     ok = TSEL->eng_req == 0u && str_eq(ENGINES[0]->presets[TSEL->preset].name, "SOFT PAD");
     select_engine(ENGI_FM6);

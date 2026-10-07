@@ -195,7 +195,7 @@ static const uint8_t DIV_ORDER[10] = {9, 8, 7, 6, 0, 1, 4, 2, 5, 3};   /* 4BAR 2
 static const uint8_t SLDIV_ORDER[6] = {0, 3, 1, 4, 2, 5};              /* 1/8 8T 1/16 16T 1/32 32T */
 static const uint8_t *enum_order(const param_desc_t *d)
 {
-    return d->names == N_DIV ? DIV_ORDER : d->names == N_SLDIV ? SLDIV_ORDER : 0;
+    return d->names == N_DIV ? DIV_ORDER : d->names == N_SLDIV ? SLDIV_ORDER : d->names == SMP_ALL_NAMES ? SMP_SET_ORDER : 0;
 }
 static int32_t enum_rank(const param_desc_t *d, int32_t v)   /* v's place in the shown order (+ min): the gauges */
 {
@@ -210,8 +210,18 @@ static int32_t enum_rank(const param_desc_t *d, int32_t v)   /* v's place in the
 static int32_t param_turn(const param_desc_t *d, int32_t v, int32_t steps)
 {
     const uint8_t *o = enum_order(d);
-    if (o)
-        return o[clamp(enum_rank(d, v) - d->min + steps, 0, d->max - d->min)] + d->min;
+    if (o) {                                         /* in the shown order, past any alias (GHOULBOX: SAMPLE's SET) */
+        int32_t r = enum_rank(d, v) - d->min, n = d->max - d->min, dir = steps > 0 ? 1 : -1, w;
+        while (steps) {
+            for (w = r + dir; w >= 0 && w <= n && enum_orig(d, o[w] + d->min) != o[w] + d->min; w += dir)
+                ;
+            if (w < 0 || w > n)
+                break;                               /* (the end holds) */
+            r = w;
+            steps -= dir;
+        }
+        return o[r] + d->min;
+    }
     return enum_step(d, v, clamp(v + steps, d->min, d->max));
 }
 
