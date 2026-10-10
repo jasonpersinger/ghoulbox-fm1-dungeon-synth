@@ -6212,6 +6212,21 @@ static int test_scenes(void)
     gb_scene_load(ui_scene);
     ok &= !strcmp(ENGINES[trk[0].engine]->presets[trk[0].preset].name, "HURDY GURDY") && song.g[G_BPM] == 72;
     bad += check("1.3 SCENE: MENU > SYSTEM row (5 names, stops at the ends); a later version's value plays DUNGEON", ok);
+    {   /* the row redraws at once when its value changes (ui_menu.c: the menu signature holds ui_scene) */
+        static uint16_t before[240 * 240];
+        ui_power_on();
+        ui_prefs |= PREF_ANIM_OFF;                     /* (no rolling digits: a frame is final) */
+        hold(B_HOME);
+        ui.menu_sel = (uint8_t)row;
+        frame(); frame();
+        turn(EN_K1, 1);
+        frame(); frame();
+        memcpy(before, host_screen, sizeof before);   /* what the menu shows after the turn, */
+        ui.force = 1;
+        frame();                                       /* .. against a full redraw: the same (no stale value) */
+        bad += check("1.4 SCENE: a knob on the row shows the new scene at once (not only after leaving the row)",
+                     ui.menu == 1 && ui_scene == 1u && !memcmp(before, host_screen, sizeof before));
+    }
     ui_power_on();
     return bad;
 }

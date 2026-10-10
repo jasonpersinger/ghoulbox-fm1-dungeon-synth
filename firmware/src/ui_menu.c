@@ -344,6 +344,7 @@ static void draw_menu(void)
         mt_follow();
     sig = ui.menu * 7u + ui.menu_sel * 131u + settings.palette * 1009u + settings.lowcut * 7919u + settings_hold * 3511u +
           settings_leds * 6151u + ui_prefs * 4099u + ui_style * 257u + song.rec * 65537u + song.sel * 13u +
+          ui_scene * 104729u +                          /* (1.4: SCENE) */
           (ui.menu == 2 ? ui.menu_scroll * 48611u : 0u);
     if (!ui.force && sig == ui.menu_sig) {
         if (ui.menu == 1 && mt.pos != pos0) {          /* only the tabs slid: their strip */
