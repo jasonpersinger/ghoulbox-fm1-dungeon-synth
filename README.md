@@ -39,9 +39,11 @@ Version 1.2 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install 
 **[Hear every sound](https://jasonpersinger.github.io/ghoulbox-fm1-dungeon-synth/sounds/)** before installing:
 all 59, rendered by the firmware's own sound code.
 
-**[User guide (PDF)](docs/guide/GHOULBOX-User-Guide-1.2.pdf):** installing, a five-minute start, the panel and
-pages, all 59 sounds, the hall and tape, the sequencer, the menu, dungeon recipes and troubleshooting. Also on
-the [Releases](https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/releases) page.
+**[User guide (PDF)](docs/guide/GHOULBOX-User-Guide-1.2.pdf):** a 48-page manual for beginners and old hands
+alike: the FM-1's hardware and installing; synth basics in plain words (oscillators, filters, envelopes, LFOs,
+effects, sequencing), each with a hands-on exercise; a full reference to every page and all 59 sounds; a first
+piece built step by step, a minor-key chord cheat sheet and dungeon recipes; recording, troubleshooting and a
+glossary. Also on the [Releases](https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/releases) page.
 
 ## Install
 
