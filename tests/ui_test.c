@@ -6205,6 +6205,39 @@ static int test_midi_cc(void)
     midi_event(0xB0u, 9, 75, 127);                              /* channel 10: ignored under ROUT CH1-4 */
     frame();
     bad += check("1.2 MIDI CC: channels 5..16 ignored with ROUT CH1-4", trk[3].p[P_DEC] == 5 && trk[0].p[P_DEC] != track_desc(&trk[0], P_DEC)->max);
+    {   /* 1.3: the effects' own settings (globals) and the LFO (the channel's track) */
+        static const struct { uint8_t cc; uint16_t id; } G13[] = {
+            {102, G_RSIZE}, {103, G_RDAMP}, {105, G_DFDBK}, {106, G_DCOLOR}, {107, G_DMIX}, {108, G_CRATE}, {109, G_CDEPTH}};
+        static const struct { uint8_t cc; uint16_t id; } T13[] = {
+            {92, P_DIST}, {76, P_LRATE}, {77, P_LD_PIT}, {78, P_LFADE}, {110, P_LD_FLT}, {111, P_LD_AMP}};
+        uint32_t i;
+        ok = 1;
+        for (i = 0; i < NELEM(G13); i++) {
+            song.g[G13[i].id] = GP[G13[i].id].min;
+            midi_event(0xB0u, 0, G13[i].cc, 127);
+        }
+        for (i = 0; i < NELEM(T13); i++) {
+            trk[1].p[T13[i].id] = track_desc(&trk[1], T13[i].id)->min;
+            midi_event(0xB0u, 1, T13[i].cc, 127);
+        }
+        frame();
+        for (i = 0; i < NELEM(G13); i++)
+            ok &= song.g[G13[i].id] == GP[G13[i].id].max;
+        for (i = 0; i < NELEM(T13); i++)
+            ok &= trk[1].p[T13[i].id] == track_desc(&trk[1], T13[i].id)->max &&
+                  trk[0].p[T13[i].id] != track_desc(&trk[0], T13[i].id)->max;
+        bad += check("1.3 MIDI CC: 102..109 reverb, delay, chorus settings; 92 DST, 76 77 78 110 111 the LFO (channel 2: track 2)", ok);
+        midi_event(0xB0u, 0, 104, 0);                           /* delay TIME by length, as its knob: 0 the longest, */
+        frame();
+        ok = song.g[G_DTIME] == 9;                              /* 4BAR (params.c N_DIV), */
+        midi_event(0xB0u, 0, 104, 127);
+        frame();
+        ok &= song.g[G_DTIME] == 3;                             /* 127 the shortest, 1/32 */
+        midi_event(0xB0u, 0, 104, 57);                          /* (the middle: 1/4 .. 1/8, never a stored-order jump) */
+        frame();
+        ok &= song.g[G_DTIME] == 0 || song.g[G_DTIME] == 1;
+        bad += check("1.3 MIDI CC: 104 delay TIME in the order of length (0 4BAR .. 127 1/32)", ok);
+    }
     ui_power_on();
     return bad;
 }

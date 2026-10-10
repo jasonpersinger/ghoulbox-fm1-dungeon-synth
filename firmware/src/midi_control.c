@@ -214,6 +214,11 @@ static const struct { uint8_t cc, kind, id; } MIDI_CC_MAP[] = {
     {91, MC_T, P_REV}, {93, MC_T, P_CHOR}, {94, MC_T, P_DLY},
     {21, MC_K, 0}, {22, MC_K, 1}, {23, MC_K, 2}, {24, MC_K, 3},
     {85, MC_G, G_CRSH}, {86, MC_G, G_TAPE}, {74, MC_F, 0},
+    /* 1.3: the distortion send, the LFO (76 77 78: GM2's vibrato rate, depth, delay), the effects' own settings */
+    {92, MC_T, P_DIST}, {76, MC_T, P_LRATE}, {77, MC_T, P_LD_PIT}, {78, MC_T, P_LFADE}, {110, MC_T, P_LD_FLT},
+    {111, MC_T, P_LD_AMP},
+    {102, MC_G, G_RSIZE}, {103, MC_G, G_RDAMP}, {104, MC_G, G_DTIME}, {105, MC_G, G_DFDBK}, {106, MC_G, G_DCOLOR},
+    {107, MC_G, G_DMIX}, {108, MC_G, G_CRATE}, {109, MC_G, G_CDEPTH},
 };
 #define NMIDI_CC (sizeof MIDI_CC_MAP / sizeof MIDI_CC_MAP[0])
 static volatile uint8_t midi_cc_q[NTRK][NMIDI_CC];       /* the latest value + 1 per track and CC, 0 = none pending */

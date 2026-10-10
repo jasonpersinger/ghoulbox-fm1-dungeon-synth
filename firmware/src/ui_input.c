@@ -858,6 +858,7 @@ static void midi_cc_apply(void)
         for (i = 0; i < NMIDI_CC; i++) {
             uint32_t f = motion_guard(), q = midi_cc_q[t][i], kind = MIDI_CC_MAP[i].kind, id = MIDI_CC_MAP[i].id;
             const param_desc_t *d;
+            const uint8_t *o;
             int32_t v;
             midi_cc_q[t][i] = 0;                        /* (read and clear together: a CC between them is kept) */
             motion_unguard(f);
@@ -873,7 +874,9 @@ static void midi_cc_apply(void)
             d = kind == MC_G ? &GP[id] : track_desc(&trk[t], id);
             if (d->max <= d->min)
                 continue;
-            v = enum_orig(d, d->min + ((d->max - d->min) * (int32_t)q + 63) / 127);
+            v = ((d->max - d->min) * (int32_t)q + 63) / 127;   /* the place along the range, */
+            o = enum_order(d);
+            v = enum_orig(d, d->min + (o ? o[v] : v));     /* in the shown order (1.3: delay TIME by length, as its knob) */
             if (kind == MC_G) {
                 song.g[id] = (int16_t)v;
             } else {
