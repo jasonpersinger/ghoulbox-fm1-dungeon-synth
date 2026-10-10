@@ -31,7 +31,7 @@ for name in d["ORDER"]:
     total += len(cells)
     rows.append(f'<tr><td><span class="k">{name}</span><br><span class="small">{WHAT.get(name, "")}</span></td>'
                 f'<td>{" · ".join(cells)}</td></tr>')
-assert total == 55, total
+assert total == 57, total
 table = '<table><tr><th>Engine</th><th>Sounds (in PRESETS order)</th></tr>' + "".join(rows) + "</table>"
 src = (HERE / "guide.html").read_text().replace("{{SOUNDS}}", table)
 tmp = HERE / ".guide.build.html"

@@ -17,20 +17,25 @@ Felucca's sequencer, song mode, effects, editor and backups all work as they do 
   bridge struck in time.
 - **Real recordings** (1.1): a bowed psaltery, a Renaissance chamber organ, a baroque tenor recorder and a folk
   harp, sampled from public-domain (CC0) libraries, on the SAMPLE engine.
-- **41 dungeon sounds**: crypt pads, string machines, monk, crypt and glass choirs, cathedral, reed and pipe
-  organs, lute, harpsichord and virginal, a dungeon harp, tower and lo-fi flutes, recorder, French horn, mournful
-  and grim brass, tuba, dark strings, cave wind, torch crackle, a bagpipe and five hurdy-gurdies, plus the four
-  recordings; seven of them are new 6-operator FM patches.
-- **A curated list**: 55 sounds across 12 engines. The pop, techno and percussion presets and the DRUM and
+- **43 dungeon sounds**: crypt pads, string machines, monk, crypt and glass choirs, a low drone voice, cathedral,
+  reed and pipe organs, lute, harpsichord and virginal, a dungeon harp, tower and lo-fi flutes, recorder, French
+  horn, mournful and grim brass, tuba, dark strings, cave wind, torch crackle, a bagpipe, a shawm and five
+  hurdy-gurdies, plus the four recordings; seven of them are new 6-operator FM patches.
+- **Eight dungeon patterns** (SEQ > PHRASES), in D minor over the power-on scene's chords: DIRGE, BALLAD,
+  CHANT, PEDAL, MARCH, LAMENT, ARPEGGIO and ANTIPHON.
+- **A curated list**: 57 sounds across 12 engines. The pop, techno and percussion presets and the DRUM and
   SLICE engines are retired from the menus; projects and user presets that use them still load and play
   them.
 - **An old-RPG screen**: VT323 pixel type, stone windows, a sword cursor, flickering wall torches, and the
   CRYPT palette (stone, bone, torch amber, blood red), a blackletter wordmark and a skull at boot.
 
-Version 1.1 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
+Version 1.2 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
 
-**[User guide (PDF)](docs/guide/GHOULBOX-User-Guide-1.1.pdf):** installing, a five-minute start, the panel and
-pages, all 55 sounds, the hall and tape, the sequencer, the menu, dungeon recipes and troubleshooting. Also on
+**[Hear every sound](https://jasonpersinger.github.io/ghoulbox-fm1-dungeon-synth/sounds/)** before installing:
+all 57, rendered by the firmware's own sound code.
+
+**[User guide (PDF)](docs/guide/GHOULBOX-User-Guide-1.2.pdf):** installing, a five-minute start, the panel and
+pages, all 57 sounds, the hall and tape, the sequencer, the menu, dungeon recipes and troubleshooting. Also on
 the [Releases](https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/releases) page.
 
 ## Install
