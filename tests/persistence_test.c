@@ -294,6 +294,14 @@ int main(void)
         fm1_ms += 1000;
         settings_poll();
         bad += check("... and retried by the settings path", !persist_pending && leds_from_stored(persist_saved.zoom) == LEDS_INV);
+        {   /* 1.3: SCENE (editor id 12), saved in favorites.factory[15][27] (read back with the favorites: device only) */
+            const uint8_t tavern[] = {12, 2, 64};
+            ed_repn = 0; ed_menu_handle(ED_MENU_SET, tavern, 3);
+            ok = ed_rep[0] == 0 && ui_scene == 2u && st_load(OBJ_SETTINGS, &q, sizeof q) == (int)sizeof q &&
+                 q.favorites.factory[15][27] == 2u;
+            bad += check("1.3 MENU_SET SCENE (id 12): saved in the settings record (favorites.factory[15][27])", ok);
+            ui_scene = 0;
+        }
         settings_hold = HOLD_DEF; settings_leds = LEDS_DIM;
     }
     reset();

@@ -10,7 +10,7 @@ enum { ED_MENU_DESC = 72, ED_MENU_SET };
 enum { EDM_ENUM, EDM_INT };                            /* kind: names follow; or a unit (none yet) */
 static const uint8_t ED_MENU[][2] = {
     {MI_COLOR, 0}, {MI_STYLE, 1}, {MI_LARGE, 2}, {MI_ANIM, 3}, {MI_LEDS, 4}, {MI_HOLD, 5}, {MI_ACCEL, 6},
-    {MI_LATCH, 7}, {MI_BPMLOCK, 8}, {MI_LOWCUT, 9}, {MI_USB, 10}, {MI_SERIAL, 11},
+    {MI_LATCH, 7}, {MI_BPMLOCK, 8}, {MI_LOWCUT, 9}, {MI_USB, 10}, {MI_SCENE, 12}, {MI_SERIAL, 11},
 };
 #define ED_MENU_N NELEM(ED_MENU)
 

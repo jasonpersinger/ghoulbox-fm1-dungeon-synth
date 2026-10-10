@@ -196,8 +196,21 @@ static const struct {
 /* the parts at power-on (engine, preset, PATTERNS[n - 1] in the sequencer, 0 = empty: all are): bass, pad, lead, drums */
 static const uint8_t TRK_DEF[NPART][3] = {{0, 4, 0}, {ENGI_FM6, 4, 0}, {3, 0, 0}, {ENGI_DRUM, 0, 0}}; /* ANALOG ACID,
                                                                        * FM6 PAD (was DIGITAL PAD), LOFI PULSE LD, DRUM KIT */
-/* GHOULBOX: what felucca_init plays instead (TRK_DEF stays Felucca's: an old project's missing parts are those):
- * melody, pad, choir, drone, in D minor; felucca_init also sets 72 BPM, HALL, TAPE 40 and 1/8 steps */
-static const uint8_t GB_SCENE[NPART][3] = {{ENGI_GURDY, 0, 15}, {0, 12, 14}, {5, 4, 16}, {ENGI_GURDY, 1, 17}}; /* GURDY
-                                                * HURDY GURDY, ANALOG CRYPT PAD, VOICE MONKS, GURDY DRONE WHEEL */
+/* GHOULBOX: what felucca_init plays instead (TRK_DEF stays Felucca's: an old project's missing parts are those), in D
+ * minor, 1/8 steps, HALL (ui.c gb_scene_load). 1.3: MENU > SYSTEM > SCENE picks one (ui_scene; append-only: a saved
+ * value keeps its scene, an unknown one plays DUNGEON). The patterns are the dungeon nine (PATTERNS[n - 1]) */
+#define GB_NSCENE 5u
+static const struct { const char *name; uint8_t bpm, tape, part[NPART][3]; } GB_SCENES[GB_NSCENE] = {
+    {"DUNGEON", 72, 40, {{ENGI_GURDY, 0, 15}, {0, 12, 14}, {5, 4, 16}, {ENGI_GURDY, 1, 17}}},   /* HURDY GURDY BALLAD,
+                                    * CRYPT PAD DIRGE, MONKS CHANT, DRONE WHEEL PEDAL: the scene up to 1.2 */
+    {"CRYPT", 60, 55, {{5, 7, 17}, {5, 5, 14}, {11, 4, 17}, {ENGI_DRUM, 2, 22}}},              /* LOW DRONE PEDAL,
+                                    * CRYPT CHOIR DIRGE, CAVE WIND PEDAL, TOMB DRUMS TOMBBEAT */
+    {"TAVERN", 96, 30, {{ENGI_GURDY, 2, 15}, {ENGI_PHYS, 11, 20}, {ENGI_PHYS, 9, 18}, {ENGI_DRUM, 1, 22}}},   /* DANCE
+                                    * GURDY BALLAD, DUNGEON HARP ARPEGGIO, LUTE MARCH, CRYPT KIT TOMBBEAT */
+    {"CHAPEL", 66, 40, {{7, 6, 14}, {5, 4, 16}, {ENGI_SAMPLE, 7, 19}, {ENGI_GURDY, 4, 21}}},     /* CATHEDRAL DIRGE,
+                                    * MONKS CHANT, TENOR RECORD LAMENT, VIELLE ANTIPHON */
+    {"BLANK", 72, 40, {{ENGI_GURDY, 0, 0}, {0, 12, 0}, {5, 4, 0}, {ENGI_GURDY, 1, 0}}},         /* DUNGEON's sounds, no
+                                    * notes: a clean start */
+};
+#define GB_SCENE (GB_SCENES[0].part)   /* (the scene up to 1.2: tests/descdump.c, tests/ghoulbox_shots.c) */
 static uint32_t trk_def_engine(uint32_t i) { return TRK_DEF[i % NPART][0]; }

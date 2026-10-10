@@ -94,36 +94,13 @@ static void fm1_fault(const fm1_crash_t *c)
     fm1_reboot();
 }
 
-/* power-on: the parts with their default sounds (TRK_DEF); the sequencers empty */
+/* power-on: GHOULBOX's scene, the one MENU > SYSTEM > SCENE picks (ui.c gb_scene_load; settings_init ran before) */
 static void felucca_init(void)
 {
-    uint32_t i;
     chain_defaults(&chain_config);
-    for (i = 0; i < G_COUNT; i++)
-        song.g[i] = GP[i].def;
-    undo_depth++;                             /* (no undo copy of the power-on loads) */
     fm6_init();                               /* every track's FM6 patch: the init voice */
-    for (i = 0; i < NTRK; i++) {
-        track_t *t = &trk[i];
-        track_defaults(t);
-        set_engine_of(t, GB_SCENE[i][0]);
-        apply_preset_to(t, GB_SCENE[i][1]);   /* with its sends */
-        t->engine = t->eng_req;
-        track_defaults_steps(t);              /* (a sound load never touches them) */
-        if (GB_SCENE[i][2])
-            load_pat16(t, PATTERNS[GB_SCENE[i][2] - 1u].note, PATTERNS[GB_SCENE[i][2] - 1u].flags);
-        pat_sig[i] = steps_sig(t);            /* a default pattern, not the user's */
-        pat_last[i] = GB_SCENE[i][2];
-        t->p[P_SDIV] = 1;                     /* GHOULBOX: 1/8, a slow scene */
-    }
-    undo_depth--;
-    song.sel = 0;
+    gb_scene_load(ui_scene);
     song.master_q12 = 2048;
-    song.g[G_BPM] = 72;                       /* GHOULBOX: the power-on scene's tempo and room */
-    song.g[G_RTYPE] = 2;                      /* HALL */
-    song.g[G_TAPE] = 40;
-    ui.home = 1;
-    ui.force = 1;
 }
 
 static void fm1_main(void)

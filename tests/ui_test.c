@@ -1443,7 +1443,7 @@ static int test_menu_tabs(void)
     ui_prefs = 0;
     bad += check("MENU tabs: DISPLAY CONTROL AUDIO SYSTEM, 1..6 rows each in a run, fit the page; tab gaps constant (S, LARGE)",
                  ok && MTAB_COUNT == 4u && str_eq(MTAB_NAME[0], "DISPLAY") && mtab_rows(MTAB_DISPLAY) == 5u &&
-                 mtab_rows(MTAB_CONTROL) == 4u && mtab_rows(MTAB_AUDIO) == 2u && mtab_rows(MTAB_SYSTEM) == 3u);
+                 mtab_rows(MTAB_CONTROL) == 4u && mtab_rows(MTAB_AUDIO) == 2u && mtab_rows(MTAB_SYSTEM) == 4u);   /* (1.3: SCENE) */
 
     ui_power_on();
     hold(B_HOME);
@@ -1458,7 +1458,7 @@ static int test_menu_tabs(void)
     turn(EN_ALGO, 1); ok &= ui.menu_sel == MI_LOWCUT && menu_tab() == MTAB_AUDIO;
     turn(EN_ALGO, -1); ok &= ui.menu_sel == MI_LATCH;   /* (back at the row left there) */
     turn(EN_ALGO, -1); ok &= ui.menu_sel == MI_LEDS;
-    turn(EN_ALGO, -1); ok &= ui.menu_sel == MI_SERIAL && menu_tab() == MTAB_SYSTEM;   /* (wraps) */
+    turn(EN_ALGO, -1); ok &= ui.menu_sel == MI_SCENE && menu_tab() == MTAB_SYSTEM;   /* (wraps; 1.3: SCENE its first row) */
     turn(EN_ALGO, 1); ok &= ui.menu_sel == MI_LEDS;
     bad += check("MENU: ALGORITHM steps between the tabs and wraps, each tab back at its last row", ok && ui.menu == 1);
     turn(EN_ALGO, 1); turn(EN_PRESET, -1);            /* CONTROL: from FX LATCH up to KNOB ACCEL */
@@ -6166,6 +6166,56 @@ static int test_sample_values(void)
 }
 
 /* GHOULBOX 1.2: MIDI CCs set a track's controls (the channel's track), applied in the main loop, as the editor's SET */
+/* 1.3: MENU > SYSTEM > SCENE, the power-on scene (engines.c GB_SCENES, ui.c gb_scene_load; main.c felucca_init) */
+static int test_scenes(void)
+{
+    static const char *const WANT[GB_NSCENE][NTRK] = {
+        {"HURDY GURDY", "CRYPT PAD", "MONKS", "DRONE WHEEL"},
+        {"LOW DRONE", "CRYPT CHOIR", "CAVE WIND", "TOMB DRUMS"},
+        {"DANCE GURDY", "DUNGEON HARP", "LUTE", "CRYPT KIT"},
+        {"CATHEDRAL", "MONKS", "TENOR RECORD", "VIELLE"},
+        {"HURDY GURDY", "CRYPT PAD", "MONKS", "DRONE WHEEL"},
+    };
+    static const char *const PAT[GB_NSCENE][NTRK] = {
+        {"BALLAD", "DIRGE", "CHANT", "PEDAL"}, {"PEDAL", "DIRGE", "PEDAL", "TOMBBEAT"},
+        {"BALLAD", "ARPEGGIO", "MARCH", "TOMBBEAT"}, {"DIRGE", "CHANT", "LAMENT", "ANTIPHON"}, {0, 0, 0, 0},
+    };
+    static const int16_t BPM[GB_NSCENE] = {72, 60, 96, 66, 72};
+    int bad = 0, ok = 1;
+    uint32_t s, i, k, row = MI_SCENE;
+    for (s = 0; s < GB_NSCENE; s++) {
+        ui_power_on();
+        gb_scene_load(s);
+        ok &= song.g[G_BPM] == BPM[s] && song.g[G_RTYPE] == 2 && ui.home;
+        for (i = 0; i < NTRK; i++) {
+            const track_t *t = &trk[i];
+            ok &= t->engine == t->eng_req && !strcmp(ENGINES[t->engine]->presets[t->preset].name, WANT[s][i]) &&
+                  t->p[P_SDIV] == 1;
+            if (PAT[s][i])
+                ok &= pat_last[i] && !strcmp(PATTERNS[pat_last[i] - 1u].name, PAT[s][i]) && pat_sig[i] == steps_sig(t);
+            else
+                for (k = 0; k < NSTEP; k++)
+                    ok &= !t->step[k].n && !t->step[k].hit;
+        }
+    }
+    bad += check("1.3 SCENE: DUNGEON CRYPT TAVERN CHAPEL BLANK load their sounds, patterns (BLANK: none), tempo, HALL", ok);
+    ui_power_on();
+    ok = MI_TAB[row] == MTAB_SYSTEM && MI_TAB[row + 1u] == MTAB_SYSTEM && row + 1u == MI_SERIAL &&
+         menu_n(row) == GB_NSCENE && str_eq(MI_NAME[row], "SCENE") && menu_get(row) == 0 &&
+         str_eq(menu_vname(row, 0), "DUNGEON") && str_eq(menu_vname(row, 4), "BLANK");
+    menu_put(row, 2);
+    ok &= menu_get(row) == 2 && ui_scene == 2 && menu_step(row, 1) == 3 && menu_step(row, -1) == 1;
+    menu_put(row, 4);
+    ok &= menu_step(row, 1) == 4;                              /* (stops at the end) */
+    ui_scene = 200;                                            /* a value from a later version: DUNGEON */
+    ok &= menu_get(row) == 0;
+    gb_scene_load(ui_scene);
+    ok &= !strcmp(ENGINES[trk[0].engine]->presets[trk[0].preset].name, "HURDY GURDY") && song.g[G_BPM] == 72;
+    bad += check("1.3 SCENE: MENU > SYSTEM row (5 names, stops at the ends); a later version's value plays DUNGEON", ok);
+    ui_power_on();
+    return bad;
+}
+
 static int test_midi_cc(void)
 {
     int bad = 0, ok;
@@ -6251,6 +6301,7 @@ int main(void)
     bad += test_hidden_presets();
     bad += test_sample_values();
     bad += test_midi_cc();
+    bad += test_scenes();
     bad += test_patterns();
     bad += test_rec();
     bad += test_rec_hold_clear();
