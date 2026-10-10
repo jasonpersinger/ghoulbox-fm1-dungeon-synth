@@ -15,6 +15,15 @@ typedef struct {
     struct { uint8_t factory[16][32]; uint32_t user, filter; } favorites;
 } persist_t;
 #define PERSIST_MAGIC 0x50455234u
+/* GHOULBOX: USB SERIAL OFF by default (MIDI host boxes and macOS's USB audio want no serial console). The MENU flag
+ * is a bit of favorites.factory[15][30] (ui.c ui_prefs, PREF_SERIAL_OFF); byte [15][28] (no engine 15, unused by
+ * Felucca) marks GHOULBOX's one-time changes: settings saved without the mark get SERIAL OFF once, then keep what the
+ * owner chooses */
+#define GB_SERIAL_OFF 64u                           /* ui.c PREF_SERIAL_OFF */
+#define GB_MIG_SERIAL 1u
+#ifdef PREF_SERIAL_OFF
+_Static_assert(GB_SERIAL_OFF == PREF_SERIAL_OFF, "settings_persist.c GB_SERIAL_OFF is ui.c's PREF_SERIAL_OFF");
+#endif
 
 /* Normalize in place; 1 = current, 2 = migrated, 0 = invalid. */
 static int settings_import(persist_t *p, int n)
@@ -32,6 +41,10 @@ static int settings_import(persist_t *p, int n)
     }
     if (old1 || old2) p->bold = 0;
     if (!current) memset(&p->favorites, 0, sizeof p->favorites);
+    if (!(p->favorites.factory[15][28] & GB_MIG_SERIAL)) {   /* GHOULBOX: once, settings from before (see above) */
+        p->favorites.factory[15][30] |= GB_SERIAL_OFF;
+        p->favorites.factory[15][28] |= GB_MIG_SERIAL;
+    }
     if (p->favorites.factory[15][29] > 1u)        /* STYLE (ui.c ui_style): 2, the retired PIXEL = LINE; unknown = FLAT */
         p->favorites.factory[15][29] = p->favorites.factory[15][29] == 2u ? 1u : 0u;
     p->magic = PERSIST_MAGIC;
@@ -63,6 +76,15 @@ static int settings_import(persist_t *p, int n)
 #endif
     if (p->panel.magic == PANEL_MAGIC) panel = p->panel;
     return current ? 1 : 2;
+}
+
+/* GHOULBOX: a device with no saved settings starts with USB SERIAL OFF (marked: the owner's later choice holds) */
+static void settings_fresh(void)
+{
+#ifdef FELUCCA_FAVORITES
+    favorites.factory[15][30] |= GB_SERIAL_OFF;
+    favorites.factory[15][28] |= GB_MIG_SERIAL;
+#endif
 }
 
 /* Start with the last imported/saved object, including fields owned by a

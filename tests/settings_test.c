@@ -30,6 +30,20 @@ int main(void)
     original.panel = PANEL_DEFAULT; original.panel.enc[0] = 3;
     original.favorites.factory[8][0] = 1;
     original.favorites.user = 1u << 31; original.favorites.filter = 1;
+    {   /* GHOULBOX: USB SERIAL off once (MIDI hosts and macOS audio), favorites.factory[15][28] bit 0 marks it done */
+        persist_t q = original;
+        q.favorites.factory[15][30] = 0;  q.favorites.factory[15][28] = 0;             /* 1.0 / Felucca: ON, unmarked */
+        assert(settings_import(&q, sizeof q) == 1 && (favorites.factory[15][30] & GB_SERIAL_OFF) &&
+               (favorites.factory[15][28] & GB_MIG_SERIAL));
+        q = original; q.favorites.factory[15][30] = 0; q.favorites.factory[15][28] = GB_MIG_SERIAL;   /* chose ON since */
+        assert(settings_import(&q, sizeof q) == 1 && !(favorites.factory[15][30] & GB_SERIAL_OFF));
+        q = original; q.favorites.factory[15][30] = GB_SERIAL_OFF | 16u; q.favorites.factory[15][28] = 0;   /* OFF, BPM LOCK */
+        assert(settings_import(&q, sizeof q) == 1 && favorites.factory[15][30] == (GB_SERIAL_OFF | 16u));
+        memset(&favorites, 0, sizeof favorites);
+        settings_fresh();                                                               /* a device never saved */
+        assert((favorites.factory[15][30] & GB_SERIAL_OFF) && (favorites.factory[15][28] & GB_MIG_SERIAL));
+        puts("settings: GHOULBOX USB SERIAL off once (unmarked ON -> OFF; marked ON kept; OFF kept; fresh OFF)");
+    }
     p = original;
     assert(settings_import(&p, sizeof p) == 1); settings_init();
     assert(settings.palette == UI_GREY_INDEX && fx_lowcut && settings.zoom && panel.enc[0] == 3);

@@ -941,6 +941,8 @@ static void persist_boot(void)                    /* before settings_init / pane
         int n = st_load(OBJ_SETTINGS, &p, sizeof p);
         if (settings_import(&p, n))
             persist_saved = p;
+        else
+            settings_fresh();                      /* GHOULBOX: never saved: USB SERIAL OFF */
     }
     {   /* projects: fill empty RAM slots from flash, so the slot list is right after power-on */
         uint32_t i;

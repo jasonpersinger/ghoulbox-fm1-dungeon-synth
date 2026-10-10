@@ -126,6 +126,7 @@ static void ui_power_on(void)
     proj_name[0] = 0;
     proj_cur = PROJ_NO_SLOT;
     memset(&favorites, 0, sizeof favorites);
+    favorites.factory[15][28] = GB_MIG_SERIAL;      /* (GHOULBOX: a device past its first boot carries the mark) */
     memset(&undo, 0, sizeof undo);
     memset(pat_last, 0, sizeof pat_last);
     memset(proj_slot, 0, sizeof proj_slot);
@@ -5463,7 +5464,7 @@ static int test_knob_accel(void)
         ok = settings_import(&p, (int)sizeof p) == 1 && ui_prefs == PREF_ACCEL;
         memset(&p.favorites, 0, sizeof p.favorites);
         p.magic = 0x50455233u;
-        ok &= settings_import(&p, (int)(sizeof p - sizeof p.favorites)) == 2 && !ui_prefs;
+        ok &= settings_import(&p, (int)(sizeof p - sizeof p.favorites)) == 2 && ui_prefs == PREF_SERIAL_OFF;   /* (GHOULBOX: older settings: SERIAL OFF once) */
         bad += check("#52 KNOB ACCEL saved with the settings; settings from before it: OFF", ok);
     }
     ui_prefs = 0;
@@ -5533,7 +5534,7 @@ static int test_usb_level(void)
         ok &= settings_import(&p, (int)sizeof p) == 1 && ui_prefs == PREF_USB_FIXED;
         memset(&p.favorites, 0, sizeof p.favorites);
         p.magic = 0x50455233u;
-        ok &= settings_import(&p, (int)(sizeof p - sizeof p.favorites)) == 2 && !ui_prefs;
+        ok &= settings_import(&p, (int)(sizeof p - sizeof p.favorites)) == 2 && ui_prefs == PREF_SERIAL_OFF;   /* (GHOULBOX: older settings: SERIAL OFF once) */
         frame();
         ok &= !fx_usb_fixed;
     }
@@ -5598,13 +5599,14 @@ static int test_usb_serial(void)
         usb.up = 0;
         usb_serial_apply();
         ok &= !usb_cdc_on && !usb.up && plain_desc();
-        memset(&p.favorites, 0, sizeof p.favorites);   /* settings from before it (PER3): ON */
+        memset(&p.favorites, 0, sizeof p.favorites);   /* settings from before it (PER3): GHOULBOX turns the console OFF */
         p.magic = 0x50455233u;
-        ok &= settings_import(&p, (int)(sizeof p - sizeof p.favorites)) == 2 && !(ui_prefs & PREF_SERIAL_OFF);
+        ok &= settings_import(&p, (int)(sizeof p - sizeof p.favorites)) == 2 && (ui_prefs & PREF_SERIAL_OFF);
+        usb_cdc_on = 1;
         usb_serial_apply();
-        ok &= usb_cdc_on && dev_is(DEV_DESC);
+        ok &= !usb_cdc_on && plain_desc();
     }
-    bad += check("  saved with the settings (older ones: ON); at boot the device enumerates with the saved choice", ok);
+    bad += check("  saved with the settings (older ones: OFF, GHOULBOX); at boot the device enumerates with the saved choice", ok);
     {   /* OFF: the soft key and the update frames still come in (USB-MIDI SysEx, EP1) */
         static const uint8_t KEY[8] = {0x04, 0xF0, 0x22, 0x24, 0x07, 0x35, 0x7D, 0xF7};
         ui_prefs = PREF_SERIAL_OFF;
@@ -5711,9 +5713,9 @@ static int test_bpm_lock(void)
         ok &= settings_import(&q, (int)sizeof q) == 1 && ui_prefs == PREF_BPM_LOCK && !memcmp(&p, &q, sizeof p);
         memset(&p.favorites, 0, sizeof p.favorites);
         p.magic = 0x50455233u;                                        /* (PER3: before the favorites record) */
-        ok &= settings_import(&p, (int)(sizeof p - sizeof p.favorites)) == 2 && !ui_prefs;
+        ok &= settings_import(&p, (int)(sizeof p - sizeof p.favorites)) == 2 && ui_prefs == PREF_SERIAL_OFF;   /* (GHOULBOX: older settings: SERIAL OFF once) */
         q = p;
-        ok &= settings_import(&q, (int)sizeof q) == 1 && !ui_prefs;
+        ok &= settings_import(&q, (int)sizeof q) == 1 && ui_prefs == PREF_SERIAL_OFF;
         frame();
         b0 = song.g[G_BPM];
         go_home(); frame();
@@ -5821,9 +5823,9 @@ static int test_large(void)
         ok &= settings_import(&q, (int)sizeof q) == 1 && ui_prefs == PREF_LARGE && !memcmp(&p, &q, sizeof p);
         memset(&p.favorites, 0, sizeof p.favorites);
         p.magic = 0x50455233u;                                    /* (PER3: before the favorites record) */
-        ok &= settings_import(&p, (int)(sizeof p - sizeof p.favorites)) == 2 && !ui_prefs;
+        ok &= settings_import(&p, (int)(sizeof p - sizeof p.favorites)) == 2 && ui_prefs == PREF_SERIAL_OFF;   /* (GHOULBOX: older settings: SERIAL OFF once) */
         q = p;
-        ok &= settings_import(&q, (int)sizeof q) == 1 && !ui_prefs;
+        ok &= settings_import(&q, (int)sizeof q) == 1 && ui_prefs == PREF_SERIAL_OFF;
         ui.force = 1; frame();
         ok &= large_kind() == LK_OFF && lg_px(30, Y_SEP_END + 1) == T_BG;
         bad += check("#15 LARGE saved with the settings; settings from before it: OFF (idempotent)", ok);
@@ -5902,7 +5904,7 @@ static int test_menu_prefs(void)
         ok = settings_import(&p, (int)sizeof p) == 1 && (ui_prefs & PREF_ANIM_OFF);
         memset(&p.favorites, 0, sizeof p.favorites);
         p.magic = 0x50455233u;
-        ok &= settings_import(&p, (int)(sizeof p - sizeof p.favorites)) == 2 && !ui_prefs;
+        ok &= settings_import(&p, (int)(sizeof p - sizeof p.favorites)) == 2 && ui_prefs == PREF_SERIAL_OFF;   /* (GHOULBOX: older settings: SERIAL OFF once) */
         bad += check("#46 ANIM saved with the settings; settings from before it: ON", ok);
     }
     ui_prefs = 0;
@@ -6148,6 +6150,50 @@ static int test_sample_values(void)
     return check("SAMPLE SET values: 0..4 the 1.0 sets, USR1..3 at 5..7, later sets after them", ok);
 }
 
+/* GHOULBOX 1.2: MIDI CCs set a track's controls (the channel's track), applied in the main loop, as the editor's SET */
+static int test_midi_cc(void)
+{
+    int bad = 0, ok;
+    const param_desc_t *d;
+    uint32_t k0;
+    ui_power_on();
+    song.g[G_ROUTE] = 0;                                        /* ROUT CH1-4: channel 2 plays track 2 */
+    trk[1].p[P_ATK] = 0;
+    midi_event(0xB0u, 1, 73, 127);                              /* CC73 attack, full, on channel 2 */
+    ok = trk[1].p[P_ATK] == 0;                                  /* (not in the audio interrupt) */
+    frame();
+    d = track_desc(&trk[1], P_ATK);
+    ok &= trk[1].p[P_ATK] == d->max && trk[0].p[P_ATK] != d->max;
+    bad += check("1.2 MIDI CC: CC73 on channel 2 sets track 2's ATK in the main loop, not track 1's", ok);
+    midi_event(0xB0u, 0, 7, 0);
+    midi_event(0xB0u, 0, 91, 127);
+    midi_event(0xB0u, 0, 21, 127);
+    frame();
+    k0 = ENGINES[trk[0].eng_req % NENGINES]->knob[0];
+    ok = trk[0].p[P_LEVEL] == track_desc(&trk[0], P_LEVEL)->min && trk[0].p[P_REV] == track_desc(&trk[0], P_REV)->max &&
+         trk[0].p[k0] == track_desc(&trk[0], k0)->max;
+    bad += check("1.2 MIDI CC: CC7 level, CC91 reverb send, CC21 HOME knob 1 (the engine's own)", ok);
+    midi_event(0xB0u, 0, 85, 127);
+    midi_event(0xB0u, 0, 86, 0);
+    midi_event(0xB0u, 0, 74, 0);
+    frame();
+    ok = song.g[G_CRSH] == GP[G_CRSH].max && song.g[G_TAPE] == GP[G_TAPE].min && perf_k[0] == -100;
+    midi_event(0xB0u, 0, 74, 64);
+    frame();
+    ok &= perf_k[0] == 0;
+    midi_event(0xB0u, 0, 74, 127);
+    frame();
+    ok &= perf_k[0] == 100;
+    perf_k[0] = 0;
+    bad += check("1.2 MIDI CC: CC85 CRSH, CC86 TAPE (globals); CC74 the filter (0 LP, 64 off, 127 HP)", ok);
+    trk[3].p[P_DEC] = 5;
+    midi_event(0xB0u, 9, 75, 127);                              /* channel 10: ignored under ROUT CH1-4 */
+    frame();
+    bad += check("1.2 MIDI CC: channels 5..16 ignored with ROUT CH1-4", trk[3].p[P_DEC] == 5 && trk[0].p[P_DEC] != track_desc(&trk[0], P_DEC)->max);
+    ui_power_on();
+    return bad;
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -6156,6 +6202,7 @@ int main(void)
     bad += test_sound_loads();
     bad += test_hidden_presets();
     bad += test_sample_values();
+    bad += test_midi_cc();
     bad += test_patterns();
     bad += test_rec();
     bad += test_rec_hold_clear();

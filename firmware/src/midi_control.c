@@ -204,10 +204,34 @@ static int midi_track_held(uint32_t track)
     return 0;
 }
 
+/* GHOULBOX: CCs that set a sound's controls on the channel's track (MIDI_CC_MAP). Here, in the audio interrupt,
+ * the value is only noted; ui_input.c midi_cc_apply sets it in the main loop, as the editor's SET does (range, alias,
+ * automation capture). MC_T a track parameter, MC_K a HOME knob (the engine's own), MC_G a global, MC_F the FX
+ * layer's filter (master: below 64 low-pass, above high-pass) */
+enum { MC_T, MC_K, MC_G, MC_F };
+static const struct { uint8_t cc, kind, id; } MIDI_CC_MAP[] = {
+    {7, MC_T, P_LEVEL}, {10, MC_T, P_PAN}, {73, MC_T, P_ATK}, {75, MC_T, P_DEC}, {79, MC_T, P_SUS}, {72, MC_T, P_REL},
+    {91, MC_T, P_REV}, {93, MC_T, P_CHOR}, {94, MC_T, P_DLY},
+    {21, MC_K, 0}, {22, MC_K, 1}, {23, MC_K, 2}, {24, MC_K, 3},
+    {85, MC_G, G_CRSH}, {86, MC_G, G_TAPE}, {74, MC_F, 0},
+};
+#define NMIDI_CC (sizeof MIDI_CC_MAP / sizeof MIDI_CC_MAP[0])
+static volatile uint8_t midi_cc_q[NTRK][NMIDI_CC];       /* the latest value + 1 per track and CC, 0 = none pending */
+static void midi_cc_note(uint32_t ch, uint32_t cc, uint32_t value)
+{
+    uint32_t i;
+    for (i = 0; i < NMIDI_CC; i++)
+        if (MIDI_CC_MAP[i].cc == cc) {
+            midi_cc_q[trk_index(midi_track(ch))][i] = (uint8_t)(value + 1u);
+            return;
+        }
+}
+
 static void midi_control(uint32_t ch, uint32_t cc, uint32_t value)
 {
     midi_channel_t *c = midi_channel(ch);
     uint32_t i, mask;
+    midi_cc_note(ch, cc, value & 127u);
     switch (cc) {
     case 1:
         c->wheel = (uint8_t)value;

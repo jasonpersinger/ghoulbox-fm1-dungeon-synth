@@ -849,8 +849,43 @@ static void ui_notices(void)
     }
 }
 
+/* GHOULBOX: the MIDI CCs midi_control.c noted (MIDI_CC_MAP), applied here in the main loop as the editor's SET
+ * applies a value: into the control's range, past an alias, captured by automation while it records */
+static void midi_cc_apply(void)
+{
+    uint32_t t, i;
+    for (t = 0; t < NTRK; t++)
+        for (i = 0; i < NMIDI_CC; i++) {
+            uint32_t q = midi_cc_q[t][i], kind = MIDI_CC_MAP[i].kind, id = MIDI_CC_MAP[i].id;
+            const param_desc_t *d;
+            int32_t v;
+            if (!q)
+                continue;
+            midi_cc_q[t][i] = 0;
+            q -= 1u;
+            if (kind == MC_F) {
+                perf_k[0] = (int8_t)(q == 64u ? 0 : clamp(((int32_t)q - 64) * 100 / 63, -100, 100));
+                continue;
+            }
+            if (kind == MC_K)
+                id = ENGINES[trk[t].eng_req % NENGINES]->knob[id & 3u];
+            d = kind == MC_G ? &GP[id] : track_desc(&trk[t], id);
+            if (d->max <= d->min)
+                continue;
+            v = enum_orig(d, d->min + ((d->max - d->min) * (int32_t)q + 63) / 127);
+            if (kind == MC_G) {
+                song.g[id] = (int16_t)v;
+            } else {
+                trk[t].p[id] = (int16_t)v;
+                (void)motion_capture(&trk[t], id, trk[t].p[id]);
+            }
+            ui.force = 1;
+        }
+}
+
 static void ui_input(void)
 {
+    midi_cc_apply();                                  /* GHOULBOX: MIDI CCs, in the main loop */
     uint32_t pressed = fm1_input_edges(0), notes = fm1_input_note_edges(), now = fm1_ticks(), id, b, k;
     uint32_t home = btn_hold(&ui.home_t0, B_HOME, now, 1);
     uint32_t rec = btn_hold(&ui.rec_t0, B_REC, now, rec_hold_page());   /* (#91: held on SEQ: the clear) */
