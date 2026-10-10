@@ -42,7 +42,7 @@ static void gurdy_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const
 {
     const int16_t *p = t->p;
     int32_t drn = 36 + clamp(p[P_E0], 0, 11), dlvl = p[P_E1] * 200, flvl = p[P_E2] * 170, whl = p[P_E3];
-    int32_t buzz = p[P_E4] * 220, body = p[P_E6] * 258, wobl = p[P_E7];
+    int32_t buzz = p[P_E4] * 258, body = p[P_E6] * 258, wobl = p[P_E7];
     uint32_t coup = (uint32_t)clamp(p[P_E5], 0, 4), i;
     uint32_t inc = m->inc, dinc = cents_inc(drn * 16, 0, m->fine), finc = cents_inc((drn + 7) * 16, 0, m->fine);
     uint32_t ph0 = v->ph[0], ph1 = v->ph[1], ph2 = v->ph[2];
@@ -78,8 +78,8 @@ static void gurdy_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const
         x += mulq15(osc_saw(ph1, dinc), dlvl) + mulq15(osc_saw(ph2, finc), flvl);   /* the drones */
         if (e > 0) {                                    /* the trompette: the dog chatters at each period's start */
             tr = osc_saw(ph1 << 1, dinc << 1);
-            tr = clamp(tr * 3, -24000, 24000) + ((ph1 << 1) < 0x30000000u ? nz : 0);
-            x += mulq15(mulq15(tr, e), buzz);
+            tr = clamp(tr * 3, -24000, 24000) + ((ph1 << 1) < 0x30000000u ? nz * 2 : 0);   /* 1.3: the chatter x2 */
+            x += mulq15(mulq15(tr, e), buzz);           /* (|tr| < 56768: no overflow at BUZZ 127) */
         }
         e += de;
         ph0 += inc;
@@ -108,12 +108,12 @@ static void gurdy_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const
 static const preset_t GURDY_PRESETS[] = {
     /* name, {DRN, DLVL, 5TH, WHL, BUZZ, COUP, BODY, WOBL}, {A D S R}, fenv, mono */
     /* GHOULBOX presets (tools/ghoulbox_presets.py) */
-    {"HURDY GURDY", {2, 90, 50, 80, 70, 2, 70, 40}, {8, 64, 127, 40}, 0, 1, FX(5, 10, 0, 90), PAT(4)},
-    {"DRONE WHEEL", {2, 110, 80, 60, 0, 0, 90, 60}, {40, 64, 127, 90}, 0, 1, FX(0, 20, 0, 105), PAT(5)},
-    {"DANCE GURDY", {2, 80, 40, 100, 110, 3, 60, 25}, {4, 64, 127, 30}, 0, 1, FX(10, 0, 10, 75), PAT(3)},
-    {"TROMPETTE", {2, 70, 30, 90, 95, 1, 65, 35}, {6, 64, 127, 50}, 0, 1, FX(8, 0, 0, 90), PAT(4)},
-    {"VIELLE", {2, 0, 0, 85, 0, 0, 80, 30}, {20, 64, 120, 60}, 0, 1, FX(0, 15, 10, 95), PAT(4)},
-    {"BAGPIPE", {2, 115, 70, 120, 0, 0, 40, 10}, {4, 64, 127, 30}, 0, 1, FX(15, 0, 0, 80), PAT(15)},
+    {"HURDY GURDY", {2, 90, 50, 80, 85, 2, 70, 40}, {8, 64, 127, 40}, 0, 1, FX(5, 10, 0, 90), PAT(15)},
+    {"DRONE WHEEL", {2, 127, 110, 45, 0, 0, 105, 70}, {50, 64, 127, 100}, 0, 1, FX(0, 20, 0, 110), PAT(17)},
+    {"DANCE GURDY", {2, 45, 0, 120, 127, 4, 35, 20}, {2, 64, 127, 25}, 0, 1, FX(12, 0, 0, 70), PAT(21)},
+    {"TROMPETTE", {2, 60, 0, 95, 110, 0, 60, 30}, {4, 64, 127, 40}, 0, 1, FX(15, 0, 0, 85), PAT(18)},
+    {"VIELLE", {2, 0, 0, 70, 0, 0, 100, 45}, {35, 64, 120, 70}, 0, 1, FX(0, 25, 10, 100), PAT(19)},
+    {"BAGPIPE", {2, 127, 90, 127, 0, 0, 25, 0}, {4, 64, 127, 30}, 0, 1, FX(18, 0, 0, 80), PAT(15)},
     /* GHOULBOX end */
 };
 

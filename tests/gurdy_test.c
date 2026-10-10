@@ -82,6 +82,22 @@ static double tone(double hz)                           /* Goertzel magnitude of
     return sqrt(s1 * s1 + s2 * s2 - c * s1 * s2) / N;
 }
 static double midi_hz(int n) { return 440.0 * pow(2, (n - 69) / 12.0); }
+/* the trompette's strokes (COUP 1/8 at 120 BPM): energy > 2 kHz in each stroke's first quarter vs its second
+ * half, in dB, for D4 held */
+static double stroke_ratio(const int16_t *e)
+{
+    static const uint8_t D4[1] = {62};
+    uint32_t per = (uint32_t)FS * 60u / 120u / 2u, i, k;
+    double on = 0, off = 0, prev = 0, hp;
+    play(e, D4, 1);
+    for (i = 1; i < N; i++) {                           /* > 2 kHz: a first difference, twice */
+        hp = y[i] - y[i - 1];
+        k = (i + FS / 5u) % per;                        /* (the strokes count from the note-on, 0.2 s before y) */
+        *(k < per / 4u ? &on : k > per / 2u ? &off : &prev) += (hp - prev) * (hp - prev);
+        prev = hp;
+    }
+    return 10 * log10((on / (per / 4.0)) / (off / (per / 2.0 - 1) + 1e-30) + 1e-30);
+}
 
 int main(void)
 {
@@ -101,27 +117,21 @@ int main(void)
         check(what, c2 > 0.01 && dd < c2 / 30);
     }
     {   /* 2 */
-        static const uint8_t D4[1] = {62};
         int16_t e[8] = {2, 0, 0, 0, 127, 2, 0, 0};       /* buzz alone (no bourdon, no fifth, little melody) */
-        double on, off, ratio[3];
-        uint32_t per = (uint32_t)FS * 60u / 120u / 2u, k, m;
+        static const int16_t HG[8] = {2, 90, 50, 80, 70, 2, 70, 40};   /* HURDY GURDY's own: drones and all */
+        double ratio[4];
+        uint32_t m;
         for (m = 0; m < 3u; m++) {
-            double prev = 0, hp;
             e[5] = m == 1u ? 0 : 2;                     /* 1/8, HOLD, 1/8 at BUZZ 0 */
             e[4] = m == 2u ? 0 : 127;
-            play(e, D4, 1);
-            on = off = 0;
-            for (i = 1; i < N; i++) {                   /* > 2 kHz: a first difference, twice */
-                hp = y[i] - y[i - 1];
-                k = (i + FS / 5u) % per;                /* (the strokes count from the note-on, 0.2 s before y) */
-                *(k < per / 4u ? &on : k > per / 2u ? &off : &prev) += (hp - prev) * (hp - prev);
-                prev = hp;
-            }
-            ratio[m] = 10 * log10((on / (per / 4.0)) / (off / (per / 2.0 - 1) + 1e-30) + 1e-30);
+            ratio[m] = stroke_ratio(e);
         }
+        ratio[3] = stroke_ratio(HG);
         snprintf(what, sizeof what, "trompette: stroke start vs end, the buzz %.1f dB at COUP 1/8, %.1f dB at HOLD, %.1f dB at BUZZ 0",
                  ratio[0], ratio[1], ratio[2]);
         check(what, ratio[0] >= 10.0 && fabs(ratio[1]) < 2.0 && fabs(ratio[2]) < 2.0);
+        snprintf(what, sizeof what, "  1.3: heard over the drones (HURDY GURDY, BUZZ 70): %.1f dB at each stroke", ratio[3]);
+        check(what, ratio[3] >= 6.0);
     }
     {   /* 3 */
         static const int16_t E[8] = {2, 90, 50, 80, 60, 2, 70, 40};
