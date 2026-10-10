@@ -14,7 +14,8 @@ Felucca's sequencer, song mode, effects, editor and backups all work as they do 
 - **TAPE and CRSH** (FX > TAPE): the mix through a worn cassette (wow, flutter, saturation, hiss) and a
   cheap sampler's bits and rate.
 - **GURDY**, a hurdy-gurdy engine: a bowed melody string, drones you tune, and the trompette's buzzing
-  bridge struck in time.
+  bridge struck in time. In 1.3 the buzz cuts through the drones, and its six sounds each have their own
+  character: an all-rounder, a drone wall, a dance gurdy, a snarling trompette, a clean vielle and a bagpipe.
 - **Real recordings** (1.1): a bowed psaltery, a Renaissance chamber organ, a baroque tenor recorder and a folk
   harp, sampled from public-domain (CC0) libraries, on the SAMPLE engine.
 - **45 dungeon sounds**: crypt pads, string machines, monk, crypt and glass choirs, a low drone voice, cathedral,
@@ -25,8 +26,8 @@ Felucca's sequencer, song mode, effects, editor and backups all work as they do 
   jingles, timpani, stick and gong) with the TOMBBEAT pattern.
 - **Nine dungeon patterns** (SEQ > PHRASES), in D minor over the power-on scene's chords: DIRGE, BALLAD,
   CHANT, PEDAL, MARCH, LAMENT, ARPEGGIO, ANTIPHON and TOMBBEAT.
-- **MIDI CC control** (1.2): a keyboard or DAW can turn level, pan, envelope, sends, the four engine knobs,
-  CRSH, TAPE and the master filter.
+- **MIDI CC control** (1.2, more in 1.3): a keyboard or DAW can turn level, pan, envelope, sends, the four
+  engine knobs, the LFO, the reverb, delay and chorus settings, CRSH, TAPE and a master low/high-pass filter.
 - **A curated list**: 59 sounds across 13 engines. The pop, techno and percussion presets and the SLICE
   engine are retired from the menus; projects and user presets that use them still load and play them.
 - **USB SERIAL off by default** (1.2): the FM-1 shows up as plain audio and MIDI; turn the developer
@@ -34,12 +35,12 @@ Felucca's sequencer, song mode, effects, editor and backups all work as they do 
 - **An old-RPG screen**: VT323 pixel type, stone windows, a sword cursor, flickering wall torches, and the
   CRYPT palette (stone, bone, torch amber, blood red), a blackletter wordmark and a skull at boot.
 
-Version 1.2 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
+Version 1.3 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
 
 **[Hear every sound](https://jasonpersinger.github.io/ghoulbox-fm1-dungeon-synth/sounds/)** before installing:
 all 59, rendered by the firmware's own sound code.
 
-**[User guide (PDF)](docs/guide/GHOULBOX-User-Guide-1.2.pdf):** a 48-page manual for beginners and old hands
+**[User guide (PDF)](docs/guide/GHOULBOX-User-Guide-1.3.pdf):** a 48-page manual for beginners and old hands
 alike: the FM-1's hardware and installing; synth basics in plain words (oscillators, filters, envelopes, LFOs,
 effects, sequencing), each with a hands-on exercise; a full reference to every page and all 59 sounds; a first
 piece built step by step, a minor-key chord cheat sheet and dungeon recipes; recording, troubleshooting and a

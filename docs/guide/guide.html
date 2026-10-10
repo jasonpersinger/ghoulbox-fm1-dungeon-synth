@@ -63,7 +63,7 @@ dl.gl dd { margin: 0 0 2pt; break-inside: avoid; }
 <div class="cover">
   <img src="boot.png" alt="The GHOULBOX boot screen: a skull and the blackletter wordmark">
   <div class="t">USER GUIDE</div>
-  <div class="s">firmware 1.2 for the M-VAVE FM-1</div>
+  <div class="s">firmware 1.3 for the M-VAVE FM-1</div>
   <div class="f">GHOULBOX is built on Felucca by Hügelton Instruments. M-VAVE and FM-1 are trademarks of their owners; GHOULBOX is not affiliated with or endorsed by them or by Hügelton Instruments.</div>
 </div>
 
@@ -687,14 +687,19 @@ dl.gl dd { margin: 0 0 2pt; break-inside: avoid; }
 <h3>Channels</h3>
 <p>MIDI has 16 channels, like 16 radio stations on one cable. With <span class="k">GLO</span> › SYSTEM › ROUT on <b>CH1-4</b>, channels 1–4 play tracks 1–4 and 5–16 are ignored: a DAW can play all four tracks at once. With ROUT on <b>SEL</b>, every channel plays the selected track. Pitch bend and the sustain pedal work too.</p>
 <h3>Control changes (CC)</h3>
-<p>Knobs on a MIDI controller send <b>control changes</b>, numbered 0–127. These turn the FM-1's controls, on the channel's track:</p>
+<p>Knobs on a MIDI controller send <b>control changes</b>, numbered 0–127. These turn the FM-1's controls: those marked <i>track</i> on the channel's track, the others for the whole mix:</p>
 <table>
   <tr><th>CC</th><th>Control</th></tr>
-  <tr><td>7 · 10</td><td>Track level · pan</td></tr>
-  <tr><td>73 · 75 · 79 · 72</td><td>Attack · decay · sustain · release</td></tr>
-  <tr><td>91 · 93 · 94</td><td>Reverb · chorus · delay sends</td></tr>
-  <tr><td>21–24</td><td>The four engine knobs (the HOME page's)</td></tr>
-  <tr><td>85 · 86</td><td>CRSH · TAPE (the whole mix)</td></tr>
+  <tr><td>7 · 10</td><td>Track level · pan (track)</td></tr>
+  <tr><td>73 · 75 · 79 · 72</td><td>Attack · decay · sustain · release (track)</td></tr>
+  <tr><td>91 · 93 · 94 · 92</td><td>Reverb · chorus · delay · distortion sends (track)</td></tr>
+  <tr><td>76 · 77 · 78</td><td>LFO rate · LFO to pitch (vibrato) · LFO fade-in (track)</td></tr>
+  <tr><td>110 · 111</td><td>LFO to filter · LFO to loudness (tremolo) (track)</td></tr>
+  <tr><td>21–24</td><td>The four engine knobs (the HOME page's) (track)</td></tr>
+  <tr><td>85 · 86</td><td>CRSH · TAPE</td></tr>
+  <tr><td>102 · 103</td><td>REVERB SIZE · DAMP</td></tr>
+  <tr><td>104 · 105 · 106 · 107</td><td>DLY TIME (from 4 bars at 0 to 1/32 at 127) · FDBK · COLR · MIX</td></tr>
+  <tr><td>108 · 109</td><td>CHORUS rate · depth</td></tr>
   <tr><td>74</td><td>The FX layer's filter on the whole mix: below 64 low-pass, above high-pass, 64 off (like the FX layer's own filter, it resets when the FX layer is let go or the menu opens)</td></tr>
 </table>
 <p>On the selected track, while it is armed (<span class="k">REC</span>), these moves are recorded as automation, as when turning its knob. The mod wheel, aftertouch and expression pedal are sources in the MOD matrix (chapter 10).</p>

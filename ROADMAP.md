@@ -21,11 +21,16 @@ Four more dungeon patterns (MARCH, LAMENT, ARPEGGIO, ANTIPHON), a LOW DRONE voic
 Reddit thread: drums are back as a dungeon kit (CRYPT, with a TOMBBEAT pattern), MIDI CC control from a keyboard
 or DAW, and USB SERIAL off by default.
 
+## Done: 1.3
+
+A stronger hurdy-gurdy: the trompette's buzz now cuts through the drones, and the six GURDY sounds were redesigned
+so each has its own character. From the Reddit thread: MIDI CCs for the LFO, the distortion send and the reverb,
+delay and chorus settings. A 48-page user guide for beginners, and a demo piece in four styles.
+
 ## Next
 
 - a choice of power-on scenes
 - a hurdy-gurdy icon and small screen polish
-- a longer demo piece
 
 ## Later
 
