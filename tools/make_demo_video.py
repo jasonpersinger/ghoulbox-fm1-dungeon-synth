@@ -4,8 +4,8 @@
 import subprocess, os
 import sys
 D = sys.argv[1] if len(sys.argv) > 1 else "."
-os.chdir(D)
 F = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "fonts") + "/"
+os.chdir(D)
 pir, vt = F + "PirataOne-Regular.ttf", F + "VT323-Regular.ttf"
 cues = [l.rstrip("\n").split("\t") for l in open("piece.wav.cues")]
 mood = {"I": "D PHRYGIAN  ·  54 BPM  ·  DARK RITUAL", "II": "D MINOR  ·  66 BPM  ·  CLASSIC DUNGEON",
