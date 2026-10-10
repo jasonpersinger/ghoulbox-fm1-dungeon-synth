@@ -8,12 +8,13 @@ medieval and fantasy synth music, from Old Tower and Hole Dweller to Mortiis-era
 Felucca's sequencer, song mode, effects, editor and backups all work as they do there; GHOULBOX adds:
 
 - **A dungeon at power-on.** The FM-1 starts in D minor at 72 BPM: a hurdy-gurdy melody, a crypt pad,
-  chanting monks and a drone, loaded and ready to play: press PLAY.
+  chanting monks and a drone, loaded and ready to play: press PLAY. From 1.4, MENU > SYSTEM > SCENE picks
+  another: CRYPT, TAVERN, CHAPEL, or BLANK for a clean start.
 - **HALL reverb**: a third REVERB TYPE beside ROOM and SPRING, 1.5 s stone chamber to 12 s cathedral, on at
   power-on; it borrows the delay's buffer, so it needs no extra RAM.
 - **TAPE and CRSH** (FX > TAPE): the mix through a worn cassette (wow, flutter, saturation, hiss) and a
   cheap sampler's bits and rate.
-- **GURDY**, a hurdy-gurdy engine: a bowed melody string, drones you tune, and the trompette's buzzing
+- **GURDY**, a hurdy-gurdy engine (with its own icon from 1.4): a bowed melody string, drones you tune, and the trompette's buzzing
   bridge struck in time. In 1.3 the buzz cuts through the drones, and its six sounds each have their own
   character: an all-rounder, a drone wall, a dance gurdy, a snarling trompette, a clean vielle and a bagpipe.
 - **Real recordings** (1.1): a bowed psaltery, a Renaissance chamber organ, a baroque tenor recorder and a folk
@@ -35,12 +36,12 @@ Felucca's sequencer, song mode, effects, editor and backups all work as they do 
 - **An old-RPG screen**: VT323 pixel type, stone windows, a sword cursor, flickering wall torches, and the
   CRYPT palette (stone, bone, torch amber, blood red), a blackletter wordmark and a skull at boot.
 
-Version 1.3 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
+Version 1.4 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
 
 **[Hear every sound](https://jasonpersinger.github.io/ghoulbox-fm1-dungeon-synth/sounds/)** before installing:
 all 59, rendered by the firmware's own sound code.
 
-**[User guide (PDF)](docs/guide/GHOULBOX-User-Guide-1.3.pdf):** a 48-page manual for beginners and old hands
+**[User guide (PDF)](docs/guide/GHOULBOX-User-Guide-1.4.pdf):** a 48-page manual for beginners and old hands
 alike: the FM-1's hardware and installing; synth basics in plain words (oscillators, filters, envelopes, LFOs,
 effects, sequencing), each with a hands-on exercise; a full reference to every page and all 59 sounds; a first
 piece built step by step, a minor-key chord cheat sheet and dungeon recipes; recording, troubleshooting and a

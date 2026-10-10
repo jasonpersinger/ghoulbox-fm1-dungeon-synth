@@ -21,7 +21,7 @@
                                   * by default; replaced by FM6, its sounds convert (fm4_convert.c) */
 #endif
 #ifndef GHOULBOX_VERSION
-#define GHOULBOX_VERSION "1.3"   /* GHOULBOX's own: the ABOUT screen; the editor's version string ends " GB" it */
+#define GHOULBOX_VERSION "1.4"   /* GHOULBOX's own: the ABOUT screen; the editor's version string ends " GB" it */
 #endif
 #define NENGINES 15u             /* SLICE 13 (reserved without FELUCCA_SLICE: never offered), GURDY 14 (GHOULBOX):
                                   * every engine keeps its number in every build */

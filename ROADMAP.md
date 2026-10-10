@@ -27,10 +27,14 @@ A stronger hurdy-gurdy: the trompette's buzz now cuts through the drones, and th
 so each has its own character. From the Reddit thread: MIDI CCs for the LFO, the distortion send and the reverb,
 delay and chorus settings. A 48-page user guide for beginners, and a demo piece in four styles.
 
+## Done: 1.4
+
+A choice of power-on scenes (MENU > SYSTEM > SCENE: DUNGEON, CRYPT, TAVERN, CHAPEL or BLANK) and a hurdy-gurdy
+icon for the GURDY engine.
+
 ## Next
 
-- a choice of power-on scenes
-- a hurdy-gurdy icon and small screen polish
+- small screen polish
 
 ## Later
 

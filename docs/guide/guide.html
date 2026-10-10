@@ -63,7 +63,7 @@ dl.gl dd { margin: 0 0 2pt; break-inside: avoid; }
 <div class="cover">
   <img src="boot.png" alt="The GHOULBOX boot screen: a skull and the blackletter wordmark">
   <div class="t">USER GUIDE</div>
-  <div class="s">firmware 1.3 for the M-VAVE FM-1</div>
+  <div class="s">firmware 1.4 for the M-VAVE FM-1</div>
   <div class="f">GHOULBOX is built on Felucca by Hügelton Instruments. M-VAVE and FM-1 are trademarks of their owners; GHOULBOX is not affiliated with or endorsed by them or by Hügelton Instruments.</div>
 </div>
 
@@ -200,6 +200,8 @@ dl.gl dd { margin: 0 0 2pt; break-inside: avoid; }
   <li><b>Turn <span class="k">KNOB 1–4</span></b> to shape the sound: on HOME they are the engine's four main controls.</li>
 </ol>
 <div class="note">Made a mess? Hold <span class="k">SAVE</span> to undo the last sound or pattern load. Switching the FM-1 off and on brings back the power-on scene (your saved projects are kept).</div>
+<h3>Other scenes</h3>
+<p>This is the <b>DUNGEON</b> scene. Hold <span class="k">HOME</span> for the menu, and on SYSTEM › <b>SCENE</b> choose what the FM-1 plays at the next power-on: <b>CRYPT</b> (a low drone, a crypt choir, cave wind and slow tomb drums, 60 BPM), <b>TAVERN</b> (a dance gurdy, a harp, a lute and a light drum kit, 96 BPM), <b>CHAPEL</b> (cathedral organ, monks, a recorder and a fiddle, 66 BPM), or <b>BLANK</b> (DUNGEON's sounds with no notes, for starting from nothing).</p>
 <div class="shots">
   <figure><img src="home.png" alt="HOME screen"><figcaption>HOME: four knob cards, the scope between the torches, the track's steps and sound at the bottom</figcaption></figure>
   <figure><img src="roll.png" alt="STEP page"><figcaption>SEQ › STEP: the piano roll of the selected track</figcaption></figure>
@@ -660,7 +662,7 @@ dl.gl dd { margin: 0 0 2pt; break-inside: avoid; }
 <p>Hold <span class="k">SAVE</span> to go back before the last sound load, pattern load or clear (hold again to redo).</p>
 <h3>Backups</h3>
 <p>The web editor (on the installer site) makes a full backup of the FM-1 to your computer and restores it. Do one now and then, and before any experiment you might regret.</p>
-<div class="note">The FM-1 always starts with the dungeon scene, not your last project. Your saved projects stay in their slots; load one from <span class="k">SAVE</span> › PROJECT.</div>
+<div class="note">The FM-1 always starts with the power-on scene (MENU › SYSTEM › SCENE), not your last project. Your saved projects stay in their slots; load one from <span class="k">SAVE</span> › PROJECT.</div>
 </section>
 
 <section>
@@ -671,7 +673,7 @@ dl.gl dd { margin: 0 0 2pt; break-inside: avoid; }
   <tr><td>DISPLAY</td><td><b>COLOR</b> (palette; GHOULBOX's is CRYPT) · <b>STYLE</b> (FLAT or LINE) · <b>LARGE</b> (bigger knob cards) · <b>ANIM</b> (rolling digits on or off) · <b>LEDS</b> (OFF, DIM LO, DIM HI, INV)</td></tr>
   <tr><td>CONTROL</td><td><b>HOLD</b> (how long a quick layer takes to open) · <b>KNOB ACCEL</b> (fast turns move further) · <b>FX LATCH</b> · <b>BPM LOCK</b> (SELECT stops changing the tempo)</td></tr>
   <tr><td>AUDIO</td><td><b>SPEAKER EQ</b> (FLAT, LOWCUT, BASS+; keep FLAT when recording) · <b>USB LEVEL</b> (MASTER or FIXED)</td></tr>
-  <tr><td>SYSTEM</td><td><b>USB SERIAL</b> (OFF from 1.2 on; turn it ON only for Felucca's developer console, and keep it OFF on macOS 13–15 so the USB audio input appears) · HARDWARE CALIBRATION · ABOUT (the version)</td></tr>
+  <tr><td>SYSTEM</td><td><b>SCENE</b> (what plays at power-on: DUNGEON, CRYPT, TAVERN, CHAPEL or BLANK; chapter 3) · <b>USB SERIAL</b> (OFF from 1.2 on; turn it ON only for Felucca's developer console, and keep it OFF on macOS 13–15 so the USB audio input appears) · HARDWARE CALIBRATION · ABOUT (the version)</td></tr>
 </table>
 </section>
 
@@ -739,7 +741,7 @@ dl.gl dd { margin: 0 0 2pt; break-inside: avoid; }
 <p class="lede">A complete piece in four parts and two sections, from empty tracks to a song. Take your time: it's an hour's work the first time, and ten minutes after that.</p>
 <h3>1. Clear the table</h3>
 <ol>
-  <li>Switch the FM-1 on (the power-on scene loads). Don't press PLAY yet.</li>
+  <li>Switch the FM-1 on (the power-on scene loads; this walk-through assumes DUNGEON, the default SCENE). Don't press PLAY yet.</li>
   <li>For each track, T1–T4 (<span class="k">ALGORITHM</span>): go to <span class="k">SEQ</span> › STEP, hold <span class="k">REC</span> and press <span class="k">OCT+</span>. The steps are cleared; the sounds stay.</li>
   <li>Turn <span class="k">SELECT</span> to about 66 BPM.</li>
 </ol>
