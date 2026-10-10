@@ -91,7 +91,51 @@ EXTRA = {
     "x_nofile": "symbol_document_disabled",
     # the MENU's tabs (ui_menu.c, 1.0.5): DISPLAY (CONTROL x_knob, AUDIO x_speaker, SYSTEM x_cog)
     "x_eye": "symbol_eye",
+    # GHOULBOX: the GURDY engine (icons.c engine_icon; the footer's 12 px, PRESETS' 16 px)
+    "x_gurdy": "gb_hurdy_gurdy",
 }
+
+# GHOULBOX: glyphs Fukiai does not have, drawn here in em units (y up) and added to the font copy (fitted_font) at a
+# private-use codepoint; EXTRA names them like any other glyph. gb_hurdy_gurdy: the instrument from the side, a
+# figure-eight body in outline with its wheel inside, the keybox along the top, the crank behind (tall enough to
+# read at 12 px)
+def _gb_hurdy_gurdy(pen, upm):
+    import math
+    u = upm / 100.0                                    # (drawn on a 100 x 100 grid, y down, then flipped)
+
+    def pt(x, y):
+        return (round(x * u), round((100 - y) * u))
+
+    def circle(cx, cy, r, hole=False):                 # 4 cubic quarters; a hole runs the other way round
+        k = 0.5523 * r
+        q = [(cx + r, cy), (cx, cy + r), (cx - r, cy), (cx, cy - r)]
+        c = [((cx + r, cy + k), (cx + k, cy + r)), ((cx - k, cy + r), (cx - r, cy + k)),
+             ((cx - r, cy - k), (cx - k, cy - r)), ((cx + k, cy - r), (cx + r, cy - k))]
+        order = range(4) if not hole else range(3, -1, -1)
+        pen.moveTo(pt(*q[0]))
+        for i in order:
+            a, b = c[i]
+            end = q[(i + 1) % 4] if not hole else q[i]
+            if hole:
+                a, b = b, a
+            pen.curveTo(pt(*a), pt(*b), pt(*end))
+        pen.closePath()
+
+    def box(x0, y0, x1, y1):
+        pen.moveTo(pt(x0, y0)); pen.lineTo(pt(x1, y0)); pen.lineTo(pt(x1, y1)); pen.lineTo(pt(x0, y1)); pen.closePath()
+
+    circle(58, 58, 33)                                 # the rear lobe, an outline (Fukiai draws lines):
+    circle(58, 58, 25, hole=True)
+    circle(14, 66, 14)                                 # .. the front lobe, touching it
+    circle(14, 66, 7, hole=True)
+    circle(58, 58, 11)                                 # the wheel inside
+    box(6, 21, 66, 29)                                 # the keybox along the top, on the rear lobe,
+    box(6, 21, 13, 54)                                 # .. and down to the front lobe
+    box(91, 52, 100, 60)                               # crank: the shaft out of the tail,
+    box(93, 52, 100, 88)                               # .. the arm down
+
+
+OWN = {"gb_hurdy_gurdy": (0xF8F0, _gb_hurdy_gurdy)}
 
 # a glyph given as a tuple: the first one the font has (a glyph still to be drawn falls back to a stand-in;
 # a missing preferred glyph never breaks the build). WHEEL: symbol_drawbar once Fukiai has it.
@@ -107,7 +151,7 @@ FIT_TO = {"system_battery_0": "system_battery_4"}
 SMALL_EXTRA = ["x_star", "x_star_o", "x_check", "x_lock", "x_cog", "x_usb", "x_plus", "x_minus", "x_undo", "x_redo",
                "x_warn", "x_folder", "x_doc", "x_back", "x_down", "x_up", "x_left", "x_right",
                "x_mixer", "x_pattern", "x_song", "x_motion", "x_motion_rec", "x_motion_del",
-               "x_fx", "x_hpf", "x_repeat", "x_reverse", "x_tstop", "x_freeze"]
+               "x_fx", "x_hpf", "x_repeat", "x_reverse", "x_tstop", "x_freeze", "x_gurdy"]
 
 # the 24 px set: the header battery (Fukiai's battery is a wide, short glyph: at 16 px its body was 12 x 6)
 # and the FX map's effect cells (ui_layer.c layer_fx: the icon alone, no name)
@@ -119,7 +163,7 @@ HUGE_DEFAULT = ["x_bat0", "x_bat1", "x_bat3", "x_bat4", "x_bat_chg", "x_usb",   
 BIG_DEFAULT = ["x_play", "x_stop", "x_pause", "x_rec", "x_rec_o", "x_usb", "x_star", "x_check",
                "x_cog", "x_power", "x_warn", "x_speaker", "x_info", "x_hugelton", "x_eye",
                "wave", "algorithm", "phase", "bits", "sample", "mouth", "trio", "drawbar", "slice", "grain",
-               "phys", "drum", "noise", "mod", "tempo", "tape",
+               "phys", "drum", "noise", "mod", "tempo", "tape", "x_gurdy",
                "x_song", "x_motion", "x_motion_del", "x_doctor", "x_fx", "x_knob", "rate", "x_bat0", "x_bat1", "x_bat3", "x_bat4", "x_bat_chg",
                "x_nofile"]
 
@@ -127,7 +171,9 @@ BIG_DEFAULT = ["x_play", "x_stop", "x_pause", "x_rec", "x_rec_o", "x_usb", "x_st
 def glyph_table(font_path):
     from fontTools.ttLib import TTFont
     f = TTFont(str(font_path))
-    return {name: cp for cp, name in f.getBestCmap().items()}
+    t = {name: cp for cp, name in f.getBestCmap().items()}
+    t.update({g: cp for g, (cp, _) in OWN.items()})   # (GHOULBOX: drawn here, added to the font copy)
+    return t
 
 
 def resolve(glyph, cps):
@@ -138,7 +184,7 @@ def resolve(glyph, cps):
 
 
 def fitted_font(font_path, out_dir, names):
-    """font_path, or a copy with the FIT_TO glyphs among names mended (see FIT_TO)"""
+    """font_path, or a copy with the FIT_TO glyphs among names mended (see FIT_TO) and the OWN ones among names added"""
     from fontTools.pens.recordingPen import RecordingPen
     from fontTools.pens.ttGlyphPen import TTGlyphPen
     from fontTools.ttLib import TTFont
@@ -192,6 +238,22 @@ def fitted_font(font_path, out_dir, names):
         glyf[g] = new
         hmtx[g] = hmtx[ref]
         fixed.append((g, len(contours) - len(keep)))
+    for g, (cp, draw) in OWN.items():                 # GHOULBOX: the glyphs drawn here
+        if g not in names:
+            continue
+        from fontTools.pens.cu2quPen import Cu2QuPen
+        tt = TTGlyphPen(None)
+        draw(Cu2QuPen(tt, max_err=1.0, reverse_direction=True), upm)   # (TrueType: outer contours clockwise)
+        glyf[g] = tt.glyph()
+        glyf[g].recalcBounds(glyf)
+        hmtx[g] = (upm, 0)
+        if g not in f.getGlyphOrder():
+            f.setGlyphOrder(f.getGlyphOrder() + [g])
+        for t in f["cmap"].tables:
+            if t.isUnicode():
+                t.cmap[cp] = g
+        f["maxp"].numGlyphs = len(f.getGlyphOrder())
+        fixed.append((g, -1))
     if not fixed:
         return str(font_path), fixed
     p = Path(out_dir) / (Path(font_path).stem + "_fitted.ttf")
@@ -239,6 +301,8 @@ def main():
         raise SystemExit(1)
     font, fixed = fitted_font(a.font, Path(a.out).parent, set(glyph_of.values()))
     for g, dropped in fixed:
+        if dropped < 0:
+            continue                                   # (an OWN glyph, added on purpose)
         print(f"icons: {g} is off the em in {Path(a.font).name}: fitted to {FIT_TO[g]}'s box"
               + (f", {dropped} filled counter copy dropped" if dropped else ""))
     for n, g in {**LEGACY, **EXTRA}.items():

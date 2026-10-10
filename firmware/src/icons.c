@@ -243,7 +243,7 @@ static uint32_t engine_icon(const char *name)
         {"SLICE", ICON_SLICE},
         {"GRAIN", ICON_GRAIN},
         {"PHYS", ICON_PHYS},
-        {"GURDY", ICON_PHYS},                 /* (GHOULBOX: bowed strings; a glyph of its own wanted) */
+        {"GURDY", ICON_X_GURDY},              /* GHOULBOX 1.3: its own glyph (tools/gen_aa_icons.py OWN) */
         {"DRUM", ICON_DRUM},
         {"NOISE", ICON_NOISE},
         {"FM6", ICON_MOD},                    /* (symbol_modular: six operators patched; a glyph of its own wanted) */
