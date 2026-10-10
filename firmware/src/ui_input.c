@@ -856,12 +856,13 @@ static void midi_cc_apply(void)
     uint32_t t, i;
     for (t = 0; t < NTRK; t++)
         for (i = 0; i < NMIDI_CC; i++) {
-            uint32_t q = midi_cc_q[t][i], kind = MIDI_CC_MAP[i].kind, id = MIDI_CC_MAP[i].id;
+            uint32_t f = motion_guard(), q = midi_cc_q[t][i], kind = MIDI_CC_MAP[i].kind, id = MIDI_CC_MAP[i].id;
             const param_desc_t *d;
             int32_t v;
+            midi_cc_q[t][i] = 0;                        /* (read and clear together: a CC between them is kept) */
+            motion_unguard(f);
             if (!q)
                 continue;
-            midi_cc_q[t][i] = 0;
             q -= 1u;
             if (kind == MC_F) {
                 perf_k[0] = (int8_t)(q == 64u ? 0 : clamp(((int32_t)q - 64) * 100 / 63, -100, 100));

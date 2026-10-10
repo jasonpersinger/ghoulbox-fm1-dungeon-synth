@@ -11,7 +11,7 @@ gb = set()                                           # GHOULBOX's own presets: t
 for m in re.finditer(r'\("([A-Z0-9 ]+)", \[', (ROOT / "tools/ghoulbox_presets.py").read_text()):
     gb.add(m.group(1))
 gb |= {"FRENCH HORN", "VIRGINAL", "GLASS CHOIR", "DARK STRINGS", "LOFI FLUTE", "PIPE ORGAN", "TUBA",
-       "BOWED PSALT", "REN ORGAN", "TENOR RECORD", "FOLK HARP"}
+       "BOWED PSALT", "REN ORGAN", "TENOR RECORD", "FOLK HARP", "CRYPT KIT", "TOMB DRUMS"}
 hidden = {}
 for e, n in d["HIDDEN"]:
     hidden.setdefault(e, set()).add(n)

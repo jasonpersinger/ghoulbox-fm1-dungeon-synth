@@ -179,7 +179,7 @@ figcaption { font-size: 8.5pt; color: var(--soft); margin-top: 3pt; }
   <tr><td><span class="k">WOBL</span></td><td>The wheel's unevenness: a slow wander in pitch and loudness</td></tr>
 </table>
 <h3>Drums (DRUM)</h3>
-<p>The DRUM engine's <b>CRYPT</b> kit is built for dungeon synth: a low <b>frame drum</b>, a <b>rope snare</b>, a hand <b>slap</b>, a <b>shaker</b>, <b>jingles</b>, a <b>timpani</b>, a wooden <b>stick</b> and a <b>gong</b>. Two sounds use it: <b>CRYPT KIT</b> and <b>TOMB DRUMS</b> (lower and drier), both suggesting the TOMBBEAT pattern. The keys follow the General MIDI drum map (C the frame drum, D the rope snare, A the timpani), and on a DRUM track <span class="k">SEQ</span> › STEP is a drum grid. KIT also offers Felucca's kits (STD, 80, 10, 66, 55, 77) if you want something less ancient.</p>
+<p>The DRUM engine's <b>CRYPT</b> kit is built for dungeon synth: a low <b>frame drum</b>, a <b>rope snare</b>, a hand <b>slap</b>, a <b>shaker</b>, <b>jingles</b>, a <b>timpani</b>, a wooden <b>stick</b> and a <b>gong</b>. Two sounds use it: <b>CRYPT KIT</b> and <b>TOMB DRUMS</b> (lower, longer and further back in the hall), both suggesting the TOMBBEAT pattern. The keys follow the General MIDI drum map (C the frame drum, D the rope snare, A the timpani), and on a DRUM track <span class="k">SEQ</span> › STEP is a drum grid. KIT also offers Felucca's kits (STD, 80, 10, 66, 55, 77) if you want something less ancient.</p>
 </section>
 
 <section>
@@ -244,7 +244,7 @@ figcaption { font-size: 8.5pt; color: var(--soft); margin-top: 3pt; }
 <h3>Recording to a computer</h3>
 <p>The FM-1 appears on a computer as a USB audio input named "Felucca", carrying the master output at 44.1 kHz with no driver. Set SPEAKER EQ to FLAT, and USB LEVEL to FIXED if you want a level that doesn't follow the MASTER knob.</p>
 <h3>MIDI keyboards and controllers</h3>
-<p>A MIDI keyboard or computer (USB) plays the FM-1: MIDI channels 1–4 play tracks 1–4 (MENU › SYSTEM › ROUT CH1-4), or set ROUT to SEL for every channel to play the selected track. From 1.2, these control changes turn the FM-1's controls, on the channel's track:</p>
+<p>A MIDI keyboard or computer (USB) plays the FM-1: MIDI channels 1–4 play tracks 1–4 (<span class="k">GLO</span> › SYSTEM › ROUT CH1-4), or set ROUT to SEL for every channel to play the selected track. From 1.2, these control changes turn the FM-1's controls, on the channel's track:</p>
 <table>
   <tr><th>CC</th><th>Control</th></tr>
   <tr><td>7 · 10</td><td>Track level · pan</td></tr>
@@ -252,7 +252,7 @@ figcaption { font-size: 8.5pt; color: var(--soft); margin-top: 3pt; }
   <tr><td>91 · 93 · 94</td><td>Reverb · chorus · delay sends</td></tr>
   <tr><td>21–24</td><td>The four engine knobs (the HOME page's)</td></tr>
   <tr><td>85 · 86</td><td>CRSH · TAPE (the whole mix)</td></tr>
-  <tr><td>74</td><td>The FX layer's filter on the whole mix: below 64 low-pass, above high-pass, 64 off (it resets when the FX layer is let go)</td></tr>
+  <tr><td>74</td><td>The FX layer's filter on the whole mix: below 64 low-pass, above high-pass, 64 off (like the FX layer's own filter, it resets when the FX layer is let go or the menu opens)</td></tr>
 </table>
 <p>On the selected track, while it is armed (<span class="k">REC</span>), track moves are recorded as automation, as when turning its knob.</p>
 </section>
@@ -280,7 +280,7 @@ figcaption { font-size: 8.5pt; color: var(--soft); margin-top: 3pt; }
   <tr><td>The installer can't find the FM-1</td><td>Use a USB data cable, close other music software, use Chrome or Edge.</td></tr>
   <tr><td>The installer stops after "update mode"</td><td>Unplug and replug the USB cable and press Install again. The FM-1 waits in update mode until finished.</td></tr>
   <tr><td>"NO SAMPLE" and a plain tone</td><td>The SAMPLE or GRAIN source is an empty user slot (USR1–3). Pick a built-in set or upload a sample in the web editor.</td></tr>
-  <tr><td>A keyboard or DAW plays the wrong track</td><td>MENU › SYSTEM › ROUT: CH1-4 sends channels 1–4 to tracks 1–4 and ignores 5–16; SEL sends every channel to the selected track.</td></tr>
+  <tr><td>A keyboard or DAW plays the wrong track</td><td><span class="k">GLO</span> › SYSTEM › ROUT: CH1-4 sends channels 1–4 to tracks 1–4 and ignores 5–16; SEL sends every channel to the selected track.</td></tr>
   <tr><td>No USB audio on a Mac</td><td>MENU › SYSTEM › USB SERIAL OFF (macOS 13–15).</td></tr>
   <tr><td>The screen is black after an interrupted update</td><td>If the computer sees a device named WL80UBOOT, the FM-1 is in its boot mode and can be recovered: try another cable and run the installer again. Felucca's README describes further recovery.</td></tr>
   <tr><td>Something else</td><td>Report it at <span class="path">github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/issues</span> with your OS, browser and the installer's log text.</td></tr>

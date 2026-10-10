@@ -23,14 +23,14 @@ CC = ["gcc", "-O2", "-w", f"-I{ROOT}/build/gen", f"-I{ROOT}/firmware/src", f"-I{
 WHAT = {"ANALOG": "virtual analog", "FM6": "6-operator FM", "PHASE": "phase distortion", "LOFI": "chiptune",
         "SAMPLE": "real recordings (CC0)", "VOICE": "sung vowels", "TRIO": "three oscillators",
         "WHEEL": "tonewheel organ", "GRAIN": "granular", "PHYS": "physical models", "GURDY": "hurdy-gurdy",
-        "NOISE": "noise and ambience"}
+        "NOISE": "noise and ambience", "DRUM": "drum kits"}
 
 
 def ghoulbox_names():
     """GHOULBOX's own presets: tools/ghoulbox_presets.py, FM6's F9.., SAMPLE's CC0 sets"""
     names = set(re.findall(r'\("([A-Z0-9 ]+)", \[', (ROOT / "tools/ghoulbox_presets.py").read_text()))
     return names | {"FRENCH HORN", "VIRGINAL", "GLASS CHOIR", "DARK STRINGS", "LOFI FLUTE", "PIPE ORGAN", "TUBA",
-                    "BOWED PSALT", "REN ORGAN", "TENOR RECORD", "FOLK HARP"}
+                    "BOWED PSALT", "REN ORGAN", "TENOR RECORD", "FOLK HARP", "CRYPT KIT", "TOMB DRUMS"}
 
 
 def main(site):
