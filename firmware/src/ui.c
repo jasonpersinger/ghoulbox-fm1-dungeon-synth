@@ -825,7 +825,8 @@ static void apply_preset_to(track_t *t, uint32_t pi)
 #endif
     if (t->eng_req % NENGINES == ENGI_SAMPLE && pi == SMP_SET_PERC) {   /* SAMPLE preset 4 was PERC (retired, a stored */
         set_engine_of(t, ENGI_DRUM);                  /* number: the editor's PRESET, a favourite): DRUM's kit */
-        return;                                       /* (core.h drum_from_perc) */
+        apply_preset_to(t, 0);                        /* (core.h drum_from_perc). GHOULBOX: its STD kit, not the first */
+        return;                                       /* preset browsing shows (CRYPT KIT): the sound it was */
     }
     load_begin(t, UNDO_SOUND);
     panic_req |= (uint8_t)(1u << trk_index(t));       /* MONO/POLY may change: release what sounds */

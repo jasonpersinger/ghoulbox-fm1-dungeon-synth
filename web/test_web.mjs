@@ -143,16 +143,16 @@ async function editorMock() {
   ok(!prefs.favorites[info.nengines][31] && !E.devicePresetRows(info, names, prefs).some((r) => r.user), "editor: erased slot disappears and loses star");
   {   /* the lists in the device's order (engines.c ENGINE_ORDER): FM6 second, DRUM last, "-" never; the numbers stay */
     const shown = E.engineOrder(info.engines).map((i) => info.engines[i]);
-    ok(shown.join() === "ANALOG,FM6,PHASE,LOFI,SAMPLE,VOICE,TRIO,WHEEL,GRAIN,PHYS,GURDY,NOISE" &&
-       E.engineOrder(info.engines)[1] === 12 && E.engineOrder(info.engines)[10] === 14 && E.engineOrder(info.engines)[11] === 11,
-       "editor: engines listed FM6 second, NOISE last; SLICE, DRUM not offered (indices kept)");
+    ok(shown.join() === "ANALOG,FM6,PHASE,LOFI,SAMPLE,VOICE,TRIO,WHEEL,GRAIN,PHYS,GURDY,NOISE,DRUM" &&
+       E.engineOrder(info.engines)[1] === 12 && E.engineOrder(info.engines)[10] === 14 && E.engineOrder(info.engines)[12] === 10,
+       "editor: engines listed FM6 second, DRUM last; SLICE not offered (indices kept)");
     ok(E.engineOrder(["ANALOG", "X", "-", "NOISE", "FM6"]).join() === "0,4,3,1", "editor: an unknown engine follows the known ones");
-    ok(E.engineOrder(["ANALOG", "DRUM", "SAMPLE", "SLICE"]).join() === "0,2", "editor: the engines GHOULBOX retired are not listed (SAMPLE is back)");
+    ok(E.engineOrder(["ANALOG", "DRUM", "SAMPLE", "SLICE"]).join() === "0,2,1", "editor: the engine GHOULBOX retired (SLICE) is not listed");
     m.state.favorites[10][0] = m.state.favorites[12][0] = true;
     await rq(E.req.uiSet(3, 0));
     prefs = await E.readDevicePreferences(rq, info, names, prefs);
     const rows = E.devicePresetRows(info, names, prefs).filter((r) => !r.user), eng = [...new Set(rows.map((r) => r.engine))];
-    ok(eng[0] === 0 && eng[1] === 12 && eng[eng.length - 1] === 11 && !rows.some((r) => (E.PRESET_HIDDEN[info.engines[r.engine]] || []).includes(r.name)),
+    ok(eng[0] === 0 && eng[1] === 12 && eng[eng.length - 1] === 10 && !rows.some((r) => (E.PRESET_HIDDEN[info.engines[r.engine]] || []).includes(r.name)),
        "editor: device presets in the device's engine order, the retired ones left out");
   }
   const none = await E.readDevicePreferences(() => { throw new Error("unexpected request"); }, { uiCaps: 0 }, []);
@@ -263,9 +263,9 @@ async function editorSamplePresets() {
   const kitD = E.parse[C.DESC](await rq(E.req.desc(0, info.pe0)));
   const kitSet = [];
   for (const v of [1, 2, 3]) kitSet.push(E.parse[C.SET](await rq(E.req.set(0, info.pe0, v))).value);
-  ok(eq(kitD.names, ["STD", "66", "10", "77", "80", "10", "66", "55", "77"]) &&
-     eq([0, 1, 2, 3, 4, 5, 6, 7, 8].map((v) => E.aliasOf(kitD.names, v)), [0, 6, 5, 8, 4, 5, 6, 7, 8]) &&
-     eq(E.enumShown(kitD).filter((v) => E.aliasOf(kitD.names, v) === v).map((v) => kitD.names[v]), ["STD", "80", "10", "66", "55", "77"]) &&
+  ok(eq(kitD.names, ["STD", "66", "10", "77", "80", "10", "66", "55", "77", "CRYPT"]) &&   /* (CRYPT: GHOULBOX 1.2) */
+     eq([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((v) => E.aliasOf(kitD.names, v)), [0, 6, 5, 8, 4, 5, 6, 7, 8, 9]) &&
+     eq(E.enumShown(kitD).filter((v) => E.aliasOf(kitD.names, v) === v).map((v) => kitD.names[v]), ["STD", "80", "10", "66", "55", "77", "CRYPT"]) &&
      eq(kitSet, [6, 5, 8]),
     "DRUM: KIT 1..3 (once HAND CYM H+CYM) named 66 10 77, aliases of 6 5 8: hidden, a SET lands there");
   const removed = E.parse[C.PRESET](await rq(E.req.preset(4, 4)));
@@ -301,8 +301,8 @@ function mockTables() {
        ph.presets.length === 13 && !ph.presets.some((p) => p.name === "RAIN" || p.name === "DRUM KIT"),
        "editor: PHYS models MODAL STRNG MEMB SYMP (no DUST, no DRUM), 13 presets (4 GHOULBOX)");
     ok(dr.name === "DRUM" && dr.edit.map((d) => d.label).join() === "KIT,TUNE,TONE,DECY,SNAP,ACC,KICK,DRV" &&
-       dr.presets.length === 1 && dr.presets.every((p) => p.pat === 12),
-       "editor: DRUM engine 10 (KIT TUNE TONE DECY SNAP ACC KICK DRV), one kit suggesting BEAT");
+       dr.presets.length === 3 && dr.presets[0].pat === 12 && dr.presets[1].pat === 22 && dr.presets[2].pat === 22,
+       "editor: DRUM engine 10 (KIT TUNE TONE DECY SNAP ACC KICK DRV): DRUM KIT on BEAT; GHOULBOX's CRYPT KIT, TOMB DRUMS on TOMBBEAT");
   }
   const dj = DESC;
   if (!existsSync(dj)) { console.log("editor: mock tables == firmware (no build/host/desc.json)        skip"); return; }

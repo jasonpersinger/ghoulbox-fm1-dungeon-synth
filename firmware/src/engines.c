@@ -87,8 +87,9 @@ static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {
     2, 3, 4, 5, 6, 7, 8, 9,      /* PHASE LOFI SAMPLE VOICE TRIO WHEEL GRAIN PHYS (SAMPLE: GHOULBOX 1.1's CC0 sets) */
     14,                          /* GURDY (GHOULBOX) */
     11,                          /* NOISE */
-};                               /* GHOULBOX: SLICE and DRUM not offered (every preset retired, GB_HIDDEN); they
-                                  * still play what a project or a user preset holds (eng_ok) */
+    10,                          /* DRUM (GHOULBOX 1.2: its CRYPT kit) */
+};                               /* GHOULBOX: SLICE not offered (every preset retired, GB_HIDDEN); it still plays
+                                  * what a project or a user preset holds (eng_ok) */
 
 /* GHOULBOX: factory presets the owner retired. Kept in their engines (a stored preset number - a project, a user
  * preset, an old format - still loads its sound) but not browsed: PRESETS, the knob, favourites, the editor
@@ -185,6 +186,9 @@ static const struct {
      {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0}},
     {"ANTIPHON", {62, 0, 65, 64, 62, 0, 0, 0, 50, 0, 53, 52, 50, 0, 0, 0},          /* 21 a call, answered an octave down */
      {1, T_, 0, 0, 0, T_, T_, 0, 1, T_, 0, 0, 0, T_, T_, 0}},
+    /* GHOULBOX 1.2: for the DRUM engine's CRYPT kit (GM notes: its FRAME, SHAKR, TIMP, ROPE, SLAP lanes) */
+    {"TOMBBEAT", {36, 42, 0, 42, 45, 42, 36, 42, 36, 42, 45, 45, 38, 42, 39, 42},       /* 22 a procession */
+     {1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0}},
 };
 #undef T_
 #define NPATTERNS (sizeof PATTERNS / sizeof PATTERNS[0])

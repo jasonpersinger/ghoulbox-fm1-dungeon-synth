@@ -845,7 +845,7 @@ static void cost(void)
 }
 
 /* --------------------------------------------------------- the model kits --- */
-static const char *const KITN[DV_NKIT] = {"80", "10", "66", "55", "77"};
+static const char *const KITN[DV_NKIT] = {"80", "10", "66", "55", "77", "CRYPT"};
 static const char *const LANEN[DV_NLANE] = {"KICK", "SNARE", "CLAP", "HATCL", "HATOP", "TOM", "RIM", "BELL"};
 #define KLEN (FS * 6u)
 
@@ -864,6 +864,8 @@ static const float KTGT[DV_NKIT][DV_NLANE][2] = {
      {0.500, 13024}, {0.200, 3480}, {0.010, 3868}, {0.110, 5821}},
     {{0.450, 1253}, {0.120, 4518}, {0.230, 5906}, {0.290, 8723},   /* 77 */
      {1.630, 8771}, {0.420, 1151}, {0.110, 3517}, {1.090, 9998}},
+    {{0.600, 1733}, {0.400, 4774}, {0.110, 3701}, {0.160, 6147},   /* CRYPT (GHOULBOX: its design, measured) */
+     {0.420, 12715}, {1.100, 1376}, {0.030, 1581}, {2.870, 2376}},
 };
 static const float KLVL[DV_NLANE] = {-14.5f, -18.2f, -24.2f, -27.4f, -23.8f, -13.6f, -22.5f, -21.0f};
 
@@ -1203,7 +1205,7 @@ static uint64_t seq_hash(const uint8_t (*ev)[3], uint32_t nev, uint32_t frames, 
 static void retired(void)
 {
     static const uint8_t MAP[4] = {DK_STD, DK_66, DK_10, DK_77};
-    static const uint8_t ORDER[6] = {DK_STD, DK_80, DK_10, DK_66, DK_55, DK_77};
+    static const uint8_t ORDER[7] = {DK_STD, DK_80, DK_10, DK_66, DK_55, DK_77, DK_CRYPT};   /* (CRYPT: GHOULBOX) */
     const param_desc_t *d = &ENG_DRUM.edit[0];
     uint32_t r, n, k, bad = 0, same = 0;
     int16_t kick;
@@ -1244,16 +1246,16 @@ static void retired(void)
     }
     {
         int32_t v = DK_STD, i;
-        for (i = 0; i < 6; i++) {                       /* STD 80 10 66 55 77, then held at the end */
+        for (i = 0; i < 7; i++) {                       /* STD 80 10 66 55 77 CRYPT, then held at the end */
             bad += v != ORDER[i];
             v = param_turn(d, v, 1);
         }
-        bad += v != DK_77 || param_turn(d, DK_80, -1) != DK_STD || param_turn(d, DK_STD, -1) != DK_STD;
+        bad += v != DK_CRYPT || param_turn(d, DK_80, -1) != DK_STD || param_turn(d, DK_STD, -1) != DK_STD;
     }
     for (r = 1; r < 4u; r++)
         bad += strcmp(d->names[r], d->names[MAP[r]]) != 0 || enum_orig(d, (int32_t)r) != MAP[r] ||
                param_fit(d, (int32_t)r) != MAP[r];
-    bad += param_fit(d, 99) != DK_77 || param_fit(d, -5) != DK_STD || enum_orig(d, DK_55) != DK_55;
+    bad += param_fit(d, 99) != DK_CRYPT || param_fit(d, -5) != DK_STD || enum_orig(d, DK_55) != DK_55;
     bad += param_fit(&TP[P_LEVEL], 77) != 77;
     {   /* a motion event of KIT 2 (CYM): stored and played as 10 */
         host_tracks_init();

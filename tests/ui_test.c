@@ -1094,6 +1094,7 @@ static int test_grid(void)
     uint32_t i, k, leds, ok;
     ui_power_on();
     set_engine_of(t, ENGI_DRUM);
+    apply_preset_to(t, 0);                        /* (DRUM KIT, the STD kit: GHOULBOX's DRUM opens on CRYPT KIT) */
     t->engine = t->eng_req;
     open_family(FAM_SEQ);
     frame();
@@ -3432,11 +3433,11 @@ static int test_quick_layers(void)
     key_down(white(1)); key_up(white(1)); frame();
     ok &= TSEL->eng_req == ENGI_FM6;                    /* (G3: FM6, second in ENGINE_ORDER) */
     key_down(white(NENG_SHOWN - 1u)); key_up(white(NENG_SHOWN - 1u)); frame();
-    ok &= TSEL->eng_req == 11u;                         /* (the last key: NOISE; GHOULBOX offers no DRUM) */
+    ok &= TSEL->eng_req == ENGI_DRUM;                   /* (the last key: DRUM, back in GHOULBOX 1.2) */
     ok &= !memcmp(TSEL->step, before.step, sizeof before.step) && TSEL->p[P_SLEN] == before.p[P_SLEN] &&
           TSEL->p[P_SLCR] == SL_STUT;
     btn_up(B_EDIT); frame();
-    bad += check("EDIT + white key n: the n-th engine shown (FM6 2nd, NOISE last), while playing; steps, LEN, SLICER stay", ok);
+    bad += check("EDIT + white key n: the n-th engine shown (FM6 2nd, DRUM last), while playing; steps, LEN, SLICER stay", ok);
     hold(B_SAVE);
     bad += check("  SAVE held: UNDO back to before the layer's loads, the steps untouched",
                  TSEL->eng_req == 0u && TSEL->preset == before.preset && !memcmp(TSEL->step, before.step, sizeof before.step));
@@ -4170,9 +4171,9 @@ static int test_fm4_retired(void)
         if (e < NENGINES)
             seen |= 1u << e;
     }
-    all &= ~(1u << ENGI_DRUM | 1u << ENGI_SLICE);   /* (GHOULBOX: not offered) */
-    bad += check("PRESETS: the list holds every engine's presets but DIGITAL's, DRUM's and SLICE's",
-                 seen == all && NENG_SHOWN == NENGINES - 3u);
+    all &= ~(1u << ENGI_SLICE);   /* (GHOULBOX: not offered) */
+    bad += check("PRESETS: the list holds every engine's presets but DIGITAL's and SLICE's",
+                 seen == all && NENG_SHOWN == NENGINES - 2u);
     go_page(GR_BROWSE);
     set_engine_of(TSEL, 0);
     for (i = 0, seen = 0; i < NENG_SHOWN; i++) {
@@ -4181,10 +4182,10 @@ static int test_fm4_retired(void)
     }
     bad += check("PRESETS KNOB 2: the engines in order, DIGITAL skipped, back to the first",
                  seen == all && TSEL->eng_req == 0u && eng_step(0, 1) == ENGI_FM6 && eng_step(ENGI_FM6, 1) == 2u &&
-                 eng_step(ENGI_FM6, -1) == 0u && eng_step(0, -1) == 11u);
+                 eng_step(ENGI_FM6, -1) == 0u && eng_step(0, -1) == ENGI_DRUM);
     {   /* the display order (engines.c ENGINE_ORDER): every engine one can pick once; the PRESETS list follows it */
         static const char *const ORDER[] = {"ANALOG", "FM6", "PHASE", "LOFI", "SAMPLE", "VOICE", "TRIO", "WHEEL", "GRAIN",
-                                            "PHYS", "GURDY", "NOISE"};
+                                            "PHYS", "GURDY", "NOISE", "DRUM"};
         uint32_t last = 0xFFu, r = 0, n = 0;
         ok = NENG_SHOWN == NELEM(ORDER);
         for (i = 0; ok && i < NENG_SHOWN; i++)
@@ -6052,20 +6053,20 @@ static int test_hidden_presets(void)
     bad += check("hidden presets: 54 names (PIANO covers SAMPLE's two), each one a real preset",
                  ok && NELEM(GB_HIDDEN) == 54u);
     preset_all_pos(&total);
-    ok = total == 57u + (FELUCCA_FM4 ? ENGINES[ENGI_DIGITAL]->npresets : 0u);   /* (+ DIGITAL's, built in; 1.1: + 4 CC0, BAGPIPE) */
+    ok = total == 59u + (FELUCCA_FM4 ? ENGINES[ENGI_DIGITAL]->npresets : 0u);   /* (+ DIGITAL's, built in; 1.1: + 4 CC0, BAGPIPE) */
     for (i = 0; i < total; i++) {
         e = preset_all_at(i, &k);
         ok &= e < NENGINES && !preset_hidden(ENGINES[e], k);
         for (uint32_t j = 0; j < NELEM(KEEP); j++)
             shown += str_eq(ENGINES[e]->presets[k].name, KEEP[j]);
     }
-    bad += check("hidden presets: the PRESETS list holds the 57 kept, none hidden", ok && shown >= NELEM(KEEP));
-    ok = NENG_SHOWN == 12u + FELUCCA_FM4 && eng_ok(ENGI_DRUM) && eng_ok(ENGI_SLICE);
+    bad += check("hidden presets: the PRESETS list holds the 59 kept, none hidden", ok && shown >= NELEM(KEEP));
+    ok = NENG_SHOWN == 13u + FELUCCA_FM4 && eng_ok(ENGI_SLICE);
     for (i = 0, k = 0; i < NENG_SHOWN; i++) {
-        ok &= eng_vis(i) != ENGI_DRUM && eng_vis(i) != ENGI_SLICE;
+        ok &= eng_vis(i) != ENGI_SLICE;
         k |= eng_vis(i) == ENGI_SAMPLE;
     }
-    bad += check("hidden engines: DRUM, SLICE not offered, still playable; 1.1: SAMPLE offered again (12 engines)", ok && k);
+    bad += check("hidden engines: SLICE not offered, still playable; SAMPLE (1.1) and DRUM (1.2) offered again (13 engines)", ok && k);
     select_engine(ENGI_SAMPLE);
     bad += check("1.1: picking SAMPLE loads BOWED PSALT (its first kept preset), SET 8",
                  str_eq(ENGINES[ENGI_SAMPLE]->presets[TSEL->preset].name, "BOWED PSALT") && TSEL->p[P_E0] == 8);
@@ -6093,7 +6094,21 @@ static int test_hidden_presets(void)
             bad += check("1.2: VOICE has LOW DRONE, TRIO has SHAWM, both browsable", a2 < ENGINES[5]->npresets &&
                          b2 < ENGINES[6]->npresets && !preset_hidden(ENGINES[5], a2) && !preset_hidden(ENGINES[6], b2));
         }
-        bad += check("1.2: patterns 18..21 MARCH LAMENT ARPEGGIO ANTIPHON, after 1.0's (none renumbered)", NPATTERNS == 21u &&
+        {   /* 1.2: the CRYPT drum kit: DRUM offered again with CRYPT KIT and TOMB DRUMS, on TOMBBEAT (pattern 22) */
+            uint32_t c2, t2, e2, sh = 0;
+            for (c2 = 0; c2 < ENGINES[ENGI_DRUM]->npresets && !str_eq(ENGINES[ENGI_DRUM]->presets[c2].name, "CRYPT KIT"); c2++)
+                ;
+            for (t2 = 0; t2 < ENGINES[ENGI_DRUM]->npresets && !str_eq(ENGINES[ENGI_DRUM]->presets[t2].name, "TOMB DRUMS"); t2++)
+                ;
+            for (e2 = 0; e2 < NENG_SHOWN; e2++)
+                sh |= eng_vis(e2) == ENGI_DRUM;
+            bad += check("1.2: DRUM offered with CRYPT KIT and TOMB DRUMS (KIT CRYPT), suggesting TOMBBEAT (22)", sh &&
+                         c2 < ENGINES[ENGI_DRUM]->npresets && t2 < ENGINES[ENGI_DRUM]->npresets &&
+                         !preset_hidden(ENGINES[ENGI_DRUM], c2) && !preset_hidden(ENGINES[ENGI_DRUM], t2) &&
+                         ENGINES[ENGI_DRUM]->presets[c2].e[0] == DK_CRYPT && ENGINES[ENGI_DRUM]->presets[c2].pat == 22u &&
+                         NPATTERNS == 22u && str_eq(PATTERNS[21].name, "TOMBBEAT"));
+        }
+        bad += check("1.2: patterns 18..21 MARCH LAMENT ARPEGGIO ANTIPHON, after 1.0's (none renumbered)", NPATTERNS >= 21u &&
                      str_eq(PATTERNS[13].name, "DIRGE") && str_eq(PATTERNS[16].name, "PEDAL") && str_eq(PATTERNS[17].name, "MARCH") &&
                      str_eq(PATTERNS[18].name, "LAMENT") && str_eq(PATTERNS[19].name, "ARPEGGIO") && str_eq(PATTERNS[20].name, "ANTIPHON"));
         bad += check("1.1: the SET knob never stops on an alias (1, 4)", param_turn(sd, 3, 1) == 3 && param_turn(sd, 3, 2) == 3 &&
@@ -6114,7 +6129,7 @@ static int test_hidden_presets(void)
     apply_preset(4);
     turn(EN_PRESET, 1);
     ok &= TSEL->preset == 7u;                               /* SUB BASS */
-    set_engine_of(TSEL, ENGI_DRUM);                         /* (an old project's DRUM track) */
+    set_engine_of(TSEL, ENGI_SLICE);                        /* (an old project's SLICE track: still not offered) */
     turn(EN_PRESET, 1);
     ok &= TSEL->eng_req == 0u && str_eq(ENGINES[0]->presets[TSEL->preset].name, "SOFT PAD");
     bad += check("hidden presets: from a retired sound or engine, browsing steps to the kept one beside it", ok);

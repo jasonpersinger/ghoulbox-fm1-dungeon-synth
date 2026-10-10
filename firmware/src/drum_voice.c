@@ -69,7 +69,7 @@ enum {
 };
 /* a lane of a model kit as a type: the kit (1..DV_NKIT) in the high 4 bits, the lane in the low 3 (Felucca's own
  * types: 0 above). Its run (the DVT_* it plays through) is the kit's (DV_KIT) */
-#define DV_NKIT 5
+#define DV_NKIT 6                                        /* (GHOULBOX: + CRYPT) */
 #define DV_KITOF(t) ((uint32_t)(t) >> 4)
 #define DV_KTYPE(kit, lane) ((uint8_t)(((kit) << 4) | (lane)))
 
@@ -180,7 +180,7 @@ typedef struct {
     int16_t v[13];
 } dv_kit_t;
 /* the accent per kit: + (x / 16384) per accent step (75: +4 dB at full, as Felucca's own) */
-static const uint8_t DV_KIT_ACC[DV_NKIT] = {120, 45, 100, 40, 40};
+static const uint8_t DV_KIT_ACC[DV_NKIT] = {120, 45, 100, 40, 40, 60};
 static const dv_kit_t DV_KIT[DV_NKIT][DV_NLANE] = {
     {   /* 80 */
         /* deep sine, a small drop, long decay */
@@ -271,6 +271,24 @@ static const dv_kit_t DV_KIT[DV_NKIT][DV_NLANE] = {
         {DVT_CLAVE, 32, 1568, 149, 2131, {84, 28000, 10000, 6348, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
         /* the cymbal: 34 ms + 0.3 s */
         {DVT_CYM, 53, 1690, 1100, 7582, {1969, 5120, 1748, 5120, 24000, 16000, 34, 24576, 6554, 5, 0, 0, 0}},
+    },
+    {   /* CRYPT (GHOULBOX): a dungeon kit, the lanes renamed (eng_drum.c drum_lane_name) */
+        /* FRAME: a frame drum, 65 Hz, a soft rise, a finger's skin click, a long body */
+        {DVT_PUNCH, 64, 576, 400, 2277, {40, 200, 0, 3200, 1600, 1100, 1000, 6000, 25, 0, 0, 0, 0}},
+        /* ROPE: a rope-tension snare, one low shell 147 Hz, a dark loose rattle (band ~2.6 kHz), long */
+        {DVT_SNARE, 40, 800, 520, 4141, {0, 90, 160, 70, 0, 9000, 1450, 8192, 40, 0, 26000, 0, 1828}},
+        /* SLAP: a hand on the drum's head: two strikes at ~740 Hz, a short tail */
+        {DVT_CLAP, 48, 1150, 200, 19234, {0, 2500, 1678, 0, 2500, 30000, 30, 300, 2, 0, 0, 0, 0}},
+        /* SHAKR: a shaker, noise only (no metal) through a band near 5 kHz, a swish in */
+        {DVT_HATC, 45, 1600, 160, 4500, {1600, 2048, 1600, 2042, 0, 0, 22000, 30, 6, 0, 0, 0, 0}},
+        /* JINGL: tambourine jingles, a high metal cluster and noise, ~0.3 s */
+        {DVT_HATO, 63, 1909, 300, 2940, {1996, 5120, 1940, 2042, 3000, 14000, 9000, 3, 3, 0, 0, 0, 0}},
+        /* TIMP: a timpani, 68 Hz, a long ring, its pitch dropping, a felt mallet */
+        {DVT_TOM, 53, 570, 900, 1684, {30, 400, 1100, 2000, 0, 7000, 0, 0, 0, 0, 0, 0, 0}},
+        /* STICK: a wooden stick, 880 Hz, a light crack */
+        {DVT_RIM, 32, 1250, 30, 6150, {200, 20000, 8000, 6000, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
+        /* GONG: low bands of the four-square metal, a soft strike, a long shimmer */
+        {DVT_CYM, 53, 900, 3500, 9000, {1500, 3413, 1300, 3413, 12000, 9000, 120, 19661, 0, 2, 0, 0, 0}},
     },
 };
 
