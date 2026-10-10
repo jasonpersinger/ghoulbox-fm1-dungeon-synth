@@ -6,42 +6,43 @@
 <style>
 @font-face { font-family: "Pirata One"; src: url("../../assets/fonts/PirataOne-Regular.ttf"); }
 @font-face { font-family: "VT323"; src: url("../../assets/fonts/VT323-Regular.ttf"); }
-@page { size: Letter; margin: 0.7in 0.75in 0.75in; }
+@page { size: Letter; margin: 0; }
 @page :first { margin: 0; }
 @page part { margin: 0; }
-:root { --ink: #1d1914; --soft: #5d554a; --rule: #d9d0bf; --ember: #b8621f; --blood: #9e2b23; --stone: #15120e; --bone: #ebdfc6; --card: #f6f1e7; --moss: #4f6a3a; }
+:root { --ink: #e4d8bf; --soft: #a4967e; --rule: #3a332a; --ember: #ee8a3c; --blood: #d9584a; --stone: #15120e; --bone: #ebdfc6; --card: #221d17; --moss: #9cb87e; }
+html { background: var(--stone); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 * { box-sizing: border-box; }
-body { font-family: "Georgia", "Times New Roman", serif; color: var(--ink); font-size: 10.5pt; line-height: 1.5; margin: 0; }
+body { background: var(--stone); font-family: "Georgia", "Times New Roman", serif; color: var(--ink); font-size: 10.5pt; line-height: 1.5; margin: 0; }
 h1, h2, h3 { font-weight: normal; break-after: avoid; }
 h2 { font-family: "Pirata One", serif; font-size: 25pt; color: var(--blood); margin: 0 0 6pt; line-height: 1.1; }
 h3 { font-family: "VT323", monospace; font-size: 16pt; letter-spacing: .04em; color: var(--ember); margin: 16pt 0 3pt; }
 p { margin: 0 0 7pt; }
-section { break-before: page; }
+section { break-before: page; padding: 0.7in 0.75in 0.75in; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .lede { font-size: 11.5pt; color: var(--soft); margin-bottom: 12pt; }
-.k { font-family: "VT323", monospace; font-size: 12.5pt; background: #ece4d3; border: 1px solid #cdbfa6; border-radius: 2px; padding: 0 4px; white-space: nowrap; }
+.k { font-family: "VT323", monospace; font-size: 12.5pt; color: var(--bone); background: #2c261e; border: 1px solid #4a4033; border-radius: 2px; padding: 0 4px; white-space: nowrap; }
 .path { font-family: "VT323", monospace; font-size: 12.5pt; color: var(--ember); white-space: nowrap; }
 ul, ol { margin: 0 0 8pt; padding-left: 16pt; }
 li { margin-bottom: 3pt; }
 table { border-collapse: collapse; width: 100%; margin: 4pt 0 10pt; font-size: 9.8pt; break-inside: auto; }
-th { text-align: left; font-family: "VT323", monospace; font-size: 12.5pt; font-weight: normal; color: var(--soft); border-bottom: 1.5px solid var(--ink); padding: 3pt 6pt 2pt 0; }
+th { text-align: left; font-family: "VT323", monospace; font-size: 12.5pt; font-weight: normal; color: var(--soft); border-bottom: 1.5px solid var(--soft); padding: 3pt 6pt 2pt 0; }
 td { border-bottom: 1px solid var(--rule); padding: 4pt 8pt 4pt 0; vertical-align: top; }
 tr { break-inside: avoid; }
 .note { background: var(--card); border-left: 3px solid var(--ember); padding: 7pt 10pt; margin: 8pt 0 10pt; font-size: 10pt; break-inside: avoid; }
 .warn { border-left-color: var(--blood); }
-.try { background: #eef0e6; border-left: 3px solid var(--moss); padding: 7pt 10pt 4pt; margin: 10pt 0 12pt; font-size: 10pt; break-inside: avoid; }
+.try { background: #1b2015; border-left: 3px solid var(--moss); padding: 7pt 10pt 4pt; margin: 10pt 0 12pt; font-size: 10pt; break-inside: avoid; }
 .try b.t { font-family: "VT323", monospace; font-size: 13.5pt; font-weight: normal; color: var(--moss); letter-spacing: .05em; display: block; margin-bottom: 2pt; }
 .try ol { margin-bottom: 4pt; }
 .shots { display: flex; gap: 12pt; margin: 8pt 0 10pt; break-inside: avoid; }
 .shots figure { margin: 0; flex: 1; text-align: center; }
-.shots img { width: 100%; image-rendering: pixelated; border: 1px solid #000; }
+.shots img { width: 100%; image-rendering: pixelated; border: 1px solid #4a4033; }
 figcaption { font-size: 8.5pt; color: var(--soft); margin-top: 3pt; }
 .gb { color: var(--blood); font-family: "VT323", monospace; font-size: 11pt; }
-.cover { height: 11in; background: var(--stone); color: var(--bone); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1in; }
+.cover { height: 11in; background: #0d0b08; color: var(--bone); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1in; }
 .cover img { width: 3.2in; image-rendering: pixelated; }
 .cover .t { font-family: "VT323", monospace; font-size: 22pt; letter-spacing: .12em; color: #ee8a3c; margin-top: 20pt; }
 .cover .s { font-family: "VT323", monospace; font-size: 14pt; color: #a4967e; margin-top: 6pt; }
 .cover .f { font-size: 9pt; color: #a4967e; margin-top: 40pt; max-width: 4.5in; }
-.part { page: part; break-before: page; height: 11in; background: var(--stone); color: var(--bone); display: flex; flex-direction: column; justify-content: center; padding: 1.2in; }
+.part { page: part; break-before: page; height: 11in; background: #0d0b08; color: var(--bone); display: flex; flex-direction: column; justify-content: center; padding: 1.2in; }
 .part .n { font-family: "VT323", monospace; font-size: 18pt; letter-spacing: .2em; color: #a4967e; }
 .part h1 { font-family: "Pirata One", serif; font-size: 48pt; color: #ee8a3c; margin: 4pt 0 14pt; line-height: 1; }
 .part p { font-size: 12pt; color: #cfc3aa; max-width: 5in; }
@@ -66,7 +67,7 @@ dl.gl dd { margin: 0 0 2pt; break-inside: avoid; }
   <div class="f">GHOULBOX is built on Felucca by Hügelton Instruments. M-VAVE and FM-1 are trademarks of their owners; GHOULBOX is not affiliated with or endorsed by them or by Hügelton Instruments.</div>
 </div>
 
-<section style="break-before: auto; padding-top: 0.2in;">
+<section style="break-before: auto;">
 <h2>Welcome to the dungeon</h2>
 <p class="lede">GHOULBOX turns the M-VAVE FM-1 into a dungeon-synth instrument: hurdy-gurdies and drones, crypt pads and monk choirs, organs, harps and recorders, all through a cathedral reverb and a worn cassette.</p>
 <p>It is a fork of <b>Felucca</b>, the open-source FM-1 firmware by Hügelton Instruments. Everything Felucca does still works here: four tracks, a 64-step sequencer, songs, the arpeggiator, chord keys, effects, the web editor and backups. GHOULBOX adds the sounds, the reverb and tape, a hurdy-gurdy engine, dungeon drums and an old-RPG look, and leaves out the sounds that don't fit the genre.</p>
