@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GHOULBOX Sounds</title>
+<meta name="description" content="Hear every sound of GHOULBOX, dungeon-synth firmware for the M-VAVE FM-1, before installing.">
+<style>
+/* Filled in by tools/make_sound_page.py (the total, the engine count, a shelf of cards per engine). One dark look: the CRYPT palette. */
+@font-face { font-family: "Pirata One"; src: url("fonts/PirataOne-Regular.ttf"); font-display: swap; }
+@font-face { font-family: "VT323"; src: url("fonts/VT323-Regular.ttf"); font-display: swap; }
+:root { --stone: #15120e; --slab: #211c16; --slab-hi: #2b241c; --edge: #3d342a; --bone: #ebdfc6; --ash: #a4967e;
+        --ember: #ee8a3c; --blood: #c0392f; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--stone); color: var(--bone); font: 16px/1.5 Georgia, "Times New Roman", serif; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 56px; }
+h1 { font-family: "Pirata One", Georgia, serif; font-weight: 400; font-size: clamp(2.6rem, 8vw, 4.4rem); line-height: 1; margin: 0; }
+h1 span { color: var(--ember); }
+.lede { color: var(--ash); max-width: 62ch; margin: 10px 0 18px; }
+.links { display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: VT323, monospace; font-size: 1.25rem; }
+a { color: var(--ember); }
+.demo { margin: 22px 0 6px; background: var(--slab); border: 1px solid var(--edge); padding: 14px 16px; display: grid; gap: 8px; }
+.demo .t { font-family: VT323, monospace; font-size: 1.3rem; color: var(--ember); }
+.demo p { margin: 0; color: var(--ash); font-size: .95rem; }
+audio { width: 100%; }
+section { margin-top: 30px; }
+h2 { margin: 0 0 10px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-weight: 400; }
+h2 .eng { font-family: VT323, monospace; font-size: 1.8rem; letter-spacing: .06em; color: var(--ember); }
+h2 .what { color: var(--ash); font-size: .95rem; }
+h2 .n { margin-left: auto; font-family: VT323, monospace; color: var(--ash); font-size: 1.1rem; }
+.grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.card { position: relative; background: var(--slab); border: 1px solid var(--edge); padding: 10px 12px 12px 58px; min-height: 58px; cursor: pointer; }
+.card:hover { border-color: var(--ash); }
+.card.on { background: var(--slab-hi); border-color: var(--ember); }
+.play { position: absolute; left: 10px; top: 10px; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--edge);
+        background: var(--stone); color: var(--bone); cursor: pointer; }
+.play::before { content: ""; position: absolute; left: 13px; top: 10px; border-left: 12px solid currentColor; border-top: 8px solid transparent; border-bottom: 8px solid transparent; }
+.card.on .play { color: var(--ember); border-color: var(--ember); }
+.card.on .play::before { left: 11px; top: 11px; border: 0; width: 12px; height: 12px; background: currentColor; }
+.play:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.nm { display: block; font-weight: 700; letter-spacing: .02em; }
+.meta { display: block; font-family: VT323, monospace; font-size: 1.05rem; color: var(--ash); }
+.meta b { font-weight: 400; color: var(--blood); }
+.bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; background: var(--ember); }
+footer { margin-top: 40px; color: var(--ash); font-size: .9rem; max-width: 72ch; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GHOULBOX <span>Sounds</span></h1>
+  <p class="lede">All {{TOTAL}} sounds of GHOULBOX, the dungeon-synth firmware for the M-VAVE FM-1, across {{ENGINES}} engines. Each plays the pattern its preset suggests, through the hall reverb and tape the FM-1 starts with, rendered by the firmware's own sound code. Sounds marked <b style="color:var(--blood);font-weight:400;font-family:VT323,monospace">GHOULBOX</b> are new; the rest come from Felucca.</p>
+  <nav class="links">
+    <a href="../">Install</a>
+    <a href="https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/releases/latest">User guide (PDF)</a>
+    <a href="https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth">Source and details</a>
+  </nav>
+  <div class="demo">
+    <span class="t">A short piece</span>
+    <audio controls preload="none" src="audio/demo.mp3"></audio>
+    <p>Hurdy-gurdy, French horn, dark strings and chanting monks, in D minor.</p>
+  </div>
+{{SHELVES}}
+  <footer>GHOULBOX is built on Felucca by Hügelton Instruments (GPL-3.0). Sampled instruments: Versilian Studios, CC0. M-VAVE and FM-1 are trademarks of their owners; GHOULBOX is not affiliated with or endorsed by them.</footer>
+</div>
+<script>
+const audio = new Audio();
+let cur = null;
+function stop() { if (!cur) return; cur.classList.remove("on"); cur.querySelector(".bar").style.width = "0"; cur = null; }
+document.addEventListener("click", (ev) => {
+  const card = ev.target.closest(".card");
+  if (!card) return;
+  if (card === cur) { audio.pause(); stop(); return; }
+  stop();
+  document.querySelector(".demo audio").pause();
+  audio.src = card.dataset.src;
+  audio.play().catch(stop);
+  cur = card; card.classList.add("on");
+});
+audio.addEventListener("ended", stop);
+audio.addEventListener("timeupdate", () => { if (cur && audio.duration) cur.querySelector(".bar").style.width = (100 * audio.currentTime / audio.duration) + "%"; });
+document.querySelector(".demo audio").addEventListener("play", () => { audio.pause(); stop(); });
+</script>
+</body>
+</html>
