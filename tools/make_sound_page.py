@@ -60,8 +60,10 @@ def main(site):
             if any(x["name"] == name for x in by_engine.get(e, [])):
                 continue                                    # (an alias: the same sound)
             fid = f"{e}_{int(k):02d}"
-            subprocess.run(["lame", "--quiet", "-b", "80", "-m", "j", t / f"{fid}.wav", out / f"audio/{fid}.mp3"],
-                           check=True)
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", t / f"{fid}.wav", "-af",
+                            "loudnorm=I=-18:TP=-1.5:LRA=11", "-ar", "44100", t / f"{fid}_n.wav"], check=True)
+            subprocess.run(["lame", "--quiet", "-b", "80", "-m", "j", t / f"{fid}_n.wav", out / f"audio/{fid}.mp3"],
+                           check=True)                 # (each at one loudness: PHYS plucks are ~20 dB quieter)
             by_engine.setdefault(e, []).append({"id": fid, "name": name, "pat": pat, "gb": name in gb})
     for f in ("PirataOne-Regular.ttf", "VT323-Regular.ttf"):
         shutil.copy(ROOT / "assets/fonts" / f, out / "fonts" / f)
@@ -72,8 +74,8 @@ def main(site):
             continue
         cards = "".join(
             f'<li class="card" data-src="audio/{s["id"]}.mp3"><button type="button" class="play" aria-label="Play '
-            f'{html.escape(s["name"])}"></button><span class="nm">{html.escape(s["name"])}</span>'
-            f'<span class="meta">plays {html.escape(s["pat"])}{" · <b>GHOULBOX</b>" if s["gb"] else ""}</span>'
+            f'{html.escape(s["name"])}"></button><span class="nm">{html.escape(s["name"])}</span>' +
+            (f'<span class="meta"><b>GHOULBOX</b></span>' if s["gb"] else "") +
             f'<i class="bar"></i></li>' for s in by_engine[e])
         shelves.append(f'<section><h2><span class="eng">{e}</span> <span class="what">{WHAT.get(e, "")}</span>'
                        f'<span class="n">{len(by_engine[e])}</span></h2><ul class="grid">{cards}</ul></section>')
