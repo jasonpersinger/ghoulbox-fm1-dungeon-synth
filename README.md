@@ -17,25 +17,30 @@ Felucca's sequencer, song mode, effects, editor and backups all work as they do 
   bridge struck in time.
 - **Real recordings** (1.1): a bowed psaltery, a Renaissance chamber organ, a baroque tenor recorder and a folk
   harp, sampled from public-domain (CC0) libraries, on the SAMPLE engine.
-- **43 dungeon sounds**: crypt pads, string machines, monk, crypt and glass choirs, a low drone voice, cathedral,
+- **45 dungeon sounds**: crypt pads, string machines, monk, crypt and glass choirs, a low drone voice, cathedral,
   reed and pipe organs, lute, harpsichord and virginal, a dungeon harp, tower and lo-fi flutes, recorder, French
   horn, mournful and grim brass, tuba, dark strings, cave wind, torch crackle, a bagpipe, a shawm and five
-  hurdy-gurdies, plus the four recordings; seven of them are new 6-operator FM patches.
-- **Eight dungeon patterns** (SEQ > PHRASES), in D minor over the power-on scene's chords: DIRGE, BALLAD,
-  CHANT, PEDAL, MARCH, LAMENT, ARPEGGIO and ANTIPHON.
-- **A curated list**: 57 sounds across 12 engines. The pop, techno and percussion presets and the DRUM and
-  SLICE engines are retired from the menus; projects and user presets that use them still load and play
-  them.
+  hurdy-gurdies, two crypt drum kits, plus the four recordings; seven of them are new 6-operator FM patches.
+- **CRYPT drums** (1.2): a dungeon kit on the DRUM engine (frame drum, rope snare, hand slap, shaker,
+  jingles, timpani, stick and gong) with the TOMBBEAT pattern.
+- **Nine dungeon patterns** (SEQ > PHRASES), in D minor over the power-on scene's chords: DIRGE, BALLAD,
+  CHANT, PEDAL, MARCH, LAMENT, ARPEGGIO, ANTIPHON and TOMBBEAT.
+- **MIDI CC control** (1.2): a keyboard or DAW can turn level, pan, envelope, sends, the four engine knobs,
+  CRSH, TAPE and the master filter.
+- **A curated list**: 59 sounds across 13 engines. The pop, techno and percussion presets and the SLICE
+  engine are retired from the menus; projects and user presets that use them still load and play them.
+- **USB SERIAL off by default** (1.2): the FM-1 shows up as plain audio and MIDI; turn the developer
+  console on in the menu if you want it.
 - **An old-RPG screen**: VT323 pixel type, stone windows, a sword cursor, flickering wall torches, and the
   CRYPT palette (stone, bone, torch amber, blood red), a blackletter wordmark and a skull at boot.
 
 Version 1.2 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
 
 **[Hear every sound](https://jasonpersinger.github.io/ghoulbox-fm1-dungeon-synth/sounds/)** before installing:
-all 57, rendered by the firmware's own sound code.
+all 59, rendered by the firmware's own sound code.
 
 **[User guide (PDF)](docs/guide/GHOULBOX-User-Guide-1.2.pdf):** installing, a five-minute start, the panel and
-pages, all 57 sounds, the hall and tape, the sequencer, the menu, dungeon recipes and troubleshooting. Also on
+pages, all 59 sounds, the hall and tape, the sequencer, the menu, dungeon recipes and troubleshooting. Also on
 the [Releases](https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/releases) page.
 
 ## Install

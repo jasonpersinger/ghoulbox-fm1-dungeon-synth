@@ -161,7 +161,7 @@ figcaption { font-size: 8.5pt; color: var(--soft); margin-top: 3pt; }
 
 <section>
 <h2>6 · The sounds</h2>
-<p class="lede">57 sounds across 12 engines. Hear them all at <span class="path">jasonpersinger.github.io/ghoulbox-fm1-dungeon-synth/sounds</span>. <span class="gb">GB</span> marks GHOULBOX's own; the rest are Felucca's that fit the genre.</p>
+<p class="lede">59 sounds across 13 engines. Hear them all at <span class="path">jasonpersinger.github.io/ghoulbox-fm1-dungeon-synth/sounds</span>. <span class="gb">GB</span> marks GHOULBOX's own; the rest are Felucca's that fit the genre.</p>
 {{SOUNDS}}
 <h3>Real recordings</h3>
 <p>The SAMPLE engine plays four real instruments, recorded by Versilian Studios and released into the public domain (CC0): a <b>bowed psaltery</b> (a medieval zither played with a bow), a <b>Renaissance chamber organ</b>, a <b>baroque tenor recorder</b> and a <b>folk harp</b>. Held notes on the first three sustain for as long as you hold the key. SAMPLE's SET knob lists them first, then your own samples (USR1–USR3, uploaded from the web editor).</p>
@@ -178,6 +178,8 @@ figcaption { font-size: 8.5pt; color: var(--soft); margin-top: 3pt; }
   <tr><td><span class="k">BODY</span></td><td>The wooden body's resonance</td></tr>
   <tr><td><span class="k">WOBL</span></td><td>The wheel's unevenness: a slow wander in pitch and loudness</td></tr>
 </table>
+<h3>Drums (DRUM)</h3>
+<p>The DRUM engine's <b>CRYPT</b> kit is built for dungeon synth: a low <b>frame drum</b>, a <b>rope snare</b>, a hand <b>slap</b>, a <b>shaker</b>, <b>jingles</b>, a <b>timpani</b>, a wooden <b>stick</b> and a <b>gong</b>. Two sounds use it: <b>CRYPT KIT</b> and <b>TOMB DRUMS</b> (lower and drier), both suggesting the TOMBBEAT pattern. The keys follow the General MIDI drum map (C the frame drum, D the rope snare, A the timpani), and on a DRUM track <span class="k">SEQ</span> › STEP is a drum grid. KIT also offers Felucca's kits (STD, 80, 10, 66, 55, 77) if you want something less ancient.</p>
 </section>
 
 <section>
@@ -204,7 +206,7 @@ figcaption { font-size: 8.5pt; color: var(--soft); margin-top: 3pt; }
 <h2>8 · Sequencer and patterns</h2>
 <p>Each track has its own sequence of up to 64 steps, with chords, ties, accents, slides, per-step chance and ratchets.</p>
 <h3>Load a factory pattern</h3>
-<p><span class="k">SEQ</span> › PHRASES lists ready-made patterns to load into the selected track. GHOULBOX adds eight in D minor, over the power-on scene's chords: <b>DIRGE</b> (slow pad chords), <b>BALLAD</b> (a melody), <b>CHANT</b> (low voices) and <b>PEDAL</b> (one held low D), which the power-on scene uses, and <b>MARCH</b> (a stepping bass), <b>LAMENT</b> (a falling melody), <b>ARPEGGIO</b> (broken chords for harp or lute) and <b>ANTIPHON</b> (a call answered an octave lower). Loading a sound never changes your pattern, and loading a pattern never changes your sound.</p>
+<p><span class="k">SEQ</span> › PHRASES lists ready-made patterns to load into the selected track. GHOULBOX adds nine, in D minor, over the power-on scene's chords: <b>DIRGE</b> (slow pad chords), <b>BALLAD</b> (a melody), <b>CHANT</b> (low voices) and <b>PEDAL</b> (one held low D), which the power-on scene uses, and <b>MARCH</b> (a stepping bass), <b>LAMENT</b> (a falling melody), <b>ARPEGGIO</b> (broken chords for harp or lute) and <b>ANTIPHON</b> (a call answered an octave lower); and <b>TOMBBEAT</b>, a slow beat for the CRYPT drums. Loading a sound never changes your pattern, and loading a pattern never changes your sound.</p>
 <h3>Write your own</h3>
 <ul>
   <li><b>Step entry:</b> on <span class="k">SEQ</span> › STEP, move the cursor with PRESETS and play a key to write it into the step.</li>
@@ -237,10 +239,22 @@ figcaption { font-size: 8.5pt; color: var(--soft); margin-top: 3pt; }
   <tr><td>DISPLAY</td><td><b>COLOR</b> (palette; GHOULBOX's is CRYPT) · <b>STYLE</b> (FLAT or LINE) · <b>LARGE</b> (bigger knob cards) · <b>ANIM</b> (rolling digits on or off) · <b>LEDS</b> (OFF, DIM LO, DIM HI, INV)</td></tr>
   <tr><td>CONTROL</td><td><b>HOLD</b> (how long a quick layer takes to open) · <b>KNOB ACCEL</b> · <b>FX LATCH</b> · <b>BPM LOCK</b> (SELECT stops changing the tempo)</td></tr>
   <tr><td>AUDIO</td><td><b>SPEAKER EQ</b> (FLAT, LOWCUT, BASS+; keep FLAT when recording) · <b>USB LEVEL</b> (MASTER or FIXED)</td></tr>
-  <tr><td>SYSTEM</td><td><b>USB SERIAL</b> (turn OFF on macOS 13–15 so the USB audio input appears) · HARDWARE CALIBRATION · ABOUT (the version)</td></tr>
+  <tr><td>SYSTEM</td><td><b>USB SERIAL</b> (OFF from 1.2 on; turn it ON only for Felucca's developer console, and keep it OFF on macOS 13–15 so the USB audio input appears) · HARDWARE CALIBRATION · ABOUT (the version)</td></tr>
 </table>
 <h3>Recording to a computer</h3>
 <p>The FM-1 appears on a computer as a USB audio input named "Felucca", carrying the master output at 44.1 kHz with no driver. Set SPEAKER EQ to FLAT, and USB LEVEL to FIXED if you want a level that doesn't follow the MASTER knob.</p>
+<h3>MIDI keyboards and controllers</h3>
+<p>A MIDI keyboard or computer (USB) plays the FM-1: MIDI channels 1–4 play tracks 1–4 (MENU › SYSTEM › ROUT CH1-4), or set ROUT to SEL for every channel to play the selected track. From 1.2, these control changes turn the FM-1's controls, on the channel's track:</p>
+<table>
+  <tr><th>CC</th><th>Control</th></tr>
+  <tr><td>7 · 10</td><td>Track level · pan</td></tr>
+  <tr><td>73 · 75 · 79 · 72</td><td>Attack · decay · sustain · release</td></tr>
+  <tr><td>91 · 93 · 94</td><td>Reverb · chorus · delay sends</td></tr>
+  <tr><td>21–24</td><td>The four engine knobs (the HOME page's)</td></tr>
+  <tr><td>85 · 86</td><td>CRSH · TAPE (the whole mix)</td></tr>
+  <tr><td>74</td><td>The FX layer's filter on the whole mix: below 64 low-pass, above high-pass, 64 off (it resets when the FX layer is let go)</td></tr>
+</table>
+<p>On the selected track, while it is armed (<span class="k">REC</span>), track moves are recorded as automation, as when turning its knob.</p>
 </section>
 
 <section>
@@ -266,6 +280,7 @@ figcaption { font-size: 8.5pt; color: var(--soft); margin-top: 3pt; }
   <tr><td>The installer can't find the FM-1</td><td>Use a USB data cable, close other music software, use Chrome or Edge.</td></tr>
   <tr><td>The installer stops after "update mode"</td><td>Unplug and replug the USB cable and press Install again. The FM-1 waits in update mode until finished.</td></tr>
   <tr><td>"NO SAMPLE" and a plain tone</td><td>The SAMPLE or GRAIN source is an empty user slot (USR1–3). Pick a built-in set or upload a sample in the web editor.</td></tr>
+  <tr><td>A keyboard or DAW plays the wrong track</td><td>MENU › SYSTEM › ROUT: CH1-4 sends channels 1–4 to tracks 1–4 and ignores 5–16; SEL sends every channel to the selected track.</td></tr>
   <tr><td>No USB audio on a Mac</td><td>MENU › SYSTEM › USB SERIAL OFF (macOS 13–15).</td></tr>
   <tr><td>The screen is black after an interrupted update</td><td>If the computer sees a device named WL80UBOOT, the FM-1 is in its boot mode and can be recovered: try another cable and run the installer again. Felucca's README describes further recovery.</td></tr>
   <tr><td>Something else</td><td>Report it at <span class="path">github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/issues</span> with your OS, browser and the installer's log text.</td></tr>
