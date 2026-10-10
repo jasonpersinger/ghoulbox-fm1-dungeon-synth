@@ -1740,14 +1740,14 @@ function makeMockDevice(opt = {}) {
         D("SHIFT", F.SEMI, -12, 12, 0), D("BUZZ", F.PCT, 0, 127, 64), D("BRTH", F.PCT, 0, 127, 10), D("Q", F.PCT, 0, 127, 64), D("RAND", F.PCT, 0, 127, 0)],
       presets: [P("CHOIR AAH", [0, 0, 0, 0, 40, 22, 60, 0], [85, 90, 115, 95], 0, 5), P("VOX LEAD", [32, 0, 0, 2, 90, 8, 72, 0], [6, 70, 105, 55], 1, 4),
         P("WOW BASS", [95, 0, 68, 0, 100, 0, 80, 0], [0, 70, 70, 30], 1, 8), P("WHISPER", [0, 95, 88, 3, 50, 120, 50, 0], [50, 90, 110, 90], 0, 5),
-        /* GHOULBOX presets (tools/ghoulbox_presets.py) */ P("MONKS", [105, 120, 0, -5, 75, 18, 70, 6], [70, 90, 120, 100], 0, 5), P("CRYPT CHOIR", [95, 0, 100, -2, 45, 30, 55, 10], [100, 90, 120, 110], 0, 5), P("WRAITH", [127, 64, 110, 0, 20, 100, 40, 30], [110, 90, 110, 115], 0, 5) /* GHOULBOX end */] },
+        /* GHOULBOX presets (tools/ghoulbox_presets.py) */ P("MONKS", [105, 120, 0, -5, 75, 18, 70, 6], [70, 90, 120, 100], 0, 5), P("CRYPT CHOIR", [95, 0, 100, -2, 45, 30, 55, 10], [100, 90, 120, 110], 0, 5), P("WRAITH", [127, 64, 110, 0, 20, 100, 40, 30], [110, 90, 110, 115], 0, 5), P("LOW DRONE", [127, 95, 0, -8, 95, 15, 85, 4], [90, 90, 127, 110], 1, 17) /* GHOULBOX end */] },
     { name: "TRIO", titles: ["OSC", "TONE"], edit: [E("WAVE", ["SAW3", "PLS3", "PPT", "SST", "TRI3", "S&T", "P&S", "P+N", "NOIS", "SYNC", "SYNCP", "SYNC3",
         "RING", "RING3", "R+S", "R+SP"], 0), D("INT2", F.SEMI, -24, 24, 0), D("INT3", F.SEMI, -24, 24, -12), D("DTN", F.INT, 0, 50, 6, null, "ct"),
         E("MODE", ["LP", "BP", "HP", "NOT"], 0), D("CUT", F.CUTOFF, 0, 127, 80), D("RES", F.PCT, 0, 127, 40), D("PW", F.PCT, 0, 127, 64)],
       presets: [P("FAT BASS", [0, 0, -12, 9, 0, 62, 45, 64], [0, 62, 60, 25], 1, 2), P("ARP LEAD", [2, 12, 0, 4, 0, 88, 25, 32], [0, 60, 90, 30], 0, 13),
         P("SYNC LEAD", [9, 9, 0, 0, 0, 82, 30, 64], [2, 70, 100, 40], 1, 4), P("RING BELL", [13, 0, 18, 6, 1, 96, 30, 64], [0, 92, 0, 80], 0, 7),
         P("CHIP CHOIR", [1, 0, 12, 7, 1, 62, 95, 40], [70, 90, 110, 85], 0, 5),
-        /* GHOULBOX presets (tools/ghoulbox_presets.py) */ P("FANTASY PAD", [0, 12, 7, 14, 0, 55, 20, 64], [90, 90, 115, 100], 0, 5), P("MOURN HORN", [1, 0, -12, 5, 0, 40, 25, 50], [40, 85, 105, 70], 0, 4), P("STRING MACH", [0, 12, 0, 18, 0, 70, 5, 64], [60, 90, 120, 95], 0, 5) /* GHOULBOX end */] },
+        /* GHOULBOX presets (tools/ghoulbox_presets.py) */ P("FANTASY PAD", [0, 12, 7, 14, 0, 55, 20, 64], [90, 90, 115, 100], 0, 5), P("MOURN HORN", [1, 0, -12, 5, 0, 40, 25, 50], [40, 85, 105, 70], 0, 4), P("STRING MACH", [0, 12, 0, 18, 0, 70, 5, 64], [60, 90, 120, 95], 0, 5), P("SHAWM", [1, 12, 19, 4, 1, 85, 70, 25], [6, 70, 115, 45], 1, 19) /* GHOULBOX end */] },
     { name: "WHEEL", titles: ["BARS", "TONE"], edit: [E("REG", ["FLUTE", "MELLO", "HOLLW", "SMOOT", "3BAR", "BLUES", "GOSPL", "ROCK",
         "TOPS", "CLARI", "REED", "STRNG", "CHAPL", "BRITE", "BASS", "FULL"], 4), D("SUB", F.INT, -8, 8, 0), D("BODY", F.INT, -8, 8, 0), D("TOP", F.INT, -8, 8, 0),
         E("PERC", ["OFF", "2ND", "3RD", "2SOFT", "3SOFT", "2SLOW", "3SLOW"], 0), D("CLICK", F.PCT, 0, 127, 40), D("DRV", F.PCT, 0, 127, 0), E("ROTR", ["OFF", "SLOW", "FAST"], 1)],
@@ -1769,10 +1769,11 @@ function makeMockDevice(opt = {}) {
         P("TOMS", [2, 0, 52, 40, 30, 100, 40, 30], [0, 100, 127, 70], 0, 2), P("DRONE STRING", [3, 127, 80, 88, 64, 100, 92, 0], [0, 100, 127, 90], 0, 3),
         P("HARP", [3, 8, 62, 74, 60, 90, 0, 0], [0, 100, 127, 80], 0, 3),
         /* GHOULBOX presets (tools/ghoulbox_presets.py) */ P("LUTE", [1, 48, 55, 70, 30, 127, 0, 0], [0, 100, 127, 70], 0, 3), P("HARPSICHORD", [1, 80, 110, 78, 12, 127, 0, 0], [0, 100, 127, 50], 0, 3), P("DUNGEON HARP", [3, 4, 50, 80, 70, 127, 0, 0], [0, 100, 127, 90], 0, 3), P("GURDY DRONE", [3, 1, 70, 95, 80, 127, 110, 0], [30, 100, 127, 90], 0, 5) /* GHOULBOX end */] },
-    { name: "DRUM", titles: ["KIT", "HIT"], edit: [E("KIT", ["STD", "66", "10", "77", "80", "10", "66", "55", "77"], 0), D("TUNE", F.PCT, 0, 127, 64),
+    { name: "DRUM", titles: ["KIT", "HIT"], edit: [E("KIT", ["STD", "66", "10", "77", "80", "10", "66", "55", "77", "CRYPT"], 0), D("TUNE", F.PCT, 0, 127, 64),
         D("TONE", F.PCT, 0, 127, 64), D("DECY", F.PCT, 0, 127, 64), D("SNAP", F.PCT, 0, 127, 64), D("ACC", F.PCT, 0, 127, 100),
         E("KICK", ["PUNCH", "ROUND"], 0), D("DRV", F.PCT, 0, 127, 0)],
-      presets: [P("DRUM KIT", [0, 64, 70, 64, 64, 100, 0, 0], [0, 100, 127, 100], 0, 12)] },
+      presets: [P("DRUM KIT", [0, 64, 70, 64, 64, 100, 0, 0], [0, 100, 127, 100], 0, 12),
+        P("CRYPT KIT", [9, 64, 64, 64, 64, 100, 0, 0], [0, 100, 127, 100], 0, 22), P("TOMB DRUMS", [9, 48, 50, 68, 64, 100, 0, 0], [0, 100, 127, 100], 0, 22)] },
     { name: "NOISE", titles: ["SRC", "MOVE"], edit: [E("MODE", ["ANLG", "DUST", "LFSR", "META"], 0), D("COLR", F.PCT, 0, 127, 64),
         D("FREQ", F.CUTOFF, 0, 127, 80), D("RES", F.PCT, 0, 127, 30), D("TRK", F.PCT, 0, 127, 64), D("DENS", F.PCT, 0, 127, 0),
         D("DRFT", F.PCT, 0, 127, 0), D("CRSH", F.PCT, 0, 127, 0)],
@@ -1824,6 +1825,11 @@ function makeMockDevice(opt = {}) {
     [[62, 0, 65, 69, 67, 0, 65, 64, 62, 0, 0, 0, 57, 58, 60, 0], [1, T_, 0, 0, 1, T_, 0, 2, 1, T_, T_, 0, 0, 0, 2, T_]],   /* 15 BALLAD */
     [[50, 0, 0, 0, 0, 0, 53, 0, 48, 0, 0, 0, 45, 0, 0, 0], [1, T_, T_, 0, 0, 0, 1, T_, 0, T_, T_, 0, 0, T_, T_, T_]],   /* 16 CHANT */
     [[38, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [1, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_, T_]],   /* 17 PEDAL */
+    [[38, 0, 45, 0, 34, 0, 41, 0, 36, 0, 43, 0, 33, 0, 40, 0], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]],   /* 18 MARCH (GHOULBOX 1.2) */
+    [[69, 0, 67, 65, 64, 0, 62, 0, 65, 64, 62, 61, 62, 0, 0, 0], [1, T_, 0, 0, 0, T_, 0, T_, 0, 0, 0, 0, 1, T_, T_, T_]],   /* 19 LAMENT (GHOULBOX 1.2) */
+    [[50, 53, 57, 62, 46, 50, 53, 58, 48, 52, 55, 60, 45, 49, 52, 57], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]],   /* 20 ARPEGGIO (GHOULBOX 1.2) */
+    [[62, 0, 65, 64, 62, 0, 0, 0, 50, 0, 53, 52, 50, 0, 0, 0], [1, T_, 0, 0, 0, T_, T_, 0, 1, T_, 0, 0, 0, T_, T_, 0]],   /* 21 ANTIPHON (GHOULBOX 1.2) */
+    [[36, 42, 0, 42, 45, 42, 36, 42, 36, 42, 45, 45, 38, 42, 39, 42], [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]],   /* 22 TOMBBEAT (GHOULBOX 1.2, the CRYPT kit) */
   ];
   for (let op = 0; op < 4; op++) TP.push(D("ATK", F.TIME, 0, 127, 0), D("DEC", F.TIME, 0, 127, 0), D("SUS", F.PCT, 0, 127, 127), D("REL", F.TIME, 0, 127, 0), D("LVL", F.PCT, 0, 127, 127));
   TP.push(E("CHRD", ["OFF", "DIA3", "DIA7", "MAJ", "MIN", "DOM7", "MAJ7", "MIN7", "SUS4", "POW"], 0),   /* the chord keys 81, 82 */
@@ -2451,10 +2457,10 @@ function enumShown(d) {
 /* the order the device shows its engines in (src/engines.c ENGINE_ORDER): the lists here follow it, the protocol keeps
    the engine numbers. engineOrder(names): the indices of names in that order, "-" (a reserved number) left out; a name
    the list does not know (another firmware) follows in index order */
-const ENGINE_ORDER = ["ANALOG", "FM6", "DIGITAL", "PHASE", "LOFI", "SAMPLE", "VOICE", "TRIO", "WHEEL", "GRAIN", "PHYS", "GURDY", "NOISE"];
+const ENGINE_ORDER = ["ANALOG", "FM6", "DIGITAL", "PHASE", "LOFI", "SAMPLE", "VOICE", "TRIO", "WHEEL", "GRAIN", "PHYS", "GURDY", "NOISE", "DRUM"];
 /* GHOULBOX: the engines and factory presets the device no longer offers (src/engines.c ENGINE_ORDER, GB_HIDDEN; a
    stored number still loads them): left out of the lists here too. test_web.mjs: == the firmware's */
-const ENGINE_HIDDEN = ["SLICE", "DRUM"];
+const ENGINE_HIDDEN = ["SLICE"];
 const PRESET_HIDDEN = { ANALOG: ["SAW LEAD", "SQR BASS", "ACID", "SINE KEY", "RAVE", "PLUCK", "BRASS"], PHASE: ["BRASS", "ORGAN", "RESO", "BELL", "WIRE"], LOFI: ["PULSE LD", "WAVE BASS", "ARP 8BIT", "WAVE LEAD", "STEP LEAD"], SAMPLE: ["PIANO", "FLUTE", "SAX"], VOICE: ["VOX LEAD", "WOW BASS", "WHISPER"], TRIO: ["FAT BASS", "ARP LEAD", "SYNC LEAD", "RING BELL"], WHEEL: ["JAZZ PERC", "GOSPEL", "ROCK DRIVE"], GRAIN: ["GLITCH", "SHIMMER"], PHYS: ["BELL TREE", "MARIMBA", "PLUCK", "BOWED METAL", "KALIMBA", "HAND DRUM", "TOMS", "DRONE STRING", "HARP"], DRUM: ["DRUM KIT"], NOISE: ["WIND", "RAIN", "ARCADE", "METAL"], FM6: ["TINE EP", "FM BASS", "BRASS", "MARIMBA", "ORGAN", "PLUCK"], SLICE: ["CHOP", "STUTTER"] };
 function engineOrder(names) {
   const rank = (n) => { const k = ENGINE_ORDER.indexOf(n); return k < 0 ? ENGINE_ORDER.length : k; };
