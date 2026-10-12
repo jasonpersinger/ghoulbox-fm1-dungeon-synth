@@ -405,5 +405,53 @@ ok(all(I.PORT_RE.search(n) for n in ("SMK-37 Elite", "MKE-P37", "STARRYKEY-37 PL
 against_js()
 official()
 shutil.rmtree(TMP, ignore_errors=True)
+
+def starrykey():
+    """a 21-character identity ("STARRYKEY-37 PLAY_016"): the device's and the package's (as web/fm1pkg.js)"""
+    def pkg(product, blocks, size=0x3000):
+        img = bytearray((i * 7) & 0xFF for i in range(size))
+        data = bytes(img[0x400:])
+        e = bytearray(0x50)
+        e[4:6] = I._crc16(data).to_bytes(2, "little")
+        e[8:16] = (0x400).to_bytes(4, "little") + len(data).to_bytes(4, "little")
+        e[0x40:0x49] = b"flash.bin"
+        lst = I._dec(bytes(e))
+        hdr = bytearray(0x40)
+        hdr[4:10] = size.to_bytes(4, "little") + (1).to_bytes(2, "little")
+        hdr[2:4] = I._crc16(lst).to_bytes(2, "little")
+        hdr[0:2] = I._crc16(bytes(hdr[2:0x40])).to_bytes(2, "little")
+        img[0:0x90] = I._dec(bytes(hdr)) + lst
+        raw = bytearray()
+        for i in range(blocks):
+            m = (ord(product[i]) + i + 1) & 0xFF if i < len(product) else 0x7D
+            raw += img[i * I.KEEP:(i + 1) * I.KEEP] + bytes([m])
+        return bytes(raw + img[blocks * I.KEEP:])
+
+    def image(raw):
+        im = I.deinterleave(raw)
+        return im[0] if isinstance(im, tuple) else im
+
+    def intact(im):
+        return I.package_damage(im) is None if hasattr(I, "package_damage") else I.files_ok(im)
+
+    ident = I.parse_identity(b"\xF0" + I.pack7(bytes([0, 0x59, 0x11, 0, 0, 0]) + b"STARRYKEY-37 PLAY_016" + bytes(7)) + b"\xF7")
+    ok(ident and ident.text == "STARRYKEY-37 PLAY_016" and ident.model == "STARRYKEY-37 PLAY" and ident.version == 16,
+       "device identity STARRYKEY-37 PLAY_016: all 21 characters")
+    ident = I.parse_identity(b"\xF0" + I.pack7(bytes([0, 0x59, 0x11, 0, 0, 0]) + b"FM-1_015\0xyz" + bytes(16)) + b"\xF7")
+    ok(ident and ident.text == "FM-1_015", "device identity: the text ends at the first NUL")
+    raw = pkg("STARRYKEY-37 PLAY_016", 36)
+    im = image(raw)
+    ok(I.identity_blocks(raw) == 21 and I.block_count(raw) == 36 and len(im) == len(raw) - 36 and intact(im)
+       and I.product_of(raw) == "STARRYKEY-37 PLAY_016", "36-block package with a 21-character identity: read in full")
+    raw = pkg("STARRYKEY-37 PLAY_015", 20)
+    ok(I.identity_blocks(raw) == 20 and I.product_of(raw) == "STARRYKEY-37 PLAY_01" and intact(image(raw)),
+       "20-block package: the identity stops at 20 characters (the stock V015 layout)")
+    raw = pkg("SMK-37 Pro_016", 36)
+    ok(I.identity_blocks(raw) == 20 and I.block_count(raw) == 36 and I.product_of(raw) == "SMK-37 Pro_016",
+       "36-block package with a short identity: unchanged")
+
+
+starrykey()
+
 print(f"INSTALL TESTS FAILED ({failed})" if failed else "install tests passed")
 sys.exit(1 if failed else 0)

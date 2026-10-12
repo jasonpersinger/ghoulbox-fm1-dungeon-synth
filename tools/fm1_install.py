@@ -126,24 +126,44 @@ def parse_identity(pkt):
     d = unpack7(pkt[1:-1])
     if len(d) != 34 or d[:3] != b"\x00\x59\x11":
         return None
-    txt = printable(d[6:33].rstrip(b"\0"))
+    txt = printable(d[6:33].split(b"\0")[0])
     m = re.fullmatch(r"([^_]+)_(\d+)", txt)
     return Identity(txt, m[1], int(m[2])) if m else None
 
 
 # --------------------------------------------------------------- package ---
 
+def _id_char(m, i):
+    c = (m - i - 1) & 0xFF
+    return 0x20 <= c < 0x7F
+
+
+def identity_blocks(raw):
+    """the identity blocks: 20, or more when the identity is longer (the Starrykey 37 Play V016's
+    "STARRYKEY-37 PLAY_016" takes 21): further identity markers count only when unused 0x7D markers follow
+    them (the 36-block layout)"""
+    def marker(k):
+        return raw[k * BLK + KEEP] if (k + 1) * BLK <= len(raw) else None
+    n = BLOCKS
+    while n < MAX_BLOCKS and (m := marker(n)) is not None and m != 0x7D and _id_char(m, n):
+        n += 1
+    return n if n > BLOCKS and marker(n) == 0x7D else BLOCKS
+
+
 def product_of(raw):
-    """the package identity ("FM-1_906", "SMK-37 Pro_016"): one marker byte after each of the first 20 blocks"""
+    """the package identity ("FM-1_906", "SMK-37 Pro_016"): one marker byte after each identity block (0x7D: none);
+    past the first 20 only when the package really has those blocks (the layout's count)"""
     if len(raw) < BLOCKS * BLK:
         raise InstallError("badpkg", "not an FM-1 package (too short)")
-    return "".join(chr((m - i - 1) & 0xFF) for i in range(BLOCKS) if (m := raw[i * BLK + KEEP]) != 0x7D)
+    ib = identity_blocks(raw)
+    n = BLOCKS if ib == BLOCKS else min(ib, layout(raw)[1])
+    return "".join(chr((m - i - 1) & 0xFF) for i in range(n) if (m := raw[i * BLK + KEEP]) != 0x7D)
 
 
 def block_count(raw):
-    """interleave blocks: 20, then more while the marker is the unused 0x7D (SMK-37 Pro v016: 36).
+    """interleave blocks: the identity blocks, then more while the marker is the unused 0x7D (SMK-37 Pro v016: 36).
     A 20-block package can have 0x7D there by chance: deinterleave checks the CRCs and falls back."""
-    n = BLOCKS
+    n = identity_blocks(raw)
     while n < MAX_BLOCKS and (n + 1) * BLK <= len(raw) and raw[n * BLK + KEEP] == 0x7D:
         n += 1
     return n
@@ -197,14 +217,19 @@ def files_ok(image):
     return True
 
 
-def deinterleave(raw):
-    """the logical image: 20 blocks, or the detected count when the files' CRCs agree"""
+def layout(raw):
+    """-> (logical image, block count): 20 blocks, or the detected count when the files' CRCs agree"""
     n = block_count(raw)
     if n != BLOCKS:
         image = logical_image(raw, n)
         if files_ok(image) or not files_ok(logical_image(raw, BLOCKS)):
-            return image
-    return logical_image(raw, BLOCKS)
+            return image, n
+    return logical_image(raw, BLOCKS), BLOCKS
+
+
+def deinterleave(raw):
+    """the logical image: 20 blocks, or the detected count when the files' CRCs agree"""
+    return layout(raw)[0]
 
 
 def model_of(text):
