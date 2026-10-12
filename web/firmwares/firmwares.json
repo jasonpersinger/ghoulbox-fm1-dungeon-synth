@@ -1,0 +1,222 @@
+[
+  {
+    "name": "ChoralRoot",
+    "author": "Quixotic7",
+    "description": "A Telepathic Orchid-style chord instrument: one hand plays roots, the other shapes chords; voicings, performance modes, bass and a looper.",
+    "repo": "https://github.com/Quixotic7/ChoralRootFM1",
+    "release": "https://github.com/Quixotic7/ChoralRootFM1/releases/tag/v0.18",
+    "emulator": "https://quixotic7.github.io/ChoralRootFM1/emu/",
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "Dinghy",
+    "author": "zvenson",
+    "description": "Your base for your own FM-1 firmware: everything under it done and documented (updates, USB rescue, USB-MIDI, USB audio, keys, screen, settings), a 4-voice sine on top.",
+    "repo": "https://github.com/zvenson/dinghy",
+    "release": "https://github.com/zvenson/dinghy/releases/tag/v0.3",
+    "emulator": null,
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "Felucca",
+    "author": "Leo Kuroshita (Hügelton Instruments)",
+    "description": "The custom firmware the others build on: the FM-1's own synth engines, a sequencer, effects and a better panel, with an editor in the browser.",
+    "repo": "https://github.com/hugelton/Felucca",
+    "release": "https://github.com/hugelton/Felucca/releases/tag/v1.5.1",
+    "emulator": "https://hugelton.github.io/Felucca/webapp/try/",
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "Felucca [Salt]",
+    "author": "Chance Roth (ChanceTheMaker)",
+    "description": "Felucca with a hardware-inspired Studio in the browser (play it there without an FM-1): many engines, presets, skins.",
+    "repo": "https://github.com/ChanceTheMaker/Felucca",
+    "release": "https://github.com/ChanceTheMaker/Felucca/releases/tag/v0.9-salt14",
+    "emulator": null,
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "FiMba-1",
+    "author": "jadamsowers",
+    "description": "A physically modelled kalimba: tines laid out like the real one, thumb-roll chords, mbira patterns, a sound hole to cover, grains, tape and a plate reverb.",
+    "repo": "https://github.com/jadamsowers/fm1-fimba",
+    "release": "https://github.com/jadamsowers/fm1-fimba/releases/tag/v0.6.0",
+    "emulator": "https://jadamsowers.github.io/fm1-fimba/",
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "fm1-chord",
+    "author": "math0ne",
+    "description": "A chord machine after the HiChord, with extras: chords in a key under the white keys, slash chords and inversions, sounds, envelopes, effects and a looper.",
+    "repo": "https://github.com/math0ne/fm1-chord",
+    "release": "https://github.com/math0ne/fm1-chord/releases/tag/v0.3",
+    "emulator": null,
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "FoMni",
+    "author": "Charles Vestal",
+    "description": "A chord harp inspired by the Omnichord: strum the white keys, pick chords on the black ones.",
+    "repo": "https://github.com/charlesvestal/fm1-fomni",
+    "release": "https://github.com/charlesvestal/fm1-fomni/releases/tag/v0.3.2",
+    "emulator": "https://charlesvestal.github.io/fm1-fomni/emu/",
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "FuMi-1",
+    "author": "cartesive",
+    "description": "A shigin conductor after the Suiko ST-50: its two rows of keys, the key set in honsū, equal or its own just tuning, a koto and twelve more sounds on a 6-op FM engine, ring time, vibrato, trill and a looper.",
+    "repo": "https://github.com/cartesive/fumi-1",
+    "release": "https://github.com/cartesive/fumi-1/releases/tag/fumi-1.0.7",
+    "emulator": "https://cartesive.github.io/fumi-1/emu/",
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "GHOULBOX",
+    "author": "Jason Persinger",
+    "description": "Dungeon synth: a cathedral hall reverb, tape and crush, a hurdy-gurdy engine, choirs, organs and recorded psaltery and harp, an old-RPG screen with wall torches.",
+    "repo": "https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth",
+    "release": "https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/releases/tag/ghoulbox-v2.0",
+    "emulator": "https://ghoulbox.messy.quest/webapp/emu/",
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "Hortator",
+    "author": "DEADACTIVE",
+    "description": "A drum machine: eight tracks of drums, a step sequencer, Grids, a pumping compressor, LFOs, resonators and live effects.",
+    "repo": "https://github.com/deadactive/hortator",
+    "release": "https://github.com/deadactive/hortator/releases/tag/drum-v0.16.0",
+    "emulator": "https://deadactive.github.io/hortator/",
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "Jangada",
+    "author": "zednaked",
+    "description": "Dark, industrial, Brazilian: drones that breathe, ten engines (6-op FM, a superwave analog with a ladder filter), four tracks, a mod matrix, live effects.",
+    "repo": "https://github.com/zednaked/jangada",
+    "release": "https://github.com/zednaked/jangada/releases/tag/v0.9.9",
+    "emulator": "https://zednaked.github.io/jangada/webapp/studio/",
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "JIANT FM",
+    "author": "juanjiant-bit",
+    "description": "A bio-synthetic groovebox: six tracks drawn as living beings in thermal colours, eight engines (FM6 with Dexed, analog, phase, voice…), mutating macros, song mode from SLOOP.",
+    "repo": "https://github.com/juanjiant-bit/JIANT",
+    "release": "https://juanjiant-bit.github.io/JIANT/",
+    "emulator": "https://juanjiant-bit.github.io/JIANT/",
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "MAKU",
+    "author": "okumurari",
+    "description": "An ambience machine for DJ interludes: switch it on and a random world in key plays, four parts, buttons that are verbs, and the worlds you like breed new ones.",
+    "repo": "https://github.com/okumurari2/maku",
+    "release": "https://github.com/okumurari2/maku/releases/tag/v0.1",
+    "emulator": "https://okumurari2.github.io/maku/",
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "Melodee",
+    "author": "keremimo",
+    "description": "Total playing pleasure, far beyond Felucca: recording without quantize, microtonal scales, a Casio CZ-1, a bit-by-bit Dexed, scale modes made for an MPC Sample as its companion.",
+    "repo": "https://github.com/keremimo/melodee",
+    "release": "https://github.com/keremimo/melodee/releases/tag/v1.3.0",
+    "emulator": null,
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "Rainbow Mode",
+    "author": "joshbartlettband-web",
+    "description": "A music toy for little children: 63 cartoon friends, every key in tune, chords, strumming, songs to follow and an ear game, notes on a staff, a volume cap for small ears.",
+    "repo": "https://github.com/joshbartlettband-web/felucca-rainbow",
+    "release": "https://joshbartlettband-web.github.io/felucca-rainbow/",
+    "emulator": "https://joshbartlettband-web.github.io/felucca-rainbow/webapp/try/",
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "SLOOP",
+    "author": "isod89",
+    "description": "A live groovebox: tracks, layers, a step sequencer, song mode, punch-in effects and samples, played on the FM-1 in real time.",
+    "repo": "https://github.com/isod89/sloop-fm1",
+    "release": "https://github.com/isod89/sloop-fm1/releases/tag/v2.6",
+    "emulator": null,
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "SLOOP DX7 Banks",
+    "author": "majnikool",
+    "description": "SLOOP 2.4 with up to twelve DX7 voice banks, kept and named in the editor, presets by kind.",
+    "repo": "https://github.com/majnikool/sloop-fm1",
+    "release": "https://github.com/majnikool/sloop-fm1/releases/tag/v2.5-b28-test",
+    "emulator": null,
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "SLOOP Floyd FM",
+    "author": "René Bohne",
+    "description": "SLOOP with a visual four-operator FM engine after Floyd Steinberg's 4-OP idea: an ADSR per operator, seven pages, a live oscilloscope that draws the envelopes as you play.",
+    "repo": "https://github.com/renebohne/sloop-fm1",
+    "release": "https://github.com/renebohne/sloop-fm1/releases/tag/v2.4",
+    "emulator": null,
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "sloopDX",
+    "author": "zvenson",
+    "description": "SLOOP's live workflow with Dexed's DX7 engine and 128 steps a track: six operators, 32 algorithms, your own .syx banks, every voice edited on the FM-1, FM drums you program.",
+    "repo": "https://github.com/zvenson/dxsloop",
+    "release": "https://dx7.designburgapps.com",
+    "emulator": null,
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "WaveLoop FM-1",
+    "author": "ELI7VH",
+    "description": "Felucca played from an Arturia MiniLab 3: track faders, a DJ filter, momentary effect pads; 32 patches a bank, 12 evolving songs, revoiced 808 and CR78 kits.",
+    "repo": "https://github.com/ELI7VH/Felucca",
+    "release": "https://github.com/ELI7VH/Felucca/releases/tag/1.0.5.2-midi23",
+    "emulator": null,
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "X0X",
+    "author": "Charles Vestal",
+    "description": "A groovebox: 909 and 808 drums, two 303s with TB-3PO, a breakbeat generator and song mode.",
+    "repo": "https://github.com/charlesvestal/fm1-x0x",
+    "release": "https://github.com/charlesvestal/fm1-x0x/releases/tag/v1.0.6",
+    "emulator": "https://charlesvestal.github.io/fm1-x0x/emu/",
+    "audio": null,
+    "audio_credit": null
+  },
+  {
+    "name": "zp12",
+    "author": "zvenson",
+    "description": "A standalone 12-bit sampler inspired by the E-mu SP-1200: sample in the browser (mic, line-in or a file), unplug, and the FM-1 plays on its own: nothing smoothed, loops and songs.",
+    "repo": "https://github.com/zvenson/zp12",
+    "release": "https://zp12.designburgapps.com",
+    "emulator": null,
+    "audio": null,
+    "audio_credit": null
+  }
+]
