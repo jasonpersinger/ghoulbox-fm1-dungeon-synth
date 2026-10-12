@@ -13,17 +13,42 @@
   /* Fukiai: Hügelton Instruments' icon font (MIT, FUKIAI-LICENSE.txt). Icons are text in .ic spans;
      they stay hidden until the face has loaded (html.fk), so a missing font never shows boxes. */
   @font-face { font-family: "Fukiai"; src: url("fukiai.ttf") format("truetype"); font-display: block; unicode-range: U+EA00-EB09; }
-  :root { --bg: #F2EAD8; --fg: #1E140C; --dim: #6E604C; --line: #C8BBA0; --theme: #9A5A0C; }   /* GHOULBOX: parchment / CRYPT */
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) { --bg: #0E0B08; --fg: #E8DCC4; --dim: #A0927C; --line: #3A2E22; --theme: #E89A2C; }
-  }
-  :root[data-theme="dark"] { --bg: #0E0B08; --fg: #E8DCC4; --dim: #A0927C; --line: #3A2E22; --theme: #E89A2C; }
+  /* GHOULBOX: the dungeon, as the installer and the emulator (CRYPT's colours; the art in ../art/, make_site.py) */
+  :root { --bg: #0D0C0B; --fg: #EFDFC6; --dim: #B3A58C; --line: #3A3A3E; --theme: #EF9A29;
+          --night: #080808; --edge: #6B4513; --frame: #3A3A3E; --ink: #000000; color-scheme: dark; }
   h1 { color: var(--theme); }
-  html { color-scheme: light dark; }
-  body { margin: 0; background: var(--bg); color: var(--fg);
+  html { color-scheme: dark; background: var(--night); }
+  body { margin: 0; color: var(--fg); min-height: 100vh; image-rendering: pixelated;
          font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
-         font-variant-numeric: tabular-nums; }
-  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+         font-variant-numeric: tabular-nums;
+         background: radial-gradient(ellipse 75% 70% at 50% 40%, transparent 35%, rgba(0, 0, 0, .78) 100%) fixed,
+                     url("../art/wall.png") 0 0 / 256px 128px var(--night); }
+  .crest { display: flex; justify-content: center; align-items: center; gap: 20px; margin: 18px 0 16px; }
+  .crest .skull { width: 72px; height: 84px; image-rendering: auto; }
+  .crest .logo { height: 78px; width: auto; image-rendering: auto; filter: drop-shadow(0 0 10px rgba(239, 154, 41, .35)); }
+  .crest .what { font: 700 26px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--fg);
+                 text-shadow: 0 0 3px var(--ink), 0 0 6px var(--ink), 0 2px 0 var(--ink); align-self: flex-end; margin-bottom: 8px; }
+  .stage { display: grid; grid-template-columns: 48px minmax(0, 1100px) 48px; gap: 32px; align-items: start; justify-content: center;
+           padding: 0 16px 32px; isolation: isolate; }
+  .torch { position: sticky; top: 140px; width: 48px; height: 120px; background: url("../art/torch.png") 0 0 / 192px 120px no-repeat;
+           animation: torch .48s steps(4) infinite; }
+  .torch.r { animation-delay: -.24s; }
+  .torch::before { content: ""; position: absolute; left: 50%; top: 18px; width: 420px; height: 420px; margin: -210px 0 0 -210px;
+                   background: radial-gradient(circle, rgba(239, 154, 41, .28), rgba(239, 77, 66, .09) 40%, transparent 68%);
+                   animation: glow 1.7s ease-in-out infinite alternate; pointer-events: none; z-index: -1; }
+  .torch.r::before { animation-duration: 1.3s; }
+  @keyframes torch { to { background-position: -192px 0; } }
+  @keyframes glow { 0% { opacity: .75; } 40% { opacity: 1; } 55% { opacity: .82; } 100% { opacity: .95; } }
+  @media (prefers-reduced-motion: reduce) { .torch, .torch::before { animation: none; } }
+  @media (max-width: 1280px) { .stage { grid-template-columns: minmax(0, 1100px); } .stage .torch { display: none; } }
+  @media (max-width: 600px) { .crest .skull { width: 48px; height: 56px; } .crest .logo { height: 52px; } .crest .what { font-size: 18px; } }
+  /* the editor on a stone plaque (a window's frame, as gfx.c cv_window) */
+  main { position: relative; z-index: 1;   /* (over the torches' glow) */
+         max-width: 1100px; margin: 0; padding: 16px 20px; background: var(--bg);
+         box-shadow: 0 0 0 2px var(--edge), 0 0 0 4px var(--ink), 0 0 0 6px var(--frame); }
+  .links { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0 0 6px; }
+  .links a { color: var(--theme); }
+  #connect { background: var(--theme); color: var(--ink); font-weight: 600; padding: 4px 14px; }
   h1 { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
   h2 { font-size: 13px; font-weight: 600; margin: 0 0 4px; padding-bottom: 2px; border-bottom: 1px solid var(--fg); }
   h3 { font-size: 11px; font-weight: 400; color: var(--dim); margin: 4px 0 0; }
@@ -156,10 +181,18 @@
 </style>
 </head>
 <body>
+<header class="crest">
+  <img class="skull" src="../art/skull.png" alt="">
+  <img class="logo" src="../art/logo.png" alt="GHOULBOX">
+  <span class="what">Editor</span>
+</header>
+<div class="stage">
+<div class="torch" aria-hidden="true"></div>
 <main>
   <button class="lang" id="lang"></button>
-  <h1>GHOULBOX Editor</h1>
-  <p class="dim"><a href="../installer/" style="color:inherit" data-t="installer"></a></p>
+  <h1 hidden>GHOULBOX Editor</h1>
+  <p class="links"><a href="../installer/" data-t="installer"></a> <a href="../emu/" data-t="tryit"></a>
+    <a href="https://ko-fi.com/ghoulbox" target="_blank" rel="noopener" data-t="support"></a></p>
   <!-- always visible: connection, version, sync mode, the tabs and (Sound / Sequencer / Tracks) the track selector -->
   <header class="top">
     <div class="bar">
@@ -348,6 +381,8 @@
     <span data-t="foot"></span> M-VAVE and FM-1 are trademarks of their respective owners.<br>
     <a href="FUKIAI-LICENSE.txt" data-t="iconsCredit"></a></footer>
 </main>
+<div class="torch r" aria-hidden="true"></div>
+</div>
 <script>
 "use strict";
 /*PROTO-BEGIN*/
@@ -2641,7 +2676,7 @@ const TEXT = {
     putDone: "本体に書き込みました: スロット ", storedSlot: "本体に保存しました: スロット ", erasedSlot: "消去しました: スロット ",
     loadedUser: "音色を読み込みました（シーケンスはそのまま。パターンは本体の SAVE > PHRASES から。SAVE 長押しで元に戻せます）: ", reloaded: "本体で音色が変わったので読み直しました", readingBank: "スロットを読み込み中",
     badEngine: "このファームウェアにないエンジンです: ", flashFail: "書き込みに失敗しました（rc {rc}）",
-    installer: "GHOULBOX インストーラー",
+    installer: "GHOULBOX インストーラー", tryit: "ブラウザで試す", support: "Ko-fi で支援",
     tabSeq: "シーケンサー", tabTracks: "トラック", tabSettings: "設定",
     needDevice: "FM-1 を接続すると編集できます。", smpNone: "このファームウェアにはユーザーサンプルのスロットがありません。",
     bankConnect: "FM-1 を接続すると本体のユーザープリセットも扱えます。", bankNone: "このファームウェアにはユーザープリセットがありません。",
@@ -2744,7 +2779,7 @@ const TEXT = {
     putDone: "Written to the device: slot ", storedSlot: "Stored on the device: slot ", erasedSlot: "Erased slot ",
     loadedUser: "Sound loaded (the sequence stays; its pattern is on the device under SAVE > PHRASES; hold SAVE to undo): ", reloaded: "The sound changed on the device: read again", readingBank: "Reading the slots",
     badEngine: "This firmware has no such engine: ", flashFail: "Write failed (rc {rc})",
-    installer: "GHOULBOX installer",
+    installer: "GHOULBOX installer", tryit: "Play it in your browser", support: "Support on Ko-fi",
     tabSeq: "Sequencer", tabTracks: "Tracks", tabSettings: "Settings",
     needDevice: "Connect the FM-1 to edit.", smpNone: "This firmware has no user sample slots.",
     bankConnect: "Connect the FM-1 to see its user presets too.", bankNone: "This firmware has no user presets.",
