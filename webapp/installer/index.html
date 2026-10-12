@@ -806,7 +806,7 @@ class BackupConnection {
 const $ = (id) => document.getElementById(id);
 const TEXT = {
   ja: {
-    tagline: "FM-1 に GHOULBOX をインストール",
+    tagline: "FM-1 に GHOULBOX {v} をインストール",
     backupFirst: "先にバックアップを保存してください（インストーラーは自動で作りません）。エディタを開いて FM-1 を接続し、Settings タブの Save backup を押します。",
     tryit: "まずブラウザで試す →",
     support: "Ko-fi で支援", supportWhy: "GHOULBOX は無料です。チップは新しい音色・レッスン・更新に使われます。",
@@ -843,7 +843,7 @@ const TEXT = {
     license: "GPL-3.0、無保証。ソース:",
   },
   en: {
-    tagline: "Install GHOULBOX on your FM-1",
+    tagline: "Install GHOULBOX {v} on your FM-1",
     backupFirst: "First save a backup: the installer doesn't make one. Open the Editor (below), connect the FM-1, and on the Settings tab press Save backup.",
     tryit: "Try it in your browser first →",
     support: "Support on Ko-fi", supportWhy: "GHOULBOX is free. Tips fund new sounds, lessons and updates.",
@@ -883,9 +883,11 @@ const TEXT = {
 let lang = (navigator.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en";
 const t = (k) => TEXT[lang][k];
 let lastKey = null, lastArg = "";
+const meta = {"version": "gb2.1", "product": "FM-1_900", "pkg": "../../firmware/felucca-gb2.1.fwsc"};
+const VER = String(meta.version).replace(/^gb/, "");   // GHOULBOX: the release's number (make_site.py's "gbX.Y")
 function applyLang() {
   document.documentElement.lang = lang;
-  document.querySelectorAll("[data-t]").forEach((e) => { e.textContent = t(e.dataset.t); });
+  document.querySelectorAll("[data-t]").forEach((e) => { e.textContent = t(e.dataset.t).replace("{v}", VER); });
   $("lang").textContent = t("other");
   if (lastKey) $("status").textContent = t(lastKey) + lastArg;
 }
@@ -895,7 +897,6 @@ const sayK = (k, arg = "") => { lastKey = k; lastArg = arg; $("status").textCont
 const say = (txt) => { lastKey = null; $("status").textContent = txt; };
 const log = (t) => { $("log").textContent += t + "\n"; };
 let image = null;
-const meta = {"version": "gb2.0", "product": "FM-1_900", "pkg": "../../firmware/felucca-gb2.0.fwsc"};
 
 let writing = false, stock = null, stockFileEpoch = 0, resumed = false;   // resumed: GHOULBOX, the page came back from a "reload"
 const lockInstaller = (on) => { writing = on; $("go").disabled = on || !image; $("stock-go").disabled = on || !stock; $("stock-file").disabled = on; $("stock-recovery").disabled = on; };
@@ -909,7 +910,7 @@ window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault
     const pkg = new Uint8Array(await r.arrayBuffer());
     if (productOf(pkg) !== meta.product) { sayK("badpkg"); return; }
     image = logicalImage(pkg);
-    say(`GHOULBOX ${meta.version}`);
+    say(`GHOULBOX ${VER}`);
     $("go").disabled = false;
     let resume = null;
     try { resume = sessionStorage.getItem("ghoulbox-resume"); sessionStorage.removeItem("ghoulbox-resume"); } catch (_) {}
