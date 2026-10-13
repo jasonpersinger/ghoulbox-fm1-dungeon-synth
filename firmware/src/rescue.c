@@ -50,7 +50,11 @@ static int rescue_key(void)
         fm1_wdt_feed();
         fm1_input_scan();
     } while ((uint32_t)(fm1_ticks() - start) < 50u * 1000u * FM1_TICKS_PER_US);
+#if BOARD_SMK37
+    return (fm1_in.buttons & FM1_OCT_BOTH) == 1u << FM1_BTN_OCT_DOWN;   /* (SMK-37 Pro: OCTAVE- is button 4) */
+#else
     return bootguard_manual(fm1_in.buttons);
+#endif
 }
 
 static void rescue_main(void)
@@ -60,7 +64,7 @@ static void rescue_main(void)
     rescue_last = rescue_usb_last = fm1_ticks();
     rescue_fraction = 0;
     fm1_ms = 0;
-    flash_ok = FL_FAR(fl_jedec_ram)() == 0x856014u;     /* (as persist_boot: the expected 1 MiB part) */
+    flash_ok = FL_JEDEC_OK(FL_FAR(fl_jedec_ram)());      /* (as persist_boot: the expected 1 MiB part) */
     lcd_init();
     lcd_fill(0, 0, 240, 240, 0);                        /* fixed colours: no palette is read here */
     draw_text_line(0, 56, 240, &AF_M, "GHOULBOX", UI_CRASH_INK, 0, 1);

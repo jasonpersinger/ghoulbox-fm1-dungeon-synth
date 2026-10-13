@@ -29,11 +29,26 @@
  *   ldr_progress(done, total)
  * plus the ota.c hooks (frames, time, idle). */
 #define LDR_APP_LO 0x4000u
+#if BOARD_SMK37
+/* SMK-37 Pro: app area up to the stock PRCT end; records only in the VM, so ldr_records_drop can never
+ * erase BTIF / USRTRIM (0xC0000..0xC1FFF, the key calibration) or anything above (see the fm1-to-smk37 guide) */
+#define LDR_APP_HI 0x9D000u
+#define LDR_REC_LO 0x9D000u
+#define LDR_REC_HI 0xC0000u
+/* records are dropped in the whole VM, where the stock app may have staged its own (its staging address is only
+ * known at run time): the store there holds only Felucca's objects (commit records at +0, user samples are in
+ * USRFLASH 0xC2000.., outside this window), so no skipped range */
+#define LDR_DATA_LO 0u
+#define LDR_DATA_HI 0u
+_Static_assert(LDR_APP_HI <= LDR_REC_LO && LDR_REC_HI <= 0xC0000u && LDR_APP_LO >= 0x4000u,
+               "SMK loader windows must stay below BTIF / USRTRIM and above the head");
+#else
 #define LDR_APP_HI 0x93000u
 #define LDR_REC_LO 0x93000u                     /* update records live above the app ... */
 #define LDR_REC_HI 0xFC000u                     /* ... and below Felucca's globals (Felucca's records: 0xE4F00, */
 #define LDR_DATA_LO 0x97000u                    /* the stock firmware's: 0xE8F00), never in Felucca's store, whose */
 #define LDR_DATA_HI 0xE0000u                    /* bytes (user samples) the host writes */
+#endif
 #define LDR_NSEC ((LDR_APP_HI - LDR_APP_LO) >> 12)
 #define LDR_FL_MAX 0x100000u                    /* flash.bin: at most the 1 MiB part */
 

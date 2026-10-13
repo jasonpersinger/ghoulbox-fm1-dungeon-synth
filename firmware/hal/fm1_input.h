@@ -144,6 +144,7 @@
 #define FM1_NCOL 11u
 #define FM1_NKEY 41u              /* ids: 0..13 buttons, 14..40 note keys */
 #define FM1_NENC 7u
+#define FM1_NBTN 14u              /* buttons: ids 0..13 */
 
 
 /* key id at (physical column, packed row bit), -1 = none */
@@ -160,6 +161,7 @@ static const uint8_t FM1_ENC[FM1_NENC][4] = {
     {0, 0, 1, 0}, {2, 0, 3, 0}, {8, 1, 9, 1}, {8, 0, 9, 0}, {6, 0, 7, 0}, {4, 0, 5, 0}, {0, 5, 1, 5},
 };
 enum { FM1_BTN_OCT_DOWN = 0, FM1_BTN_OCT_UP = 1 };
+#define FM1_OCT_BOTH (1u << FM1_BTN_OCT_DOWN | 1u << FM1_BTN_OCT_UP)
 
 
 static volatile struct {

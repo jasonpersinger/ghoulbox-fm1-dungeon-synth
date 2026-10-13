@@ -21,7 +21,11 @@
  * fvb_boot finishes the copy at the next power-on, before any autosave can take that sector): never half of one. A
  * wrong CRC commits nothing. An autosave between two requests (it waits 10 s after the last, project.c) takes the
  * sector: WRITE and END find its commit record there and answer 5 (start again). Included by upreset.c. */
+#if BOARD_SMK37
+#define FVB_HOME ST_SMK_VBANK                  /* SMK-37 Pro: 0xB0000 in FL_DATA (storage.c) */
+#else
 #define FVB_HOME 0xE7000u
+#endif
 #define FVB_INFO 224u                          /* the bank's header; the voices from FVB_VOICES */
 #define FVB_VOICES 256u
 #define FVB_MAGIC 0x56364D46u                  /* "FM6V" */

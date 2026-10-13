@@ -664,6 +664,20 @@ static __attribute__((noinline)) void perf_key_remap(void)
     }
 }
 
+#if BOARD_SMK37
+/* SMK-37 Pro: velocity keys and pads. Key k's velocity (a pad: its white key's, smk_input.h); key_on_v: the velocity
+ * of the key being started (keyboard_block, ext_keys_block: its own sound and KEYS LAYER's second one) */
+static uint32_t key_on_v = 100u;
+static uint32_t key_vel(uint32_t k)
+{
+    uint32_t v = fm1_in.key_vel[SMK_KEY_F3 + k];
+    return v ? v : 100u;
+}
+#define KEY_ON_VEL key_on_v
+#else
+#define KEY_ON_VEL 100                              /* the FM-1's keys have no velocity */
+#endif
+
 /* key k plays kb_note[k] on track t: its chord (chord.c; the note alone with CHRD OFF). A note another key
  * holds already sounds: it is not started again (nor sent to MIDI OUT); the key keeps its notes */
 /* a key's note (and its chord) on track t: the notes into chord[], their count into *chn (GHOULBOX 2.1: the key's
@@ -676,9 +690,9 @@ static void key_on_to(track_t *t, uint32_t note, uint8_t *chord, uint8_t *chn)
         uint32_t x = chord[i];
         if (midi_local_held(t, x))
             continue;
-        input_on(t, x, 100);
+        input_on(t, x, KEY_ON_VEL);
         if (!lt[trk_index(t)].stop)                 /* (a press that ended the drone: silent, MIDI OUT too) */
-            midi_out_event(0x09u | (0x90u | mc) << 8 | x << 16 | 100u << 24);
+            midi_out_event(0x09u | (0x90u | mc) << 8 | x << 16 | KEY_ON_VEL << 24);
     }
     *chn = (uint8_t)n;
 }
@@ -741,10 +755,66 @@ static __attribute__((noinline)) void kb_lat(uint32_t k)
 }
 #endif
 
+#if BOARD_SMK37
+/* SMK-37 Pro: the keybed's 10 keys beyond the FM-1's 27 (C3..E3 below F3, G#5..C6 above G5) continue the keys: the
+ * selected track's key map (kb_map: QNT, ROOT, SCALE, TRN, the octave; DRUM's GM drum map, SLICE's slices) past
+ * either end, at the key's velocity, with the track's chord and the drone latch as a key (key_on_to). HOME > KEYS
+ * as on the 27: SPLIT, C3..E3 lie below any split key and play KTRK; LAYER, KTRK too. They play only while the keys
+ * play: no layer held or locked, no DRUM grid, NAME or SONG keys, not under the splash or waking the screen */
+#define SMK_EXT_N 10u                           /* keybed 0..4 and 32..36 */
+static uint8_t ext_trk[SMK_EXT_N], ext_trk2[SMK_EXT_N];   /* the track sounding + 1, 0 = none (2: KEYS LAYER's) */
+static uint8_t ext_chord[SMK_EXT_N][CHORD_MAX], ext_chn[SMK_EXT_N], ext_chord2[SMK_EXT_N][CHORD_MAX], ext_chn2[SMK_EXT_N];
+static volatile int16_t smk_bend14;             /* the pitch wheel, -8192..8191 (main.c smk_wheels) */
+static volatile uint8_t smk_modw;               /* the mod wheel, 0..127 */
+static void ext_keys_block(void)
+{
+    int32_t e;
+    while ((e = smk_extkey_take()) >= 0) {
+        uint32_t k = (uint32_t)e >> 8, v = (uint32_t)e & 0x7Fu, x, tr, n;
+        int32_t rel = (int32_t)k - (int32_t)SMK_KEY_F3;     /* -5..-1 below F3, 27..31 above G5 */
+        if (k >= FM1_NKEY || (rel >= 0 && rel < 27))
+            continue;
+        x = rel < 0 ? k : k - 27u;
+        if (!v) {
+            if (ext_trk2[x])
+                key_off_from(&trk[(ext_trk2[x] - 1u) % NTRK], ext_chord2[x], &ext_chn2[x]);
+            if (ext_trk[x])
+                key_off_from(&trk[(ext_trk[x] - 1u) % NTRK], ext_chord[x], &ext_chn[x]);
+            ext_trk[x] = ext_trk2[x] = 0;
+            continue;
+        }
+        if (ext_trk[x] || ext_trk2[x] || kb_boot_hold || kb_asleep || song.grid || (fm1_in.buttons & kb_mask) || kb_lock)
+            continue;
+        key_on_v = v;
+        tr = song.sel % NTRK;
+        if (rel < 0 && song.g[G_KMODE] == 2 && keys_on()) {      /* KEYS SPLIT: below the split */
+            tr = keys_trk();
+            n = keys_note(tr, (uint32_t)rel);
+        } else {
+            n = kb_map(&trk[tr], (uint32_t)rel);
+        }
+        if (n != KB_SILENT) {
+            ext_trk[x] = (uint8_t)(tr + 1u);
+            key_on_to(&trk[tr], n, ext_chord[x], &ext_chn[x]);
+        }
+        if (song.g[G_KMODE] == 1 && keys_on() && keys_trk() != song.sel) {   /* KEYS LAYER: KTRK too */
+            n = keys_note(keys_trk(), (uint32_t)rel);
+            if (n != KB_SILENT) {
+                ext_trk2[x] = (uint8_t)(keys_trk() + 1u);
+                key_on_to(&trk[keys_trk()], n, ext_chord2[x], &ext_chn2[x]);
+            }
+        }
+    }
+}
+#endif
+
 static void keyboard_block(void)
 {
     uint32_t cur = fm1_in.notes, ch, k;
     uint32_t lay, fx, mute;
+#if BOARD_SMK37
+    ext_keys_block();
+#endif
     ch = cur ^ kb_prev;                          /* keys also sound while entering steps */
     if (perf_remap)
         perf_key_remap();
@@ -767,6 +837,9 @@ static void keyboard_block(void)
         if ((cur >> k) & 1u) {                    /* the selected track; the key-up goes to the same one */
             kb_trk[k] = song.sel;
             kb_trk2[k] = 0;                       /* (GHOULBOX 2.1: no second sound unless KEYS LAYER gives one) */
+#if BOARD_SMK37
+            key_on_v = key_vel(k);                /* (its velocity: key_on_to) */
+#endif
             if (kb_asleep) {                      /* (SCREEN OFF: the wake press is swallowed) */
                 kb_note[k] = KB_SILENT;
                 continue;
@@ -1211,6 +1284,44 @@ static int32_t click_beat_now(void)
 }
 
 /* everything that happens between two rendered blocks */
+#if BOARD_SMK37
+/* SMK-37 Pro: the wheels (main.c smk_wheels) as the selected track's own MIDI controllers, as if played on its
+ * channel: the pitch wheel its pitch bend (the channel's bend range, RPN 0: 2 semitones unless set; a DRUM track
+ * ignores it, as it ignores MIDI bend), the mod wheel its CC1, the mod matrix's MODW source (mod.c). Both go to MIDI
+ * OUT too. Another track selected: the one before is left unbent, its MODW at 0. Audio ISR, before the MIDI IN of
+ * the block (an incoming bend or CC1 for the same track wins until the wheel moves again) */
+static void smk_wheels_block(void)
+{
+    static uint8_t prev = 0xFF, lm = 0xFF;
+    static int32_t lb = 0x7FFFFFFF;
+    uint32_t sel = song.sel % NTRK, mc = trk_midi_ch(sel), m = smk_modw;
+    int32_t b = smk_bend14;
+    if (sel != prev) {
+        if (prev < NTRK) {
+            midi_bend_target[prev] = 0;
+            trk[prev].mw = 0;
+        }
+        prev = (uint8_t)sel;
+        lb = 0x7FFFFFFF;
+        lm = 0xFF;
+    }
+    if (b != lb) {
+        const midi_channel_t *c = midi_channel(mc);
+        int32_t range = ((int32_t)c->semis * 100 + c->cents) * 256 / 100;
+        uint32_t u = (uint32_t)(b + 8192);
+        lb = b;
+        if (!drum_track(&trk[sel]))
+            midi_bend_target[sel] = b * range / (b < 0 ? 8192 : 8191);
+        midi_out_event(0x0Eu | (0xE0u | mc) << 8 | (u & 0x7Fu) << 16 | ((u >> 7) & 0x7Fu) << 24);
+    }
+    if (m != lm) {
+        lm = (uint8_t)m;
+        trk[sel].mw = (uint8_t)m;
+        midi_out_event(0x0Bu | (0xB0u | mc) << 8 | 1u << 16 | m << 24);
+    }
+}
+#endif
+
 static void events_block(uint32_t n)
 {
     uint32_t i, pr, seq_n = n;
@@ -1291,6 +1402,9 @@ static void events_block(uint32_t n)
         t->armp = t->p[P_AMODE];
         t->aholdp = t->p[P_AHOLD];
     }
+#if BOARD_SMK37
+    smk_wheels_block();
+#endif
     keyboard_block();
     while (mi_r != mi_w) {                            /* USB-MIDI (and TRS) in */
         uint32_t at = mi_r % MQ, pkt = midi_in_q[at], status = (pkt >> 8) & 0xFFu;

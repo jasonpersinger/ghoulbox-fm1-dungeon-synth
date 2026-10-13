@@ -59,13 +59,20 @@ Build options (environment, `0` or `1`; defaults in `firmware/src/felucca.c`, `c
 | `FELUCCA_CDC_DEFAULT` | 1 | `0`: the console is built in but left out of USB from boot (as MENU > USB SERIAL OFF) |
 | `FELUCCA_UAC` | 1 | USB audio input (the master output, stereo, 44.1 kHz) |
 | `FELUCCA_UAC_48K` | 0 | `1`: the USB audio input offers 48 kHz too (Felucca's default; GHOULBOX 2.2 gave its 8 KB to headroom). Leaves under 16 KiB spare, so build it with `FELUCCA_SPARE_MIN=0` (`firmware/src/usb.c`) |
-| `FELUCCA_UART` | 1 | TRS MIDI IN |
+| `FELUCCA_UART` | 1 (SMK-37: 0) | TRS MIDI IN; must stay 0 on the SMK-37 (PH8 is a key row there) |
 | `FELUCCA_SLICE` | 1 | the SLICE engine |
 | `FELUCCA_ICONS` | 1 | parameter icons on the knob cards |
 | `FELUCCA_FM4` | 0 | the retired DIGITAL engine (4-operator FM) instead of its FM6 conversion |
 
 `FELUCCA_USB_LAYOUT` (`0` to `3`, default `0`) picks other USB descriptor layouts for testing; see
 `firmware/src/usb.c`.
+
+Target board: `BOARD=smk37 ./build.sh` (or `./build.sh --board smk37`) builds Felucca for the M-Vave
+SMK-37 Pro: `-DBOARD_SMK37=1` for the app and the update loader, identity `SMK-37 Pro_900` (release
+`SMK-37 Pro_9XY`), the SMK flash layout (PRCT 0x9D000, the stock region table with USRTRIM / USRFLASH) and the
+package `build/felucca-smk37.fwsc`. The intermediate files (`build/felucca.bin`, `build/loader/ota.bin`,
+`build/felucca.dis`) are shared: build the FM-1 again before `tests/run_tests.sh`. The default stays the FM-1,
+byte for byte.
 
 ## Samples
 

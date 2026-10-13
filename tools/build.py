@@ -3,12 +3,16 @@
 # Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
 """Build Felucca: the app, the update loader and an installable .fwsc package.
 
-  tools/build.py [--release X.Y[-suffix]]
+  tools/build.py [--release X.Y[-suffix]] [--board fm1|smk37]
 
 Outputs in build/: felucca.bin (app), loader/ota.bin (update loader),
 felucca.fwsc (package). A release build (--release X.Y) writes felucca-X.Y.fwsc and a folder
 release-X.Y/ with the package, the app, SHA256SUMS, the sample attribution and the licence files.
 See BUILDING.md for the toolchain and the SDK.
+
+BOARD=smk37 (or --board smk37) builds Felucca for the M-Vave SMK-37 Pro: -DBOARD_SMK37=1 for the app and
+the loader, identity SMK-37 Pro_900 (release SMK-37 Pro_9XY), the SMK flash layout (fm1pkg_make.py), and the
+package build/felucca-smk37.fwsc (felucca-smk37-X.Y.fwsc for a release). The default stays the FM-1.
 
 The JieLi toolchain is Linux x86-64 only. JIELI_TOOLCHAIN points at it; on
 macOS (or with JIELI_DOCKER=1) each tool runs in a linux/amd64 container.
@@ -51,6 +55,12 @@ SDK_SHA256 = {
 }
 
 PRODUCT = "FM-1_900"                # package identity; release builds are FM-1_9XY
+BOARD = "fm1"                       # fm1 (default) or smk37: BOARD env or --board
+BOARD_PREFIX = {"fm1": "FM-1_9", "smk37": "SMK-37 Pro_9"}   # identity of a release build: prefix + X + Y
+BOARD_DEFS = {"fm1": [], "smk37": ["-DBOARD_SMK37=1"]}       # the FM-1 build gets no new flag (byte-identical)
+BOARD_STEM = {"fm1": "felucca", "smk37": "felucca-smk37"}        # package name: STEM.fwsc, STEM-X.Y.fwsc
+SMK_DATA_FAMILY = "GHOULBX"         # SMK store owner tag (storage.c st_owner_check); FELUCCA_DATA_FAMILY overrides
+SMK_DATA_UNTAGGED_OK = 0            # an untagged SMK store is another firmware's: cleared (FELUCCA_DATA_UNTAGGED_OK)
 VERSION = None                      # FELUCCA_VERSION for release builds (default: firmware/src/felucca.c)
 
 
@@ -150,7 +160,7 @@ def ldr_wrap(image):
 def build_loader():
     LDR.mkdir(parents=True, exist_ok=True)
     src = FW / "loader"
-    flags = [*CFLAGS, "-Ifirmware/hal", "-Ifirmware/src"]
+    flags = [*CFLAGS, *BOARD_DEFS[BOARD], "-Ifirmware/hal", "-Ifirmware/src"]
     tc_all(("cc", "-c", src / "crt0_ldr.S", "-o", LDR / "crt0_ldr.o"),
            ("cc", *flags, "-c", src / "loader.c", "-o", LDR / "loader.o"))
     elf = LDR / "loader.elf"
@@ -179,10 +189,10 @@ def build_loader():
 # ---- app
 
 def build_app():
-    flags = [*CFLAGS, "-Ifirmware/hal", "-Ifirmware/src", "-Ibuild/gen"]
+    flags = [*CFLAGS, *BOARD_DEFS[BOARD], "-Ifirmware/hal", "-Ifirmware/src", "-Ibuild/gen"]
     for flag in ("FELUCCA_FLASH", "FELUCCA_OTA", "FELUCCA_OTA_DRYRUN", "FELUCCA_OTA_RAMONLY", "FELUCCA_CDC",
                  "FELUCCA_UART", "FELUCCA_UAC", "FELUCCA_UAC_TONE", "FELUCCA_UAC_48K", "FELUCCA_ICONS", "FELUCCA_SLICE", "FELUCCA_FM4",
-                 "FELUCCA_CDC_DEFAULT"):
+                 "FELUCCA_CDC_DEFAULT", "FELUCCA_DATA_UNTAGGED_OK"):
         v = os.environ.get(flag)    # unset: the default in firmware/src/felucca.c
         if v in ("0", "1"):
             flags.append(f"-D{flag}={v}")
@@ -190,6 +200,13 @@ def build_app():
     if v in ("0", "1", "2", "3"):
         flags.append(f"-DFELUCCA_USB_LAYOUT={v}")
     flags.append(f'-DFELUCCA_ID="{PRODUCT}"')
+    if BOARD == "smk37":            # SMK store owner (storage.c): GHOULBOX's own family, never another firmware's data
+        fam = os.environ.get("FELUCCA_DATA_FAMILY") or SMK_DATA_FAMILY
+        if not re.fullmatch(r"[A-Z0-9]{1,7}", fam):
+            raise SystemExit("FELUCCA_DATA_FAMILY: 1..7 of A-Z 0-9")
+        flags.append(f'-DFELUCCA_DATA_FAMILY="{fam}"')
+        if os.environ.get("FELUCCA_DATA_UNTAGGED_OK") not in ("0", "1"):
+            flags.append(f"-DFELUCCA_DATA_UNTAGGED_OK={SMK_DATA_UNTAGGED_OK}")
     if VERSION:
         flags.append(f'-DFELUCCA_VERSION="{VERSION}"')
     # felucca.c goes to LLVM IR without the optimizer, the main-loop functions (UI, stores, editor) are
@@ -208,7 +225,14 @@ def build_app():
         tc("cc", *[f for f in flags if not f.startswith(("-I", "-D", "-W"))], "-c",
            OUT / "felucca_size.ll", "-o", OUT / "felucca.o")
     elf = OUT / "felucca.elf"
-    tc("pi32v2/bin/ld", "-T", FW / "app.ld", OUT / "crt0.o", OUT / "fm1_vec.o", OUT / "fm1_isr.o",
+    ld = FW / "app.ld"
+    if APP_SLOT != 0x8DFBC:          # another board's app slot (SMK-37 Pro): the same script, its XIP length
+        txt = ld.read_text()
+        if txt.count("LENGTH = 0x8DFBC") != 1:
+            raise SystemExit("app.ld: the XIP LENGTH line was not found")
+        ld = OUT / "app.ld"
+        ld.write_text(txt.replace("LENGTH = 0x8DFBC", f"LENGTH = {APP_SLOT:#X}".replace("0X", "0x")))
+    tc("pi32v2/bin/ld", "-T", ld, OUT / "crt0.o", OUT / "fm1_vec.o", OUT / "fm1_isr.o",
        OUT / "felucca.o", "-o", elf)
     for sect in ("text.bin", "data.bin", "ramtext.bin"):
         (OUT / sect).unlink(missing_ok=True)
@@ -322,25 +346,34 @@ def mmio_check():
 
 
 def main():
-    global PRODUCT, VERSION
+    global PRODUCT, VERSION, BOARD, APP_SLOT
     ap = argparse.ArgumentParser()
     ap.add_argument("--release", metavar="X.Y", help="release build: identity FM-1_9XY, version string vX.Y")
+    ap.add_argument("--board", choices=sorted(BOARD_PREFIX), default=None,
+                    help="target board: fm1 (default) or smk37 (default: $BOARD, else fm1)")
     ap.add_argument("--sdk", type=Path, help="JieLi AC79 SDK checkout (default: $AC79_SDK)")
     ap.add_argument("--gen-only", action="store_true",
                     help="GHOULBOX: only the generated headers (build/gen), no toolchain or SDK: the host tests (CI)")
     a = ap.parse_args()
+    BOARD = (a.board or os.environ.get("BOARD") or "fm1").lower().replace("-", "")
+    if BOARD not in BOARD_PREFIX:
+        raise SystemExit(f"BOARD={BOARD}: use fm1 or smk37")
+    fm1pkg_make.set_board(BOARD)
+    APP_SLOT = fm1pkg_make.APP_SLOT
+    stem = BOARD_STEM[BOARD]
+    PRODUCT = fm1pkg_make.BOARDS[BOARD][2]
     if a.gen_only:
         generate()
         print(f"gen      {GEN}")
         return 0
-    name = "felucca.fwsc"
+    name = f"{stem}.fwsc"
     if a.release:                   # one digit each: the identity has room for two (X.Y.Z and X.Y.Z.W keep X.Y's)
         m = re.fullmatch(r"(\d)\.(\d)(?:\.\d){0,2}(-[A-Za-z0-9]+)?", a.release)
         if not m:
             raise SystemExit(f"--release {a.release}: use X.Y, X.Y.Z, X.Y.Z.W or X.Y-suffix, one digit each")
-        PRODUCT = "FM-1_9" + m[1] + m[2]
+        PRODUCT = BOARD_PREFIX[BOARD] + m[1] + m[2]
         VERSION = "v" + a.release.lower()      # e.g. v1.0, v1.1-rc1
-        name = f"felucca-{a.release}.fwsc"
+        name = f"{stem}-{a.release}.fwsc"
     fm1pkg_make.SDK = a.sdk
     for rel, sha in SDK_SHA256.items():          # fail early without the SDK
         if hashlib.sha256(fm1pkg_make.sdk_file(rel)).hexdigest() != sha:
@@ -369,12 +402,12 @@ def main():
         shutil.copy(att, OUT / "ATTRIBUTION.txt")
     print(f"app      {OUT / 'felucca.bin'}  {len(img)} B")
     print(f"loader   {LDR / 'ota.bin'}  {len(ota)} B")
-    print(f"package  {OUT / name}  {len(pkg)} B, identity {PRODUCT}")
+    print(f"package  {OUT / name}  {len(pkg)} B, identity {PRODUCT}, board {BOARD}")
     if a.release:                   # what a release carries: the package, the app and every licence they need
         rel = OUT / f"release-{a.release}"
         shutil.rmtree(rel, ignore_errors=True)
         (rel / "LICENSES").mkdir(parents=True)
-        app = f"felucca-{a.release}-app.bin"
+        app = f"{stem}-{a.release}-app.bin"
         (rel / name).write_bytes(pkg)
         (rel / app).write_bytes(img)
         (rel / "SHA256SUMS").write_text("".join(f"{hashlib.sha256(b).hexdigest()}  {n}\n"

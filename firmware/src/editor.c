@@ -87,6 +87,10 @@ static int ed_smp_erase(uint32_t k, uint32_t all)  /* header sector, or the whol
 {
     uint32_t i, took;
     int rc = 0;
+#if BOARD_SMK37
+    if (!SMP_USER_HAS(k))
+        return -8;                                 /* SMK: USR3 has no flash */
+#endif
     usr_nz[k] = 0;
     for (i = 0; i < 16u; i++)
         usr_zone[k][i].n = 0;                     /* a sounding voice ends instead of reading 0xFF */
@@ -102,6 +106,10 @@ static int ed_flash_stop(void);
 static int ed_smp_end(uint32_t k, const uint8_t *a, uint32_t na)
 {
     const smp_user_hdr_t *h = (const smp_user_hdr_t *)ed_smp_buf;
+#if BOARD_SMK37
+    if (!SMP_USER_HAS(k))
+        return 4;                                      /* SMK: USR3 has no flash */
+#endif
     if (ed_unpack7(a, na, ed_smp_buf, sizeof(smp_user_hdr_t)) != sizeof(smp_user_hdr_t))
         return 1;
     if (h->magic != SMP_USER_MAGIC || h->version != 1 || !h->nz || h->nz > 16u ||
@@ -603,7 +611,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         len = ed_unpack7(a + 4, na - 4u, ed_smp_buf, 256u);
         if (off < SMP_USER_DATA || (off & 0xFFu) || !len || off + len > SMP_USER_SIZE)
             rc = 1;
-        else if (usr_nz[a[0]])
+        else if (usr_nz[a[0]] || !SMP_USER_HAS(a[0]))
             rc = 4;                                        /* slot in use: SMP_BEGIN first (voices read it) */
         else if (ed_flash_stop())
             rc = 1;

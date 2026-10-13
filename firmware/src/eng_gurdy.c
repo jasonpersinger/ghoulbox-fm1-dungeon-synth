@@ -33,7 +33,11 @@ static uint32_t div_samples(uint32_t div);              /* fx.c */
  * be no more than one click over the time since the last, and nothing after CRANK_STOP. A wrist stroke: a speed
  * 1.7 x the recent one (smoothed, ~140 ms) on a wheel already turning, at most one per CRANK_GAP. One crank: every
  * CRANK track's wheel follows it (gurdy_render). Written by the UI, read by the audio: word-sized values */
+#if BOARD_SMK37
+#define CRANK_FPS 625u                                  /* SMK-37 Pro: input frames per second (10 kHz / 16 columns) */
+#else
 #define CRANK_FPS 909u                                  /* input frames per second (10 kHz / 11 columns) */
+#endif
 #define CRANK_STOP (CRANK_FPS * 3u / 10u)               /* 300 ms without a click: stopped */
 #define CRANK_GAP (CRANK_FPS * 7u / 100u)               /* 70 ms between strokes */
 #define CRANK_TURNING (6u * 16u)                        /* strokes only on a wheel turning at 6 clicks/s or more */

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
-"""Install a Felucca package (.fwsc) on an FM-1 over USB-MIDI.
+"""Install a Felucca package (.fwsc) on an FM-1 (or an M-Vave SMK-37 Pro) over USB-MIDI.
 
 The same update as the web installer (web/fm1ota.js): step 1, the
 running firmware reads parts of the package and starts the update loader;
@@ -11,6 +11,7 @@ the FM-1 restarts and the installed identity is checked.
 
   fm1_install.py PACKAGE.fwsc [--port NAME] [--yes] [--force]
   fm1_install.py FM-1.fwsc            (the official V15 file: back to the stock firmware)
+  fm1_install.py SMK-37_Pro_016.fwsc (the official SMK-37 Pro V016 file: back to the stock firmware)
   fm1_install.py --info [--port NAME]
 
 If the FM-1 is still in update mode (an earlier install was cut off), the
@@ -19,6 +20,9 @@ install finishes the write. Needs mido with python-rtmidi.
 Exit codes: 0 done, 1 cancelled or other error, 2 bad arguments or package,
 3 FM-1 not found, 4 connection lost or the device stopped, 5 timeout (no
 loader / no restart), 6 wrong model, or another identity after the install.
+
+Packages: 20 interleave blocks (FM-1, Felucca, the SMK build) or more (the stock SMK-37 Pro v016 has 36: the extra
+markers are 0x7D); the count is detected and checked with the files' CRCs.
 """
 import argparse
 import hashlib
@@ -31,12 +35,15 @@ HS_QUERY = bytes([0xF0, 0x00, 0x32, 0x45, 0x00, 0x00, 0x00, 0x40, 0x7F, 0xF7])
 UPGRADE = bytes([0xF0, 0x22, 0x24, 0x35, 0x7F, 0xF7])
 FINISH_CHECK, FINISH_WRITE = 0xE0000000, 0xF0000000
 MAXDATA = 512
-BLOCKS, BLK, KEEP = 20, 0x30, 0x2F
+BLOCKS, BLK, KEEP = 20, 0x30, 0x2F         # BLOCKS: the identity blocks (more may follow, see block_count)
+MAX_BLOCKS = 64
 LOADER_MARK = b"FELUCCA-LOADER-1"
 # the unmodified official FM-1 V15 (FM-1.fwsc from M-VAVE): returning to it is allowed without --force,
 # as the web installer's "Return to official V15" (web/fm1pkg.js validateStockPackage)
 STOCK_V15_SHA256 = "db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a"
-PORT_RE = re.compile(r"fm-1|felucca|ota|composite|sinco|usb-midi", re.I)   # never probe other gear
+# the unmodified official SMK-37 Pro V016 (SMK-37_Pro_016.fwsc, 36 interleave blocks): the return of an SMK-37 Pro
+STOCK_SMK016_SHA256 = "2d98ce72530e71d617384963423820536f094501299e2cfec0a8d3c3fb6bcfb0"
+PORT_RE = re.compile(r"fm-1|smk|felucca|melodee|fomni|x0x|makkuro|ota|composite|sinco|usb-midi", re.I)   # never probe other gear
 
 # seconds; the tests shorten them
 DELAY = {"open": 0.3, "start": 2.0, "reply": 0.01, "loader": 3.0, "reboot": 3.0, "retry": 1.0,
@@ -127,18 +134,77 @@ def parse_identity(pkt):
 # --------------------------------------------------------------- package ---
 
 def product_of(raw):
-    """the package identity ("FM-1_906"): one marker byte after each of the first 20 blocks"""
+    """the package identity ("FM-1_906", "SMK-37 Pro_016"): one marker byte after each of the first 20 blocks"""
     if len(raw) < BLOCKS * BLK:
         raise InstallError("badpkg", "not an FM-1 package (too short)")
     return "".join(chr((m - i - 1) & 0xFF) for i in range(BLOCKS) if (m := raw[i * BLK + KEEP]) != 0x7D)
 
 
-def logical_image(raw):
-    """the image the device reads during an update: the package without the 20 marker bytes"""
+def block_count(raw):
+    """interleave blocks: 20, then more while the marker is the unused 0x7D (SMK-37 Pro v016: 36).
+    A 20-block package can have 0x7D there by chance: deinterleave checks the CRCs and falls back."""
+    n = BLOCKS
+    while n < MAX_BLOCKS and (n + 1) * BLK <= len(raw) and raw[n * BLK + KEEP] == 0x7D:
+        n += 1
+    return n
+
+
+def logical_image(raw, blocks=BLOCKS):
+    """the image the device reads during an update: the package without the marker bytes"""
     out = bytearray()
-    for i in range(BLOCKS):
+    for i in range(blocks):
         out += raw[i * BLK:i * BLK + KEEP]
-    return bytes(out + raw[BLOCKS * BLK:])
+    return bytes(out + raw[blocks * BLK:])
+
+
+def _crc16(data, crc=0):
+    """CRC-16/XMODEM, as the package and the device use"""
+    for b in data:
+        crc ^= b << 8
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x1021) & 0xFFFF if crc & 0x8000 else (crc << 1) & 0xFFFF
+    return crc
+
+
+def _dec(b):
+    """JieLi ENC stream cipher (its own inverse)"""
+    out, key = bytearray(b), 0xFFFF
+    for i in range(len(out)):
+        out[i] ^= key & 0xFF
+        key = ((key << 1) ^ (0x1021 if key & 0x8000 else 0)) & 0xFFFF
+    return bytes(out)
+
+
+def files_ok(image):
+    """the logical image's header and file list are intact and flash.bin (0) / ota.bin (100) match their CRCs.
+    The stock packer's other entries store a CRC of something else: checked for their bounds only."""
+    if len(image) < 0x40:
+        return False
+    hdr = _dec(image[0:0x40])
+    if _crc16(hdr[2:0x40]) != int.from_bytes(hdr[0:2], "little"):
+        return False
+    count = int.from_bytes(hdr[8:10], "little")
+    if not 1 <= count <= 8 or len(image) < 0x40 + 0x50 * count:
+        return False
+    for i in range(count):
+        e = _dec(image[0x40 + i * 0x50:0x90 + i * 0x50])
+        typ = int.from_bytes(e[0:2], "little")
+        off, size = int.from_bytes(e[8:12], "little"), int.from_bytes(e[12:16], "little")
+        if off + size > len(image):
+            return False
+        if typ in (0, 100) and _crc16(image[off:off + size]) != int.from_bytes(e[4:6], "little"):
+            return False
+    return True
+
+
+def deinterleave(raw):
+    """the logical image: 20 blocks, or the detected count when the files' CRCs agree"""
+    n = block_count(raw)
+    if n != BLOCKS:
+        image = logical_image(raw, n)
+        if files_ok(image) or not files_ok(logical_image(raw, BLOCKS)):
+            return image
+    return logical_image(raw, BLOCKS)
 
 
 def model_of(text):
@@ -379,12 +445,12 @@ def load_package(path, force):
     product = product_of(raw)
     if not re.fullmatch(r"[^_]+_\d+", product):
         raise InstallError("badpkg", f"{path}: not an FM-1 package (identity {product!r})")
-    official = hashlib.sha256(raw).hexdigest() == STOCK_V15_SHA256
+    official = hashlib.sha256(raw).hexdigest() in (STOCK_V15_SHA256, STOCK_SMK016_SHA256)
     if LOADER_MARK not in raw and not official and not force:
         raise InstallError("badpkg", f"{path}: no Felucca update loader in this package; only Felucca's own "
-                                     "packages and the unmodified official V15 (FM-1.fwsc) are installed "
-                                     "(--force overrides)")
-    return product, logical_image(raw)
+                                     "packages and the unmodified official V15 (FM-1.fwsc) or SMK-37 Pro V016 "
+                                     "(SMK-37_Pro_016.fwsc) are installed (--force overrides)")
+    return product, deinterleave(raw)
 
 
 def not_found(up):

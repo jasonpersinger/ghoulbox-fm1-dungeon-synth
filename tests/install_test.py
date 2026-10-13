@@ -6,7 +6,8 @@ The fake device is the one in web/test_web.mjs: identity on the handshake,
 then "device asks, host answers" reads of the logical image. Run from the repo root:
   python3 tests/install_test.py
 Also checks logical_image/product_of against web/fm1pkg.js (needs node and
-build/felucca.fwsc, skipped otherwise)."""
+build/felucca.fwsc, skipped otherwise), and (BOARD_SMK37) the SMK-37 Pro identities and port names and the
+20 / 36 block deinterleave (the stock SMK-37 Pro V016 from a directory named by SMK_STOCK_DIR, skipped when unset)."""
 import io
 import queue
 import shutil
@@ -67,8 +68,9 @@ class FakeFM1:
     """a MIDI backend with one FM-1 on it"""
 
     def __init__(self, image, identity="FM-1_015", name="FM-1", unplug_after=None, after_write="FM-1_900",
-                 stall_after=None, bad_addr=None):
+                 stall_after=None, bad_addr=None, loader=("ota-FM-1_900", "Felucca Update")):
         self.image, self.unplug_after, self.after_write = image, unplug_after, after_write
+        self.loader = loader
         self.stall_after, self.bad_addr = stall_after, bad_addr
         self.served = self.bad = self.upgrades = 0
         self.sent, self.links, self.gen, self.lock = [], [], 0, threading.Lock()
@@ -123,7 +125,7 @@ class FakeFM1:
             if self.stall_after and self.served >= self.stall_after:
                 return
             if addr == I.FINISH_CHECK:
-                threading.Timer(0.05, self.boot, ("ota-FM-1_900", "Felucca Update")).start()
+                threading.Timer(0.05, self.boot, self.loader).start()
             elif addr == I.FINISH_WRITE:
                 threading.Timer(0.05, self.boot, (self.after_write, "Felucca")).start()
             else:
@@ -145,6 +147,32 @@ def package(product="FM-1_900", marker=True, size=0x2000):
     for i in range(I.BLOCKS):
         raw[i * I.BLK + I.KEEP] = (ord(product[i]) + i + 1) & 0xFF if i < len(product) else 0x7D
     raw[0x1800:0x1800 + 16] = I.LOADER_MARK if marker else bytes(16)
+    return bytes(raw)
+
+
+def package_crc(product="FM-1_900", size=0x3000, blocks=20, seed=7):
+    """a package with a valid header and file list (one file, flash.bin: 0x400 to the end), as fm1pkg_make writes,
+    in `blocks` interleave blocks (the stock SMK-37 Pro V016: 36)"""
+    img = bytearray((i * seed) & 0xFF for i in range(size))
+    img[0x1800:0x1800 + 16] = I.LOADER_MARK
+    data = bytes(img[0x400:])
+    e = bytearray(0x50)
+    e[0:16] = bytes(4) + I._crc16(data).to_bytes(2, "little") + bytes(2) + \
+        (0x400).to_bytes(4, "little") + len(data).to_bytes(4, "little")
+    e[0x40:0x49] = b"flash.bin"
+    lst = I._dec(bytes(e))
+    hdr = bytearray(0x40)
+    hdr[4:8] = size.to_bytes(4, "little")
+    hdr[8:10] = (1).to_bytes(2, "little")
+    hdr[2:4] = I._crc16(lst).to_bytes(2, "little")
+    hdr[0:2] = I._crc16(bytes(hdr[2:0x40])).to_bytes(2, "little")
+    img[0:0x40] = I._dec(bytes(hdr))
+    img[0x40:0x90] = lst
+    raw = bytearray()
+    for i in range(blocks):
+        m = (ord(product[i]) + i + 1) & 0xFF if i < len(product) else 0x7D
+        raw += img[i * I.KEEP:(i + 1) * I.KEEP] + bytes([m])
+    raw += img[blocks * I.KEEP:]
     return bytes(raw)
 
 
@@ -306,9 +334,62 @@ def official():
     ok(rc == 2 and "official V15" in err and dev.sent == [], "a modified V15 is still refused (no MIDI)")
 
 
+def smk():
+    """SMK-37 Pro: identities, port names, the 36-block stock package, the SMK install path"""
+    ok(I.PORT_RE.search("SMK-37 Pro Midi") and I.PORT_RE.search("FM-1") and not I.PORT_RE.search("IAC Driver Bus 1"),
+       "port names: SMK-37 Pro ports probed, FM-1 too, other gear not")
+    ident = I.parse_identity(b"\xF0" + I.pack7(bytes([0, 0x59, 0x11, 0, 0, 0]) + b"SMK-37 Pro_016" + bytes(14)) + b"\xF7")
+    ok(ident and ident.model == "SMK-37 Pro" and ident.version == 16 and I.model_of("ota-SMK-37 Pro_900") == "SMK-37 Pro",
+       "identity SMK-37 Pro_016 parses (model SMK-37 Pro, the space kept)")
+    raw36 = package_crc("SMK-37 Pro_900", blocks=36)
+    image36 = I.deinterleave(raw36)
+    ok(I.block_count(raw36) == 36 and len(image36) == len(raw36) - 36 and I.files_ok(image36)
+       and I.product_of(raw36) == "SMK-37 Pro_900", "36 blocks (synthetic): detected, logical image valid")
+    ok(not I.files_ok(I.logical_image(raw36)), "... a fixed 20-block deinterleave of it fails the CRCs")
+    for seed in range(1, 256):                  # a 20-block package with 0x7D at the 21st marker by chance
+        raw = package_crc("FM-1_900", seed=seed)
+        if raw[20 * I.BLK + I.KEEP] == 0x7D:
+            break
+    image = I.deinterleave(raw)
+    ok(I.block_count(raw) > 20 and image == I.logical_image(raw) and I.files_ok(image),
+       f"20 blocks with a 0x7D data byte at the 21st marker (seed {seed}): falls back to 20")
+    raw = package("FM-1_900")
+    ok(I.deinterleave(raw) == I.logical_image(raw), "a plain 20-block package: deinterleave == logical_image")
+
+    p = pkgfile("smk.fwsc", package("SMK-37 Pro_900"))
+    image = I.logical_image(package("SMK-37 Pro_900"))
+    dev = FakeFM1(image, identity="SMK-37 Pro_016", name="SMK-37 Pro Midi", after_write="SMK-37 Pro_900",
+                  loader=("ota-SMK-37 Pro_900", "Felucca Update"))
+    rc, out, err = cli([p, "--yes"], dev)
+    ok(rc == 0 and dev.bad == 0 and dev.upgrades == 2 and "SMK-37 Pro_900" in out,
+       "install on an SMK-37 Pro: running -> loader -> SMK-37 Pro_900")
+    dev = FakeFM1(image, identity="ota-SMK-37 Pro_900", name="Felucca Update", after_write="SMK-37 Pro_900")
+    rc, out, err = cli([p, "--yes"], dev)
+    ok(rc == 0 and dev.upgrades == 1, "SMK-37 Pro in Felucca's update mode -> finishes the write")
+    dev = FakeFM1(image, identity="SMK-37 Pro_016", name="SMK-37 Pro Midi")
+    rc, out, err = cli([pkgfile("fm1.fwsc", package("FM-1_900")), "--yes"], dev)
+    ok(rc == 6 and dev.upgrades == 0, "FM-1 package on an SMK-37 Pro -> exit 6 (wrong model), nothing sent")
+    dev = FakeFM1(image, identity="FM-1_015", name="FM-1")
+    rc, out, err = cli([p, "--yes"], dev)
+    ok(rc == 6 and dev.upgrades == 0, "SMK-37 Pro package on an FM-1 -> exit 6, nothing sent")
+
+    import os                                     # the stock package (outside this repo; read only)
+    v016 = Path(os.environ.get("SMK_STOCK_DIR") or ROOT / "no-stock-packages") / "SMK-37_Pro_016.fwsc"
+    if not v016.exists():
+        print("stock SMK-37 Pro V016: skipped (SMK_STOCK_DIR not set)")
+        return
+    raw = v016.read_bytes()
+    image = I.deinterleave(raw)
+    ok(I.block_count(raw) == 36 and I.product_of(raw) == "SMK-37 Pro_016" and I.files_ok(image),
+       "stock SMK-37_Pro_016.fwsc: 36 blocks, identity SMK-37 Pro_016, CRCs ok")
+    product, image2 = I.load_package(str(v016), False)
+    ok(product == "SMK-37 Pro_016" and image2 == image, "... accepted for the return to stock (pinned SHA-256)")
+
+
 wire()
 installs()
 errors()
+smk()
 against_js()
 official()
 shutil.rmtree(TMP, ignore_errors=True)
