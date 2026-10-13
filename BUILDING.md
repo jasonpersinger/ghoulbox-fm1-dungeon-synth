@@ -67,10 +67,12 @@ Build options (environment, `0` or `1`; defaults in `firmware/src/felucca.c`, `c
 `FELUCCA_USB_LAYOUT` (`0` to `3`, default `0`) picks other USB descriptor layouts for testing; see
 `firmware/src/usb.c`.
 
-Target board: `BOARD=smk37 ./build.sh` (or `./build.sh --board smk37`) builds Felucca for the M-Vave
-SMK-37 Pro: `-DBOARD_SMK37=1` for the app and the update loader, identity `SMK-37 Pro_900` (release
+Target board: `BOARD=smk37 ./build.sh` (or `./build.sh --board smk37`) builds GHOULBOX for the M-Vave
+SMK-37: `-DBOARD_SMK37=1` for the app and the update loader, identity `SMK-37 Pro_900` (release
 `SMK-37 Pro_9XY`), the SMK flash layout (PRCT 0x9D000, the stock region table with USRTRIM / USRFLASH) and the
-package `build/felucca-smk37.fwsc`. The intermediate files (`build/felucca.bin`, `build/loader/ota.bin`,
+package `build/ghoulbox-smk37.fwsc`. `MODEL=elite` or `MODEL=mke` builds the same firmware under the SMK-37 Elite's or
+the MKE-P37's model name (`build/ghoulbox-smk37-elite.fwsc`, `build/ghoulbox-smk37-mke.fwsc`), so M-Vave's updater still
+takes that unit's factory package; the Starrykey 37 Play uses the Pro build. Controls: [SMK37.md](SMK37.md). The intermediate files (`build/felucca.bin`, `build/loader/ota.bin`,
 `build/felucca.dis`) are shared: build the FM-1 again before `tests/run_tests.sh`. The default stays the FM-1,
 byte for byte.
 
