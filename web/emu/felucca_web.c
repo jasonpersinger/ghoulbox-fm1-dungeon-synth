@@ -200,6 +200,8 @@ static int st_prog(uint32_t off, const void *src, uint32_t n)       /* NOR: a wr
 static uint32_t irq_save(void) { return 0; }
 static void irq_restore(uint32_t f) { (void)f; }
 static uint32_t fl_jedec_ram(void) { return 0x856014u; }             /* the FM-1's part (project.c) */
+#define FL_JEDEC_OK(id) ((id) == 0x856014u)                          /* as hal/fm1_flash_map.h (FM-1) */
+#define FM1_OCT_BOTH 3u                                              /* OCT- + OCT+, as hal/fm1_input.h (FM-1) */
 static void fl_plain_window_init(void) {}
 #define FL_FAR(fn) (fn)
 #include "../../firmware/src/storage.c"
