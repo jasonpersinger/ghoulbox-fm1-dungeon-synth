@@ -153,6 +153,8 @@ const TEXT = {
     error: "エラー: ",
     denied: "MIDI（SysEx）の使用が許可されませんでした。アドレスバーのサイト設定で MIDI を許可して、もう一度押してください。",
     notfound: "FM-1 が見つかりません。USB ケーブル（データ通信用か）を確かめ、MIDI を使う他のアプリを閉じてから、もう一度押してください。",
+    other: "このキーボードは ChanceTheMaker の SMK ファームウェア（Felucca SMK、Sloop SMK、Melodee SMK、Doom）のどれかで動いています。それらは専用のアップデーターを持ち、自分のパッケージしか受け付けないため、ここからは上書きインストールできません。何も書き込んでいません。",
+    foreign: "キーボードは別のファームウェアのアップデートモードです。何も書き込んでいません。そのファームウェアのアップデーターで完了させてください: ",
     model: "接続されている機器は FM-1 ではありません。",
     lost: "USB の接続が切れました。挿し直してもう一度押してください。",
     reload: "書き込みモードの FM-1 に接続するためページを再読み込みします…",
@@ -190,6 +192,8 @@ const TEXT = {
     error: "Error: ",
     denied: "MIDI (SysEx) access was not allowed. Allow MIDI in the site settings (address bar) and press Install again.",
     notfound: "FM-1 not found. Check the USB cable (a data cable), close other apps that use MIDI, and press Install again.",
+    other: "This keyboard runs one of ChanceTheMaker's SMK firmwares (Felucca SMK, Sloop SMK, Melodee SMK, Doom). They have their own updater, which takes only their packages, so these firmwares cannot be installed over them from here. Nothing was written.",
+    foreign: "The keyboard is in the update mode of another firmware: nothing was written. Finish that update with its own updater: ",
     model: "The connected device is not an FM-1.",
     lost: "The USB connection was lost. Replug it and press Install again.",
     reload: "Reloading the page to reach the FM-1 in update mode…",
@@ -260,7 +264,7 @@ $("go").addEventListener("click", async () => {
     };
     if (resumed) {                                   // GHOULBOX: reloaded to reach the loader: wait for it (its ports can be
       resumed = false;                               // listed a moment late), never fall back to looking for a running FM-1
-      const ok = await up.resume(image, step, meta.product, 15000);
+      const ok = await up.resume(image, step, { package: meta.product, anyModel: true, waitMs: 15000 });
       if (ok) { try { sessionStorage.removeItem("ghoulbox-reloads"); } catch (_) {} }
       sayK(ok ? "done" : "noloader");
       lockInstaller(false);
@@ -269,9 +273,9 @@ $("go").addEventListener("click", async () => {
     const ota = await up.find((id) => /^ota-/i.test(id.model));
     if (ota) {
       ota.link.close();
-      sayK((await up.resume(image, step, meta.product)) ? "done" : "stopped");
+      sayK((await up.resume(image, step, { package: meta.product, anyModel: true })) ? "done" : "stopped");
     } else {
-      await up.install(image, meta.product, step);
+      await up.install(image, meta.product, step, true);
     }
   } catch (e) {
     let reloads = 0;
@@ -290,7 +294,7 @@ $("go").addEventListener("click", async () => {
       setTimeout(() => location.reload(), 500);
       return;
     }
-    if (e && e.code && TEXT[lang][e.code]) sayK(e.code, e.detail || "");
+    if (e && e.code && TEXT[lang][e.code]) sayK(e.code, e.code === "other" ? "" : e.detail || "");
     else sayK("error", e && e.message);
     log(String(e && e.stack || e));
   }
@@ -336,7 +340,7 @@ $("stock-go").addEventListener("click", async () => {
       loader.link.close();
       if (!$("stock-recovery").checked) { sayK("stockNeedBackup"); return; }
       if (!confirm(t("stockConfirm"))) return;
-      sayK(await up.resume(selected.image, step, selected.product) ? "done" : "stopped");
+      sayK(await up.resume(selected.image, step, { product: selected.product }) ? "done" : "stopped");
     } else {
       const device = await up.find(id => id.model === "FM-1");
       if (!device) { sayK("notfound"); return; }
@@ -351,7 +355,7 @@ $("stock-go").addEventListener("click", async () => {
       await up.install(selected.image, selected.product, step);
     }
   } catch (e) {
-    if (e.code && TEXT[lang][e.code]) sayK(e.code,e.detail || ""); else sayK("error",e.message);
+    if (e.code && TEXT[lang][e.code]) sayK(e.code, e.code === "other" ? "" : e.detail || ""); else sayK("error",e.message);
     log(String(e.stack || e));
   } finally { if (link) link.close(); lockInstaller(false); }
 });
