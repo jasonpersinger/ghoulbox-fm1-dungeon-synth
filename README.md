@@ -13,6 +13,8 @@ medieval and fantasy synth music, from Old Tower and Hole Dweller to Mortiis-era
 [learn it in fifteen video lessons](https://www.youtube.com/playlist?list=PLMUs0QD7QfOw) ·
 [read the guide (PDF)](docs/guide/GHOULBOX-User-Guide-2.3.pdf)
 
+**M-Vave SMK-37:** see [SMK-37 instructions](SMK37.md).
+
 GHOULBOX is free and always will be. To support it: [Ko-fi](https://ko-fi.com/ghoulbox) · [merch](https://ghoulbox-shop.fourthwall.com/).
 
 ## What's new
