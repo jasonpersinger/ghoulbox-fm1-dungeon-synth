@@ -147,6 +147,8 @@ footer small { font-size: 11px; opacity: .8; }
 .midi-map summary { cursor: pointer; }
 .midi-map table { margin: 8px auto 0; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .midi-map th, .midi-map td { padding: 3px 10px; border-bottom: 1px solid rgba(239, 223, 198, .18); text-align: left; }
+.tools-manual-link { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid rgba(239, 223, 198, .18); text-align: right; }
+.tools-manual-link a { font: 700 13px/1.4 DotGothic16, monospace; letter-spacing: .035em; }
 .screen-hint { cursor: zoom-in; }
 body.focus-mode { overflow: hidden; background: #000; }
 body.focus-mode main { max-width: none; padding: 0; }
@@ -214,6 +216,7 @@ body.focus-mode .device canvas { position: fixed; left: 50% !important; top: 50%
     <table><thead><tr><th>CC</th><th>Control</th><th>Message</th></tr></thead><tbody id="midi-map"></tbody></table>
     <p>Buttons must send 127 when pressed and 0 when released. Panel CC messages are consumed by the emulator; GHOULBOX’s direct sound CC map remains available for every other CC.</p>
   </details>
+  <p class="tools-manual-link"><a href="tools.html" target="_blank" rel="noopener">Open the Web Synth Tools manual ↗</a></p>
 </details>
 
 <footer>
