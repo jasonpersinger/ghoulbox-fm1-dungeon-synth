@@ -47,7 +47,8 @@ GHOULBOX is free and always will be. To support it: [Ko-fi](https://ko-fi.com/gh
 - **A USB rescue.** If GHOULBOX fails to start twice in a row, or you hold OCT- while switching on, the FM-1
   starts in a rescue mode with no sound and no menu, where the installer still works.
 - **Play it in your browser** at [ghoulbox.messy.quest](https://ghoulbox.messy.quest): the same firmware on a
-  drawn FM-1, played with the mouse or the computer keys, before you install anything.
+  drawn FM-1, played with the mouse, computer keys or MIDI, before you install anything. The web synth can
+  save and move its complete state, focus the display, and record a performance locally as a 24-bit stereo WAV.
 - **A [demo of what's new](https://youtu.be/NMSw1_wnCwQ)**, rendered by the firmware's own sound and screen
   code: the cave, the latch, the crank, the tunings and the scales.
 

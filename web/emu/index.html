@@ -59,7 +59,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 20px 16px 32px; }
                             .crest { gap: 12px; } .tagline { font-size: 15px; }
                             p.keys span, p.keys label { display: block; white-space: normal; margin: 4px 0; } }
 /* the text on stone plaques (a window's frame: EDGE outside, STONE inside, as gfx.c cv_window) */
-.keys, footer { max-width: 1040px; margin-left: auto; margin-right: auto; background: var(--plaque); padding: 12px 16px;
+.keys, .utility, footer { max-width: 1040px; margin-left: auto; margin-right: auto; background: var(--plaque); padding: 12px 16px;
                 box-shadow: 0 0 0 2px #6b4513, 0 0 0 4px #000, 0 0 0 6px #3a3a3e; }
 @media (orientation: portrait) and (max-width: 700px) { main { padding: 8px 8px 24px; } }
 a { color: inherit; }
@@ -106,7 +106,7 @@ a { color: inherit; }
 .start button { font: inherit; font-size: 18px; padding: 12px 28px; background: #fff; color: #000; border: 0; cursor: pointer; }
 .start button:disabled { opacity: .4; cursor: progress; }
 .start p { margin: 0; max-width: 32em; text-align: center; color: #fff; }
-.keys, footer { margin-top: 22px; color: var(--bone); text-align: center; }
+.keys, .utility, footer { margin-top: 22px; color: var(--bone); text-align: center; }
 a { color: var(--amber); }
 .keys span { white-space: nowrap; margin: 0 8px; }
 .keys label { white-space: nowrap; margin: 0 8px; cursor: pointer; }
@@ -117,6 +117,46 @@ kbd { font: 600 11px ui-monospace, Menlo, monospace; border: 1px solid #6b6b70; 
 footer { margin-top: 12px; font-size: 12px; }
 footer nav a { margin: 0 6px; }
 footer small { font-size: 11px; opacity: .8; }
+.utility { text-align: left; }
+.utility > summary { cursor: pointer; color: var(--amber); font: 700 15px/1.4 DotGothic16, monospace; letter-spacing: .04em; }
+.utility-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 12px; }
+.utility label { white-space: nowrap; }
+.utility button, .utility select { border: 1px solid #6b4513; color: var(--bone); background: #1d1d1f; font: inherit;
+                                  min-height: 34px; padding: 6px 11px; }
+.utility button { cursor: pointer; box-shadow: inset 0 -2px rgba(0, 0, 0, .45); }
+.utility button:hover:not(:disabled), .utility button:focus-visible { border-color: var(--amber); }
+.utility button:disabled { opacity: .45; cursor: default; }
+.utility .primary { color: var(--night); background: var(--amber); font-weight: 700; }
+.recorder { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 5px 8px;
+            border: 1px solid rgba(239, 223, 198, .2); background: rgba(0, 0, 0, .2); }
+.recorder .record { color: #ffd9d2; border-color: #7c2c24; }
+.recorder.recording .record { color: #fff; background: #8f2018; border-color: #ff8c7f; }
+.recorder.recording .rec-dot { animation: rec-pulse 1.1s steps(2, end) infinite; }
+.rec-dot { display: inline-block; width: .62em; height: .62em; margin-right: 6px; border-radius: 50%; background: #e54b3d; }
+.rec-clock { min-width: 4.6em; color: var(--bone); font: 700 14px/1 ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+.rec-meter { display: inline-block; width: 70px; height: 7px; padding: 1px; border: 1px solid #5c4a34; background: #080808; }
+.rec-meter::after { content: ""; display: block; width: var(--peak, 0%); height: 100%; max-width: 100%;
+                    background: var(--amber); }
+.recorder.clipped .rec-meter::after { background: #ff4f42; }
+.rec-peak { min-width: 6.4em; font-size: 11px; color: #b9ac99; font-variant-numeric: tabular-nums; }
+.rec-help { flex-basis: 100%; margin: 0; font-size: 11px; color: #b9ac99; }
+@keyframes rec-pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .recorder.recording .rec-dot { animation: none; } }
+.tool-status { min-height: 1.6em; margin: 9px 0 0; color: var(--amber); }
+.midi-map { margin-top: 8px; }
+.midi-map summary { cursor: pointer; }
+.midi-map table { margin: 8px auto 0; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.midi-map th, .midi-map td { padding: 3px 10px; border-bottom: 1px solid rgba(239, 223, 198, .18); text-align: left; }
+.screen-hint { cursor: zoom-in; }
+body.focus-mode { overflow: hidden; background: #000; }
+body.focus-mode main { max-width: none; padding: 0; }
+body.focus-mode main > :not(.stage) { display: none; }
+body.focus-mode .stage { display: block; width: 100vw; height: 100vh; }
+body.focus-mode .torch, body.focus-mode .device svg, body.focus-mode .device .hit, body.focus-mode .device .start { display: none; }
+body.focus-mode .device { width: 100vw; height: 100vh; aspect-ratio: auto !important; background: #000; }
+body.focus-mode .device canvas { position: fixed; left: 50% !important; top: 50% !important;
+                                 width: min(100vw, 100vh) !important; height: min(100vw, 100vh) !important;
+                                 transform: translate(-50%, -50%); cursor: zoom-out; }
 </style>
 </head>
 <body>
@@ -135,7 +175,7 @@ footer small { font-size: 11px; opacity: .8; }
 <div class="torch" aria-hidden="true"></div>
 <div class="device" id="device">
   <svg id="panel" viewBox="0 0 1000 624" aria-hidden="true"></svg>
-  <canvas id="screen" width="240" height="240" role="img" aria-label="The screen"></canvas>
+  <canvas id="screen" width="240" height="240" role="button" tabindex="0" aria-label="Screen; enter Focus Mode"></canvas>
   <div class="start" id="start"><button id="go" type="button">Switch on</button><p id="status" hidden></p></div>
 </div>
 <div class="torch r" aria-hidden="true"></div>
@@ -145,8 +185,36 @@ footer small { font-size: 11px; opacity: .8; }
   <span>Play with the mouse, or with the computer keys printed on the panel.</span>
   <span>Drag or scroll a knob to turn it.</span>
   <span><kbd>Shift</kbd>-click a button to keep it held (for GLO + a key, and the like).</span>
-  <label><input type="checkbox" id="midi"> MIDI in (play it from a MIDI keyboard)</label>
+  <span class="screen-hint">Click the screen for Focus Mode.</span>
 </p>
+
+<details class="utility" id="utility">
+  <summary>MIDI, saves, audio &amp; display</summary>
+  <div class="utility-grid">
+    <label><input type="checkbox" id="midi"> MIDI in</label>
+    <label><input type="checkbox" id="panel-midi"> Panel CC mapping</label>
+    <label>Knobs <select id="midi-knob-mode"><option value="absolute">Absolute 0–127</option><option value="relative">Relative 1 / 127</option></select></label>
+    <label>Velocity <select id="midi-velocity"><option value="0">Keyboard velocity</option><option value="64">Fixed 64</option><option value="80">Fixed 80</option><option value="96">Fixed 96</option><option value="100">Fixed 100 (FM-1 keys)</option><option value="112">Fixed 112</option><option value="127">Fixed 127</option></select></label>
+    <div class="recorder" id="recorder">
+      <button type="button" id="audio-record" class="record" aria-pressed="false" disabled><span class="rec-dot" aria-hidden="true"></span>Record WAV</button>
+      <button type="button" id="audio-stop" disabled>Stop &amp; download</button>
+      <span class="rec-clock" id="rec-clock" aria-label="Recording time">00:00</span>
+      <span class="rec-meter" id="rec-meter" aria-hidden="true"></span>
+      <span class="rec-peak" id="rec-peak">−∞ dBFS</span>
+      <p class="rec-help">24-bit stereo · up to 10 minutes · captures everything heard, including the click · processed only in this browser</p>
+    </div>
+    <button type="button" id="state-export" class="primary" disabled>Export state</button>
+    <button type="button" id="state-import" disabled>Import state</button>
+    <button type="button" id="state-recover" disabled>Undo last import</button>
+    <button type="button" id="focus-mode">Focus screen</button>
+    <input id="state-file" type="file" accept=".json,application/json" hidden>
+  </div>
+  <p class="tool-status" id="tool-status" role="status" aria-live="polite"></p>
+  <details class="midi-map"><summary>Panel MIDI CC list</summary>
+    <table><thead><tr><th>CC</th><th>Control</th><th>Message</th></tr></thead><tbody id="midi-map"></tbody></table>
+    <p>Buttons must send 127 when pressed and 0 when released. Panel CC messages are consumed by the emulator; GHOULBOX’s direct sound CC map remains available for every other CC.</p>
+  </details>
+</details>
 
 <footer>
   <small class="version">GHOULBOX @GBVERSION@@PREVIEW@ · on Felucca @VERSION@</small><br>
@@ -157,6 +225,12 @@ footer small { font-size: 11px; opacity: .8; }
 </main>
 
 <script type="module">
+import {
+  PANEL_BUTTONS, PANEL_KNOBS, base64ToBytes, bytesToBase64, fixedVelocityMessage,
+  makeEmulatorState, panelCcAction, panelNoteAction, readEmulatorState, stateCrc,
+} from "./emu_io.js";
+import { WAV_FRAME_BYTES, recordingTime, wavHeader } from "./audio_export.js";
+
 const NS = "http://www.w3.org/2000/svg";
 // panel.c's labels (bit = label) and encoder roles
 const B = { FX: 0, SCL: 1, ENV: 2, LFO: 3, EDIT: 4, GLO: 5, HOME: 6, SAVE: 7, ARP: 8, SEQ: 9, PLAY: 10, REC: 11, "OCT-": 12, "OCT+": 13 };
@@ -168,6 +242,9 @@ const BLACK = [1, 3, 5, 8, 10, 13, 15, 17, 20, 22, 25];
 const BLACK_AFTER = [0, 1, 2, 4, 5, 7, 8, 9, 11, 12, 14];      // the white key each black one follows
 const STORE = "ghoulbox-emu-flash";   // (GHOULBOX: its own saves, not a Felucca page's)
 const MIDI_PREF = "ghoulbox-emu-midi"; // (GHOULBOX: MIDI in off until asked: a plugged-in FM-1 would play it)
+const PANEL_PREF = "ghoulbox-emu-panel-midi", KNOB_PREF = "ghoulbox-emu-knob-mode", VEL_PREF = "ghoulbox-emu-velocity";
+const PENDING = "ghoulbox-emu-import-project", RECOVERY = "ghoulbox-emu-import-recovery";
+const FIRMWARE = "GHOULBOX @GBVERSION@ on Felucca @VERSION@";
 
 // ------------------------------------------------------------------ the panel
 // Two drawings of the same controls: WIDE after the FM-1's own layout, TALL for a phone held upright (the
@@ -225,6 +302,8 @@ const KEYNAMES = ["F", "F♯", "G", "G♯", "A", "A♯", "B", "C", "C♯", "D", 
 const keyName = (k) => KEYNAMES[k % 12] + (3 + Math.floor((k + 5) / 12));
 
 let node = null, btnMask = 0, keyMask = 0, latched = 0, masterValue = 700, lastLeds = [0, 0, 0, 0, 0], layout = null;
+let requestId = 0, toolBusy = false, recording = null;
+const requests = new Map(), midiLast = new Map(), midiDiverted = new Set();
 const angle = Object.fromEntries(KNOBS.map((n) => [n, 0]));
 angle.MASTER = -135 + 270 * masterValue / 1023;
 const knobs = [], buttons = [], keys = [];
@@ -360,17 +439,22 @@ function release(e) {
 for (const t of ["pointerup", "pointercancel", "lostpointercapture"]) device.addEventListener(t, release);
 
 function drawKnob(k) { if (k.ind) k.ind.setAttribute("transform", `rotate(${angle[k.name]} ${k.x} ${k.y})`); }
+function setMaster(value) {
+  masterValue = Math.max(0, Math.min(1023, value | 0));
+  angle.MASTER = -135 + 270 * masterValue / 1023;
+  send({ type: "master", value: masterValue });
+  const k = knobs.find((x) => x.role === "master");
+  if (k) drawKnob(k);
+}
 function turn(k, n) {
   if (!n) return;
   if (k.role === "master") {
-    masterValue = Math.max(0, Math.min(1023, masterValue + n * 16));
-    angle.MASTER = -135 + 270 * masterValue / 1023;
-    send({ type: "master", value: masterValue });
+    setMaster(masterValue + n * 16);
   } else {
     angle[k.name] = (angle[k.name] + n * 18) % 360;            // 20 detents a turn
     send({ type: "enc", role: k.role, n });
   }
-  drawKnob(k);
+  if (k.role !== "master") drawKnob(k);
 }
 function bindKnob(k) {
   let drag = null, wheel = 0;
@@ -496,34 +580,282 @@ function saveFlash(sectors) {
   } catch { return false; }                                       // private mode, full: this session only
 }
 
-// ------------------------------------------------------------------ Web MIDI in (channel messages)
-// GHOULBOX: only with the page's MIDI IN ticked (remembered); unticked, every note let go (CC123 on each channel)
-const midiBox = document.getElementById("midi");
+function pendingRuntime() {
+  try {
+    const o = JSON.parse(localStorage.getItem(PENDING) || "null");
+    if (!o || !Number.isInteger(o.size) || o.size <= 0 || o.size > 3840 || !Number.isInteger(o.crc)) return null;
+    const bytes = base64ToBytes(o.data, o.size);
+    return stateCrc(bytes) === o.crc ? bytes : null;
+  } catch { return null; }
+}
+
+function keepPending(runtime) {
+  const o = { size: runtime.length, crc: stateCrc(runtime), data: bytesToBase64(runtime) };
+  localStorage.setItem(PENDING, JSON.stringify(o));
+}
+
+// ------------------------------------------------------------------ Web MIDI in (notes, direct sound CCs, and the optional panel CC map)
+const midiBox = document.getElementById("midi"), panelMidiBox = document.getElementById("panel-midi");
+const knobMode = document.getElementById("midi-knob-mode"), velocity = document.getElementById("midi-velocity");
+const LAYER_BUTTONS = [B.FX, B.GLO, B.SCL, B.EDIT, B.SEQ, B.REC].reduce((m, b) => m | 1 << b, 0);
 let midiAccess = null;
-try { midiBox.checked = localStorage.getItem(MIDI_PREF) === "1"; } catch { /* no storage: off */ }
-midiBox.addEventListener("change", () => {
-  try { localStorage.setItem(MIDI_PREF, midiBox.checked ? "1" : "0"); } catch { /* this visit only */ }
-  if (midiBox.checked) { midiOn(); return; }
-  if (midiAccess) for (const input of midiAccess.inputs.values()) input.onmidimessage = null;
+try {
+  midiBox.checked = localStorage.getItem(MIDI_PREF) === "1";
+  panelMidiBox.checked = localStorage.getItem(PANEL_PREF) === "1";
+  knobMode.value = localStorage.getItem(KNOB_PREF) === "relative" ? "relative" : "absolute";
+  const v = localStorage.getItem(VEL_PREF) || "0";
+  velocity.value = [...velocity.options].some((o) => o.value === v) ? v : "0";
+} catch { /* no storage: defaults */ }
+
+function releaseMidiPanel() {
+  for (const id of [...btnBy.keys()]) if (id.startsWith("mc")) btnBy.delete(id);
+  for (const id of [...keyBy.keys()]) if (id.startsWith("mn")) keyBy.delete(id);
+  midiDiverted.clear(); midiLast.clear(); syncButtons(); syncKeys();
+}
+function midiPanic() {
+  releaseMidiPanel();
   for (let ch = 0; ch < 16; ch++) send({ type: "midi", data: [0xB0 | ch, 123, 0] });
+}
+function panelMidi(d) {
+  if (!panelMidiBox.checked || (d[0] & 0xF0) !== 0xB0 || d.length < 3) return false;
+  const a = panelCcAction(d[1], d[2], midiLast, knobMode.value);
+  if (!a) return false;
+  if (a.type === "button") {
+    const id = "mc" + a.cc;
+    if (a.down) btnBy.set(id, a.bit); else btnBy.delete(id);
+    syncButtons();
+  } else if (a.type === "master") setMaster(a.value);
+  else if (a.type === "encoder") {
+    const k = knobs.find((x) => x.role === a.role);
+    if (k) turn(k, a.n);
+  }
+  return true;
+}
+function midiMessage(data) {
+  let d = Array.from(data || []);
+  if (d.length < 2 || d[0] < 0x80 || d[0] >= 0xF0) return;
+  if (panelMidi(d)) return;
+  const note = panelNoteAction(d, !!(btnMask & LAYER_BUTTONS), midiDiverted);
+  if (note) {
+    if (note.down) keyBy.set(note.id, note.key); else keyBy.delete(note.id);
+    syncKeys(); return;
+  }
+  d = fixedVelocityMessage(d, +velocity.value);
+  send({ type: "midi", data: [d[0], d[1], d[2] || 0] });
+}
+
+for (const [box, key] of [[midiBox, MIDI_PREF], [panelMidiBox, PANEL_PREF]]) box.addEventListener("change", () => {
+  try { localStorage.setItem(key, box.checked ? "1" : "0"); } catch { /* this visit only */ }
+  if (box === midiBox && midiBox.checked) { midiOn(); return; }
+  if (box === midiBox) {
+    if (midiAccess) for (const input of midiAccess.inputs.values()) input.onmidimessage = null;
+    midiPanic();
+  } else if (!box.checked) releaseMidiPanel();
 });
+for (const [select, key] of [[knobMode, KNOB_PREF], [velocity, VEL_PREF]]) select.addEventListener("change", () => {
+  midiLast.clear();
+  try { localStorage.setItem(key, select.value); } catch { /* this visit only */ }
+});
+
 async function midiOn() {
   if (!navigator.requestMIDIAccess || !node || !midiBox.checked) return;
   try {
     const access = midiAccess ??= await navigator.requestMIDIAccess();
     const bind = () => {
-      for (const input of access.inputs.values()) {
-        if (!midiBox.checked) { input.onmidimessage = null; continue; }
-        input.onmidimessage = (e) => {
-          const d = e.data;
-          if (d.length >= 2 && d[0] >= 0x80 && d[0] < 0xF0) send({ type: "midi", data: [d[0], d[1], d[2] || 0] });
-        };
-      }
+      for (const input of access.inputs.values()) input.onmidimessage = midiBox.checked && input.state !== "disconnected" ? (e) => midiMessage(e.data) : null;
     };
-    access.onstatechange = bind;
+    access.onstatechange = () => { midiPanic(); bind(); };
     bind();
-  } catch { /* no permission: the panel only */ }
+  } catch { toolSay("MIDI permission was not granted; the panel still works."); }
 }
+
+// ------------------------------------------------------------------ portable state files, audio recording and Focus Mode
+const toolStatus = document.getElementById("tool-status"), stateExport = document.getElementById("state-export");
+const stateImport = document.getElementById("state-import"), stateRecover = document.getElementById("state-recover");
+const stateFile = document.getElementById("state-file"), focusButton = document.getElementById("focus-mode");
+const recorder = document.getElementById("recorder"), audioRecord = document.getElementById("audio-record");
+const audioStop = document.getElementById("audio-stop"), recClock = document.getElementById("rec-clock");
+const recMeter = document.getElementById("rec-meter"), recPeak = document.getElementById("rec-peak");
+const toolSay = (s) => { toolStatus.textContent = s || ""; };
+function toolsReady() {
+  const busy = toolBusy || !!recording;
+  stateExport.disabled = stateImport.disabled = busy || !node;
+  audioRecord.disabled = toolBusy || !!recording || !node;
+  audioStop.disabled = !recording || recording.stopping;
+  try { stateRecover.disabled = busy || !localStorage.getItem(RECOVERY); }
+  catch { stateRecover.disabled = true; }
+}
+async function toolOp(fn) {
+  if (toolBusy) return;
+  toolBusy = true; toolsReady();
+  try { await fn(); }
+  catch (err) { toolSay("Could not complete that action: " + (err && err.message || err)); }
+  finally { toolBusy = false; toolsReady(); }
+}
+function workletRequest(type, data = {}) {
+  if (!node) return Promise.reject(new Error("Switch on GHOULBOX first"));
+  const id = ++requestId;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { requests.delete(id); reject(new Error("The emulator did not answer")); }, 5000);
+    requests.set(id, { resolve, reject, timer, type });
+    node.port.postMessage({ ...data, type, id });
+  });
+}
+const snapshot = () => workletRequest("snapshot");
+function download(name, value) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2) + "\n"], { type: "application/json" }));
+  const a = document.createElement("a"); a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function downloadBlob(name, blob) {
+  const url = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function installState(archive) {
+  keepPending(archive.runtime);
+  if (!saveFlash(archive.sectors)) {
+    try { localStorage.removeItem(PENDING); } catch { /* already reporting the failure */ }
+    throw new Error("This browser could not store the imported state");
+  }
+}
+
+stateExport.addEventListener("click", () => toolOp(async () => {
+  toolSay("Capturing the live instrument…");
+  const s = await snapshot(), file = makeEmulatorState(s.sectors, s.runtime, FIRMWARE);
+  download(`GHOULBOX-emulator-state-${new Date().toISOString().slice(0, 10)}.json`, file);
+  toolSay("State exported: live music, projects, sounds, samples and settings.");
+}));
+stateImport.addEventListener("click", () => stateFile.click());
+stateFile.addEventListener("change", () => {
+  const file = stateFile.files[0]; stateFile.value = "";
+  if (!file) return;
+  toolOp(async () => {
+    if (file.size > 3 * 1024 * 1024) throw new Error("The selected file is too large");
+    toolSay("Checking every object and checksum…");
+    const archive = readEmulatorState(await file.text());
+    const valid = await workletRequest("validate-project", { runtime: archive.runtime });
+    if (!valid.ok) throw new Error("The live project failed firmware validation");
+    if (!confirm("Import this GHOULBOX emulator state? Current browser music, projects, sounds, samples and settings will be replaced.")) {
+      toolSay("Import cancelled."); return;
+    }
+    const old = await snapshot(), recovery = makeEmulatorState(old.sectors, old.runtime, FIRMWARE);
+    localStorage.setItem(RECOVERY, JSON.stringify(recovery));
+    installState(archive);
+    toolSay("State checked and installed. Restarting…");
+    location.reload();
+  });
+});
+stateRecover.addEventListener("click", () => toolOp(async () => {
+  const raw = localStorage.getItem(RECOVERY);
+  if (!raw) throw new Error("There is no previous state to restore");
+  const archive = readEmulatorState(raw);
+  if (!confirm("Undo the last import and restore the state that preceded it?")) { toolSay("Restore cancelled."); return; }
+  installState(archive);
+  localStorage.removeItem(RECOVERY);
+  toolSay("Previous state restored. Restarting…");
+  location.reload();
+}));
+
+function recordDisplay(frames = 0, rate = 44100, peak = 0, clipped = 0) {
+  recClock.textContent = recordingTime(frames, rate);
+  recMeter.style.setProperty("--peak", `${Math.min(100, Math.max(0, peak * 100))}%`);
+  recPeak.textContent = peak > 0 ? `${(20 * Math.log10(peak)).toFixed(1)} dBFS` : "−∞ dBFS";
+  recorder.classList.toggle("clipped", clipped > 0);
+}
+function recordingMessage(m) {
+  if (m.type === "record-started") {
+    if (!recording) return true;
+    recording.rate = m.rate;
+    recording.maxSeconds = m.maxSeconds;
+    recording.active = true;
+    recorder.classList.add("recording");
+    audioRecord.setAttribute("aria-pressed", "true");
+    toolSay(`Recording 24-bit WAV locally — maximum ${Math.round(m.maxSeconds / 60)} minutes.`);
+    toolsReady();
+    return true;
+  }
+  if (m.type === "record-chunk") {
+    if (!recording) return true;
+    if (!(m.bytes instanceof Uint8Array) || !Number.isInteger(m.frames) ||
+        m.frames <= 0 || m.bytes.length !== m.frames * WAV_FRAME_BYTES) {
+      recording.failed = "The audio recorder returned an invalid chunk";
+    } else {
+      recording.chunks.push(m.bytes);
+      recording.frames += m.frames;
+      recording.peak = Math.max(recording.peak, m.peak || 0);
+      recording.clipped = m.clipped || 0;
+    }
+    recordDisplay(recording.frames, recording.rate, recording.peak, recording.clipped);
+    return true;
+  }
+  if (m.type === "record-stopped") {
+    if (!recording) return true;
+    const take = recording;
+    recording = null;
+    recorder.classList.remove("recording");
+    audioRecord.setAttribute("aria-pressed", "false");
+    take.peak = m.peak || 0; take.clipped = m.clipped || 0;
+    recordDisplay(take.frames, take.rate, take.peak, take.clipped);
+    toolsReady();
+    if (take.failed || take.frames !== m.frames) {
+      toolSay("Recording failed: " + (take.failed || "audio chunks were lost"));
+      return true;
+    }
+    if (!take.frames) { toolSay("Nothing was recorded."); return true; }
+    try {
+      const blob = new Blob([wavHeader(take.rate, take.frames), ...take.chunks], { type: "audio/wav" });
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      downloadBlob(`GHOULBOX-recording-${stamp}.wav`, blob);
+      const clipped = take.clipped ? ` Warning: ${take.clipped} sample${take.clipped === 1 ? "" : "s"} clipped.` : "";
+      const limit = m.reason === "limit" ? `${Math.round(take.maxSeconds / 60)}-minute limit reached. ` : "";
+      toolSay(`${limit}WAV saved: ${recordingTime(take.frames, take.rate)}, ${(blob.size / 1048576).toFixed(1)} MB.${clipped}`);
+    } catch (err) { toolSay("Could not create the WAV: " + (err && err.message || err)); }
+    return true;
+  }
+  if (m.type === "record-error") {
+    recording = null;
+    recorder.classList.remove("recording");
+    audioRecord.setAttribute("aria-pressed", "false");
+    toolsReady(); toolSay("Recording failed: " + m.message);
+    return true;
+  }
+  return false;
+}
+audioRecord.addEventListener("click", () => {
+  if (!node || recording) return;
+  recording = { chunks: [], frames: 0, rate: 44100, peak: 0, clipped: 0, active: false, stopping: false };
+  recordDisplay(); toolsReady();
+  node.port.postMessage({ type: "record-start" });
+});
+audioStop.addEventListener("click", () => {
+  if (!node || !recording || recording.stopping) return;
+  recording.stopping = true; toolsReady();
+  node.port.postMessage({ type: "record-stop" });
+});
+addEventListener("beforeunload", (e) => {
+  if (recording) { e.preventDefault(); e.returnValue = ""; }
+});
+
+for (const x of [...PANEL_KNOBS, ...PANEL_BUTTONS]) {
+  const tr = document.createElement("tr"), td1 = document.createElement("td"), td2 = document.createElement("td"), td3 = document.createElement("td");
+  td1.textContent = x.cc; td2.textContent = x.name;
+  td3.textContent = x.role !== undefined ? (x.role === "master" ? "0–127 absolute" : "0–127 / 1, 127") : "127 press / 0 release";
+  tr.append(td1, td2, td3); document.getElementById("midi-map").appendChild(tr);
+}
+
+function focusMode(on) {
+  if (on && !node) { document.getElementById("utility").open = true; toolSay("Switch on GHOULBOX before entering Focus Mode."); return; }
+  document.body.classList.toggle("focus-mode", on);
+  canvas.setAttribute("aria-label", on ? "Screen; exit Focus Mode" : "Screen; enter Focus Mode");
+  focusButton.textContent = on ? "Exit focus" : "Focus screen";
+}
+const toggleFocus = () => focusMode(!document.body.classList.contains("focus-mode"));
+canvas.addEventListener("click", toggleFocus);
+canvas.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { toggleFocus(); e.preventDefault(); } });
+focusButton.addEventListener("click", toggleFocus);
+addEventListener("keydown", (e) => { if (e.key === "Escape" && document.body.classList.contains("focus-mode")) focusMode(false); });
+toolsReady();
 
 // ------------------------------------------------------------------ switching on
 const status = document.getElementById("status");
@@ -533,6 +865,7 @@ async function switchOn() {
   go.disabled = true;
   go.textContent = "Starting…";
   try {
+    const runtime = pendingRuntime();
     const ac = new AudioContext({ sampleRate: 44100, latencyHint: "interactive" });
     const [wasm] = await Promise.all([
       fetch("felucca.wasm").then((r) => { if (!r.ok) throw new Error(`felucca.wasm: ${r.status}`); return r.arrayBuffer(); }),
@@ -543,7 +876,15 @@ async function switchOn() {
     await new Promise((res, rej) => {
       node.port.onmessage = (e) => {
         const m = e.data;
-        if (m.type === "ready") res();
+        if (recordingMessage(m)) {
+          /* recorder messages are ordered: every transferred PCM chunk arrives before record-stopped */
+        } else if ((m.type === "snapshot" || m.type === "validate-project") && requests.has(m.id)) {
+          const p = requests.get(m.id); requests.delete(m.id); clearTimeout(p.timer);
+          if (m.error) p.reject(new Error(m.error)); else p.resolve(m);
+        } else if (m.type === "ready") {
+          if (runtime) try { localStorage.removeItem(PENDING); } catch { /* it may harmlessly restore once more */ }
+          res();
+        }
         else if (m.type === "error") rej(new Error(m.message));
         else if (m.type === "frame") {
           if (m.fb) drawScreen(m.fb);
@@ -554,7 +895,7 @@ async function switchOn() {
           }
         }
       };
-      node.port.postMessage({ type: "load", wasm, sectors: loadFlash(), master: masterValue }, [wasm]);
+      node.port.postMessage({ type: "load", wasm, sectors: loadFlash(), runtime, master: masterValue }, [wasm]);
     });
     await ac.resume();
     document.getElementById("start").hidden = true;
@@ -563,9 +904,11 @@ async function switchOn() {
     syncButtons();
     syncKeys();
     send({ type: "visible", on: !document.hidden });
+    toolsReady();
     midiOn();
   } catch (err) {
     node = null;
+    toolsReady();
     go.disabled = false;
     go.textContent = "Switch on";
     say("Could not start: " + (err && err.message || err) + ". A current Chrome, Edge, Firefox or Safari should work.");

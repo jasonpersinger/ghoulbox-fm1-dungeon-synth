@@ -358,6 +358,31 @@ EXPORT void web_boot(void)
         web_power_on();
 }
 
+/* A portable emulator backup carries the live music separately from the flash sectors: unlike the automatic
+ * restore object, it is exact even while playing or during the ten-second autosave quiet period. Import uses the
+ * project format's existing checksum, range and compatibility validation before it touches the running music. */
+static uint8_t web_project_in[3840];
+EXPORT uint8_t *web_project_capture(void)
+{
+    project_capture(&proj_scratch);
+    proj_wire_gen++;
+    return proj_pack(&proj_wire, &proj_scratch) ? proj_wire_u.raw : 0;
+}
+EXPORT uint32_t web_project_size(void) { return sizeof(project_store_t); }
+EXPORT uint8_t *web_project_import_buffer(void) { return web_project_in; }
+EXPORT uint32_t web_project_import_capacity(void) { return sizeof web_project_in; }
+EXPORT uint32_t web_project_validate(uint32_t n)
+{
+    return n <= sizeof web_project_in && proj_import(&proj_scratch, web_project_in, (int)n);
+}
+EXPORT uint32_t web_project_restore(uint32_t n)
+{
+    if (!web_project_validate(n))
+        return 0;
+    proj_bound(&proj_scratch);
+    return project_restore_runtime(&proj_scratch) == 0;
+}
+
 /* input, by the printed labels: buttons bit b = B_FX .. B_OCTUP (panel.c), keys bit k = key k (F3 .. G5),
  * encoders by role (EN_SELECT .. EN_K4), MASTER 0..1023 */
 static uint32_t web_btn_labels, web_key_mask;

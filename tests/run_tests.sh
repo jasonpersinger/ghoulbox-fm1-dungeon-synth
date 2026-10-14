@@ -100,7 +100,7 @@
 #                   underrun / overrun, restart; SET_CUR; the 44.1 -> 48 kHz resampler (every frame against a
 #                   double-precision one, response, SNR, cost); the stream at 48 kHz (47..49 frames per packet,
 #                   fast and slow I2S clocks, switching rates mid-stream).
-# web (web/test_web.mjs): the editor protocol against its mock device, whose tables must equal the
+# web (web/test_web.mjs, web/emu/io_test.mjs, web/emu/audio_export_test.mjs): the editor protocol against its mock device, whose tables must equal the
 #                   firmware's (tests/descdump.c -> build/host/desc.json; the MENU settings: tests/editor_test.c -> build/host/menu.json),
 #                   the package builder, the updater.
 # Browser emulator (web/emu, when emcc is there): the firmware in WebAssembly (build/emu) boots, plays keys and MIDI,
@@ -407,6 +407,8 @@ run "installer CLI (fm1_install.py) against a simulated FM-1" python3 tests/inst
 if command -v node >/dev/null 2>&1; then
     run "web pages: editor protocol + samples, package builder, update protocol" node web/test_web.mjs
     run "web backup: capture, validation before writes, restore order" node web/test_backup.mjs
+    run "browser emulator I/O: panel MIDI map, fixed velocity, state validation" node web/emu/io_test.mjs
+    run "browser emulator audio export: PCM capture and 24-bit WAV" node web/emu/audio_export_test.mjs
 else
     echo "== skip web tests (no node)"
 fi

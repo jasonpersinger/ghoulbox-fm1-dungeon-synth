@@ -84,9 +84,10 @@ python3 -m http.server -d build/emu 8790     # open http://localhost:8790/
 ```
 
 `web/emu/felucca_web.c` builds the firmware's sources as the host tests do, against a simulated FM-1, and
-Emscripten compiles it to WebAssembly (`build/emu/felucca.wasm`, with `index.html`, `worklet.js` and the font in `fonts/`). The page
-keeps the flash's storage sectors (projects, user presets, settings) in the browser. Not emulated: USB (audio,
-MIDI out, the editor, updates), TRS MIDI and the user sample slots. A build of it is on the site:
+Emscripten compiles it to WebAssembly (`build/emu/felucca.wasm`, with `index.html`, `worklet.js`, the browser helper
+modules and the font in `fonts/`). The page keeps the flash's storage sectors (projects, user presets, settings) in
+the browser. It can export and import its complete state and record the final stereo output as a 24-bit WAV. Not
+emulated: USB (audio, MIDI out, the editor, updates), TRS MIDI and the user sample slots. A build of it is on the site:
 <https://hugelton.github.io/Felucca/webapp/try/>.
 
 ## Tests

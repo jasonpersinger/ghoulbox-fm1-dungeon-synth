@@ -137,6 +137,17 @@ c.render(600);
 check("a fresh instance with the kept sectors has it; one without does not",
       b.ex.web_test_user_preset(0) === 1 && c.ex.web_test_user_preset(0) === 0);
 
+// ---- portable state: the live project is captured even apart from the autosave sectors, and validated by firmware
+const livePtr = a.ex.web_project_capture(), liveSize = a.ex.web_project_size();
+const live = new Uint8Array(a.mem.buffer, livePtr, liveSize).slice();
+const inPtr = a.ex.web_project_import_buffer(), inCap = a.ex.web_project_import_capacity();
+new Uint8Array(a.mem.buffer, inPtr, live.length).set(live);
+const liveValid = a.ex.web_project_validate(live.length);
+const corrupt = live.slice(); corrupt[corrupt.length - 1] ^= 1;
+new Uint8Array(a.mem.buffer, inPtr, corrupt.length).set(corrupt);
+check(`portable state captures a ${liveSize}-byte live project and validates before restore`,
+      livePtr && liveSize > 0 && liveSize <= inCap && liveValid === 1 && a.ex.web_project_validate(corrupt.length) === 0);
+
 // ---- deterministic: the same gestures, the same samples
 async function song() {
   const d = await device(null);
