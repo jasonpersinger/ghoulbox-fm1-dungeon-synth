@@ -11,6 +11,19 @@ export function withTimeout(task, timeoutMs, message) {
   });
 }
 
+export function preparePlaybackSession(nav = globalThis.navigator) {
+  const session = nav?.audioSession;
+  if (!session) return false;
+  try {
+    // WebKit otherwise uses an ambient iOS audio session, which the Ring/Silent
+    // switch hard-mutes even while an AudioWorklet continues to render.
+    session.type = "playback";
+    return session.type === "playback";
+  } catch {
+    return false;
+  }
+}
+
 export function resumeAudio(context, timeoutMs = 3000) {
   let resumed;
   try {

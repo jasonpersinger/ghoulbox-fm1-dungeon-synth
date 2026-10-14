@@ -250,7 +250,7 @@ import {
 } from "./emu_io.js";
 import { AUDIO_FORMATS, StreamingAudioEncoder } from "./audio_encode.js";
 import { WAV_FRAME_BYTES, recordingTime, wavHeader } from "./audio_export.js";
-import { resumeAudio, withTimeout } from "./audio_session.js";
+import { preparePlaybackSession, resumeAudio, withTimeout } from "./audio_session.js";
 
 const NS = "http://www.w3.org/2000/svg";
 // panel.c's labels (bit = label) and encoder roles
@@ -965,6 +965,7 @@ audioResume.addEventListener("click", async () => {
   audioResume.disabled = true;
   audioRecoveryStatus.textContent = "Waking audio…";
   try {
+    preparePlaybackSession();
     await resumeAudio(ac);
     send({ type: "visible", on: !document.hidden });
     audioRecoveryState();
@@ -980,6 +981,7 @@ async function switchOn() {
   go.textContent = "Starting…";
   try {
     const runtime = pendingRuntime();
+    preparePlaybackSession();
     const ac = new AudioContext({ sampleRate: 44100, latencyHint: "interactive" });
     audioContext = ac;
     ac.onstatechange = () => { if (ac === audioContext) audioRecoveryState(); };
