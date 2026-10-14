@@ -60,6 +60,9 @@ check("audio export defaults to FLAC with MP3 and WAV available",
   /<select id="audio-format"><option value="flac">/.test(page) &&
   page.includes('<option value="mp3">') && page.includes('<option value="wav">') &&
   page.includes('from "./audio_encode.js"'));
+check("switch-on and recovery request an audible iOS session",
+  page.includes("import { preparePlaybackSession, resumeAudio, withTimeout }") &&
+  (page.match(/preparePlaybackSession\(\);/g) || []).length === 2);
 check("the manual covers every tool and takes its CC tables from the shared map",
   ["Quick start", "MIDI", "Portable saves", "Record audio", "FLAC", "MP3", "WAV", "Focus Mode", "Troubleshooting"].every((x) => manual.includes(x)) &&
   manual.includes('import { PANEL_BUTTONS, PANEL_KNOBS } from "./emu_io.js"'));

@@ -1,8 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
-import { resumeAudio, withTimeout } from "./audio_session.js";
+import { preparePlaybackSession, resumeAudio, withTimeout } from "./audio_session.js";
 
 let fails = 0;
 const check = (what, ok) => { console.log(`audio session: ${what.padEnd(59)} ${ok ? "ok" : "FAIL"}`); if (!ok) fails++; };
+
+const mobile = { audioSession: { type: "ambient" } };
+check("iOS is put on the audible playback session",
+  preparePlaybackSession(mobile) && mobile.audioSession.type === "playback");
+check("browsers without AudioSession remain supported", !preparePlaybackSession({}));
+const guarded = { audioSession: { get type() { return "ambient"; }, set type(value) { throw new Error(value); } } };
+check("a refused AudioSession change does not block startup", !preparePlaybackSession(guarded));
 
 function context(resume) {
   const calls = [], source = {
