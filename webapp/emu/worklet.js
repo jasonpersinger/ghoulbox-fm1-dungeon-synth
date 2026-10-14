@@ -5,10 +5,13 @@
 // between quanta the page's input goes in and, about 30 times a second (4 when the page is hidden), the screen,
 // the lights and any changed flash go out. After X0X's web/emu/worklet.js (charlesvestal/fm1-x0x, GPL-3.0).
 
+import { STORE_AREAS } from "./emu_io.js";
+import { Pcm24Recorder, RECORD_MAX_SECONDS } from "./audio_export.js";
+
 // The flash the page keeps: storage.c's areas (projects, user presets and their FM6 patches, the user sample
 // slots 0x97000..0xDFFFF; the autosave 0xE5000..0xE6FFF (1.2) and FM6's voice bank 0xE7000 (1.4.1); the settings and
 // the second FM6 copy 0xFC000..0xFFFFF), only the sectors that hold something (an erased sector is all 0xFF). {offset: bytes}
-export const STORE_AREAS = [[0x97000, 0xE0000], [0xE5000, 0xE8000], [0xFC000, 0x100000]];
+export { STORE_AREAS };
 export function storeSectors(nor) {
   const out = {};
   for (const [a, b] of STORE_AREAS)
@@ -28,6 +31,12 @@ export function restoreSectors(nor, sectors) {
 
 export const HOLD_MS = 24;
 
+function projectInput(ex, bytes, restore) {
+  if (!(bytes instanceof Uint8Array) || !bytes.length || bytes.length > ex.web_project_import_capacity()) return false;
+  new Uint8Array(ex.memory.buffer, ex.web_project_import_buffer(), bytes.length).set(bytes);
+  return !!(restore ? ex.web_project_restore(bytes.length) : ex.web_project_validate(bytes.length));
+}
+
 if (typeof registerProcessor === "function") {
   const clock = globalThis.performance ? () => globalThis.performance.now() : () => Date.now();
   class Felucca extends AudioWorkletProcessor {
@@ -43,6 +52,7 @@ if (typeof registerProcessor === "function") {
       this.frames = 0;
       this.queue = [];                                // button / key changes, each held >= HOLD_MS of device time
       this.nextOk = 0;
+      this.recorder = new Pcm24Recorder();
       this.port.onmessage = (e) => this.onMessage(e.data);
     }
 
@@ -56,6 +66,7 @@ if (typeof registerProcessor === "function") {
           restoreSectors(new Uint8Array(ex.memory.buffer, ex.web_nor(), ex.web_nor_size()), m.sectors);
           ex.web_master(m.master ?? 700);
           ex.web_boot();
+          if (m.runtime && !projectInput(ex, m.runtime, true)) throw new Error("The imported live project is invalid");
           this.ex = ex;
           this.sentWrites = ex.web_flash_writes_count();
           this.port.postMessage({ type: "ready", rate: ex.web_sample_rate() });
@@ -66,11 +77,50 @@ if (typeof registerProcessor === "function") {
       }
       const ex = this.ex;
       if (!ex) return;
-      if (m.type === "buttons" || m.type === "keys") this.queue.push(m);
+      if (m.type === "snapshot") {
+        const p = ex.web_project_capture(), n = ex.web_project_size();
+        if (!p || !n) { this.port.postMessage({ type: "snapshot", id: m.id, error: "Could not capture the live project" }); return; }
+        const runtime = new Uint8Array(ex.memory.buffer, p, n).slice();
+        const sectors = storeSectors(new Uint8Array(ex.memory.buffer, ex.web_nor(), ex.web_nor_size()));
+        const transfer = [runtime.buffer, ...Object.values(sectors).map((x) => x.buffer)];
+        this.port.postMessage({ type: "snapshot", id: m.id, runtime, sectors }, transfer);
+      } else if (m.type === "validate-project") {
+        this.port.postMessage({ type: "validate-project", id: m.id, ok: projectInput(ex, m.runtime, false) });
+      } else if (m.type === "record-start") {
+        if (this.recorder.active) {
+          this.port.postMessage({ type: "record-error", message: "A recording is already running" });
+        } else {
+          const rate = Math.round(globalThis.sampleRate || ex.web_sample_rate());
+          this.recorder.start(rate * RECORD_MAX_SECONDS);
+          this.port.postMessage({ type: "record-started", rate, maxSeconds: RECORD_MAX_SECONDS });
+        }
+      } else if (m.type === "record-stop") {
+        if (this.recorder.active) {
+          const done = this.recorder.stop();
+          this.sendRecordingChunk(done.chunk);
+          this.port.postMessage({ type: "record-stopped", frames: done.frames, peak: done.peak,
+                                  clipped: done.clipped, reason: "user" });
+        }
+      } else if (m.type === "buttons" || m.type === "keys") this.queue.push(m);
       else if (m.type === "enc") ex.web_enc(m.role, m.n | 0);
       else if (m.type === "master") ex.web_master(m.value | 0);
       else if (m.type === "midi") ex.web_midi(m.data[0] | 0, m.data[1] | 0, m.data[2] | 0);
       else if (m.type === "visible") this.period = m.on ? 1 / 30 : 1 / 4;
+    }
+
+    sendRecordingChunk(chunk) {
+      if (!chunk) return;
+      this.port.postMessage({ type: "record-chunk", bytes: chunk.bytes, frames: chunk.frames,
+                              peak: this.recorder.peak, clipped: this.recorder.clipped }, [chunk.bytes.buffer]);
+    }
+
+    record(left, right) {
+      if (!this.recorder.active) return;
+      const result = this.recorder.write(left, right);
+      for (const chunk of result.chunks) this.sendRecordingChunk(chunk);
+      if (result.stopped)
+        this.port.postMessage({ type: "record-stopped", frames: result.frames, peak: result.peak,
+                                clipped: result.clipped, reason: "limit" });
     }
 
     publish() {
@@ -129,6 +179,7 @@ if (typeof registerProcessor === "function") {
       this.frames += n;
       out[0].set(new Float32Array(ex.memory.buffer, ex.web_out_l(), n));
       if (out[1]) out[1].set(new Float32Array(ex.memory.buffer, ex.web_out_r(), n));
+      this.record(out[0], out[1] || out[0]);
       if (currentTime - this.lastFrame >= this.period) {
         this.lastFrame = currentTime;
         this.publish();
