@@ -3,7 +3,7 @@
 # Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
 # Felucca in the browser: the firmware's sources as the host tests build them (web/emu/felucca_web.c), compiled
 # to WebAssembly with Emscripten, plus the page. After X0X's web/emu/build.sh (charlesvestal/fm1-x0x, GPL-3.0).
-#   web/emu/build.sh   ->  build/emu/{index.html, worklet.js, felucca.wasm, fonts/}
+#   web/emu/build.sh   ->  build/emu/{index.html, tools.html, worklet.js, felucca.wasm, fonts/}
 # Run after one ./build.sh (build/gen: the tables, the fonts, the CC0 samples).
 # -ffp-contract=off: no fused multiply-adds, as the host build. EMU_OPT replaces -O2, EMU_CFLAGS adds flags
 # (EMU_CFLAGS=-msimd128: let the compiler vectorise; every browser with AudioWorklet has wasm SIMD).
@@ -25,6 +25,7 @@ sed -e "s/@GBVERSION@/$GBVERSION/g" -e "s/@VERSION@/$VERSION/g" -e "s/@PREVIEW@/
 cp web/emu/worklet.js build/emu/
 cp web/emu/emu_io.js build/emu/
 cp web/emu/audio_export.js build/emu/
+cp web/emu/tools.html build/emu/
 python3 tools/gen_emu_art.py build/gen build/emu/art   # GHOULBOX: the dungeon's pixel art (torch, wall, name)
 cp web/emu/fonts/DotGothic16-subset.woff web/emu/fonts/OFL.txt build/emu/fonts/
 echo "emu: build/emu ($(wc -c < build/emu/felucca.wasm | tr -d ' ') B wasm, GHOULBOX $GBVERSION on Felucca $VERSION)"
