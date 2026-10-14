@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+import fs from "fs";
 import {
   PANEL_BUTTONS, PANEL_KNOBS, fixedVelocityMessage, makeEmulatorState, midiKeyIndex,
   panelCcAction, panelNoteAction, readEmulatorState, stateCrc,
@@ -50,6 +51,14 @@ check("duplicate flash offsets are rejected", refused);
 const outside = structuredClone(file); outside.sectors[0].offset = 0;
 refused = false; try { readEmulatorState(outside); } catch { refused = true; }
 check("flash offsets outside the emulator save areas are rejected", refused);
+
+const page = fs.readFileSync(new URL("./index.html", import.meta.url), "utf8");
+const manual = fs.readFileSync(new URL("./tools.html", import.meta.url), "utf8");
+check("the tools box ends with a manual link that preserves the running synth",
+  /<p class="tools-manual-link"><a href="tools\.html" target="_blank" rel="noopener">/.test(page));
+check("the manual covers every tool and takes its CC tables from the shared map",
+  ["Quick start", "MIDI", "Portable saves", "Record a WAV", "Focus Mode", "Troubleshooting"].every((x) => manual.includes(x)) &&
+  manual.includes('import { PANEL_BUTTONS, PANEL_KNOBS } from "./emu_io.js"'));
 
 console.log(fails ? `emu io: ${fails} FAILED` : "emu io: all ok");
 process.exit(fails ? 1 : 0);
