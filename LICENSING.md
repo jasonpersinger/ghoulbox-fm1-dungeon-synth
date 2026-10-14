@@ -52,7 +52,15 @@ All by Hügelton Instruments (Leo Kuroshita), in this tree:
 | klattsch by Tony Gies (<https://github.com/tgies/klattsch>): design reference for the VOICE engine; no code copied. Formant data from Klatt (1980) / Hillenbrand et al. (1995) | MIT (klattsch) | credit only |
 | X0X by charlesvestal (<https://github.com/charlesvestal/fm1-x0x>), a Felucca fork: the design of the browser emulator (the worklet, the device clock driven by its audio, the exports); its files credit it in their headers | GPL-3.0 | `web/emu/` |
 | DotGothic16 font by The DotGothic16 Project Authors (<https://github.com/fontworks-fonts/DotGothic16>): the browser emulator's knob labels, served with its page (cut to printable ASCII; the font declares no Reserved Font Name) | SIL OFL 1.1 | `web/emu/fonts/DotGothic16-subset.woff`, `LICENSES/OFL-DotGothic16.txt` (also `web/emu/fonts/OFL.txt`) |
+| libflac.js 5.6.0 by DFKI GmbH (<https://github.com/mmig/libflac.js>): the web synth's FLAC encoder wrapper | MIT | `web/emu/vendor/libflac/libflac.min.wasm.js`, `LICENSES/MIT-libflac.js.txt` |
+| libFLAC 1.3.4 by Josh Coalson and the Xiph.Org Foundation (<https://github.com/xiph/flac/tree/1.3.4>): compiled into the web synth's FLAC WebAssembly module | BSD 3-Clause | `web/emu/vendor/libflac/libflac.min.wasm.wasm`, `LICENSES/BSD-3-Clause-libFLAC.txt` |
+| wasm-media-encoders 0.7.0 by arseneyr (<https://github.com/arseneyr/wasm-media-encoders>): the web synth's MP3 encoder wrapper | MIT | `web/emu/vendor/mp3/WasmMediaEncoder.min.js`, `LICENSES/MIT-wasm-media-encoders.txt` |
+| LAME by the LAME project (<https://github.com/arseneyr/lame/tree/98db548e8e851defbba3184125ce10725355c332>): compiled into the web synth's separately loaded MP3 WebAssembly module | LGPL-2.0-or-later | `web/emu/vendor/mp3/mp3.wasm`, `LICENSES/LGPL-2.0-LAME.txt`, `LICENSES/LAME-NOTICE.txt` |
 | JieLi AC79 SDK by JieLi Technology: three of its files go into every `.fwsc` package (below); none are in this tree | Apache-2.0 | `LICENSES/Apache-2.0.txt` |
+
+The exact browser-codec versions, source commits, build-source links and binary SHA-256 hashes are recorded in
+`web/emu/vendor/README.md`. The LAME WebAssembly file is loaded as a separate runtime module and can be replaced
+with a compatible build from the cited source. None of these codecs is linked into the FM-1 firmware.
 
 On the device, HOME held > ABOUT opens the information screen; turning PRESETS scrolls on into
 CREDITS, a short list of these authors, licences and source URLs.

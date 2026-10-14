@@ -409,6 +409,8 @@ if command -v node >/dev/null 2>&1; then
     run "web backup: capture, validation before writes, restore order" node web/test_backup.mjs
     run "browser emulator I/O: panel MIDI map, fixed velocity, state validation" node web/emu/io_test.mjs
     run "browser emulator audio export: PCM capture and 24-bit WAV" node web/emu/audio_export_test.mjs
+    run "browser emulator compressed audio: streaming FLAC and MP3 codecs" node web/emu/audio_encode_test.mjs
+    run "browser emulator audio session: synchronous unlock, state and timeout" node web/emu/audio_session_test.mjs
 else
     echo "== skip web tests (no node)"
 fi

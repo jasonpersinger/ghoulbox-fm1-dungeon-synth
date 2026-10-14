@@ -56,8 +56,12 @@ const page = fs.readFileSync(new URL("./index.html", import.meta.url), "utf8");
 const manual = fs.readFileSync(new URL("./tools.html", import.meta.url), "utf8");
 check("the tools box ends with a manual link that preserves the running synth",
   /<p class="tools-manual-link"><a href="tools\.html" target="_blank" rel="noopener">/.test(page));
+check("audio export defaults to FLAC with MP3 and WAV available",
+  /<select id="audio-format"><option value="flac">/.test(page) &&
+  page.includes('<option value="mp3">') && page.includes('<option value="wav">') &&
+  page.includes('from "./audio_encode.js"'));
 check("the manual covers every tool and takes its CC tables from the shared map",
-  ["Quick start", "MIDI", "Portable saves", "Record a WAV", "Focus Mode", "Troubleshooting"].every((x) => manual.includes(x)) &&
+  ["Quick start", "MIDI", "Portable saves", "Record audio", "FLAC", "MP3", "WAV", "Focus Mode", "Troubleshooting"].every((x) => manual.includes(x)) &&
   manual.includes('import { PANEL_BUTTONS, PANEL_KNOBS } from "./emu_io.js"'));
 
 console.log(fails ? `emu io: ${fails} FAILED` : "emu io: all ok");

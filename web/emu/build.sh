@@ -14,7 +14,7 @@ cd "$(dirname "$0")/../.."
 command -v emcc >/dev/null 2>&1 || { echo "emu: no emcc (Emscripten)"; exit 1; }
 VERSION=$(sed -n 's/^#define FELUCCA_VERSION "\([^"]*\)".*/\1/p' firmware/src/felucca.c)
 GBVERSION=$(sed -n 's/^#define GHOULBOX_VERSION "\([^"]*\)".*/\1/p' firmware/src/core.h)   # GHOULBOX: the page shows both
-mkdir -p build/emu/fonts
+mkdir -p build/emu/fonts build/emu/vendor/libflac build/emu/vendor/mp3 build/emu/licenses
 # shellcheck disable=SC2086
 emcc ${EMU_OPT:--O2} -ffp-contract=off -std=gnu99 -w ${EMU_CFLAGS:-} \
     "-DFELUCCA_VERSION=\"$VERSION\"" -Ibuild/gen -Ifirmware/src \
@@ -25,7 +25,13 @@ sed -e "s/@GBVERSION@/$GBVERSION/g" -e "s/@VERSION@/$VERSION/g" -e "s/@PREVIEW@/
 cp web/emu/worklet.js build/emu/
 cp web/emu/emu_io.js build/emu/
 cp web/emu/audio_export.js build/emu/
+cp web/emu/audio_encode.js web/emu/audio_encode_worker.js build/emu/
+cp web/emu/audio_session.js build/emu/
 cp web/emu/tools.html build/emu/
+cp web/emu/vendor/libflac/libflac.min.wasm.js web/emu/vendor/libflac/libflac.min.wasm.wasm build/emu/vendor/libflac/
+cp web/emu/vendor/mp3/WasmMediaEncoder.min.js web/emu/vendor/mp3/mp3.wasm build/emu/vendor/mp3/
+cp web/emu/vendor/README.md build/emu/vendor/
+cp LICENSES/MIT-libflac.js.txt LICENSES/BSD-3-Clause-libFLAC.txt LICENSES/MIT-wasm-media-encoders.txt LICENSES/LGPL-2.0-LAME.txt LICENSES/LAME-NOTICE.txt build/emu/licenses/
 python3 tools/gen_emu_art.py build/gen build/emu/art   # GHOULBOX: the dungeon's pixel art (torch, wall, name)
 cp web/emu/fonts/DotGothic16-subset.woff web/emu/fonts/OFL.txt build/emu/fonts/
 echo "emu: build/emu ($(wc -c < build/emu/felucca.wasm | tr -d ' ') B wasm, GHOULBOX $GBVERSION on Felucca $VERSION)"

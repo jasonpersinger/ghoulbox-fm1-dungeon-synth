@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
 <title>Web Synth Tools Manual · GHOULBOX</title>
-<meta name="description" content="Instructions for MIDI control, portable saves, WAV recording and Focus Mode in the GHOULBOX web synthesizer.">
+<meta name="description" content="Instructions for MIDI control, portable saves, FLAC, MP3 and WAV recording, and Focus Mode in the GHOULBOX web synthesizer.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22/%3E%3Crect x=%224%22 y=%224%22 width=%228%22 height=%228%22 fill=%22%23fff%22/%3E%3C/svg%3E">
 <style>
 @font-face { font-family: "DotGothic16"; src: url("fonts/DotGothic16-subset.woff") format("woff"); font-display: swap; }
@@ -87,7 +87,7 @@ td:first-child { color: #fff5e4; font-family: ui-monospace, monospace; }
 <header class="hero">
   <img src="art/skull.png" alt="">
   <div><p class="eyebrow">Field notes · GHOULBOX 2.1</p><h1>Web Synth Tools</h1>
-    <p class="subtitle">MIDI control, portable saves, live WAV recording and a screen-only performance view.</p></div>
+    <p class="subtitle">MIDI control, portable saves, live audio export and a screen-only performance view.</p></div>
   <a class="back" href="./">← Return to the synth</a>
 </header>
 
@@ -142,22 +142,28 @@ td:first-child { color: #fff5e4; font-family: ui-monospace, monospace; }
 </section>
 
 <section class="panel" id="audio" data-rune="IV">
-  <h2>Record a WAV</h2>
+  <h2>Record audio</h2>
   <ol class="steps">
-    <li>Switch on the synth, prepare the sound or project, and press <strong>Record WAV</strong>.</li>
+    <li>Switch on the synth, prepare the sound or project, then choose <strong>FLAC</strong>, <strong>MP3</strong> or <strong>WAV</strong> from the Format menu.</li>
+    <li>Press <strong>Record FLAC</strong>, <strong>Record MP3</strong> or <strong>Record WAV</strong>. The label follows the selected format.</li>
     <li>Perform with the drawn panel, computer keyboard or MIDI controller. The recorder captures the final stereo mix: instruments, effects, ambience and the metronome click.</li>
-    <li>Press <strong>Stop &amp; download</strong>. Your browser saves a timestamped, 24-bit stereo <code>.wav</code> file.</li>
+    <li>Press <strong>Stop &amp; download</strong>. Wait for the finishing message; your browser then saves a timestamped file.</li>
   </ol>
+  <div class="table-wrap"><table><thead><tr><th>Format</th><th>Use it for</th><th>Details</th></tr></thead><tbody>
+    <tr><td>FLAC</td><td>Lossless masters and archiving</td><td>The default. Preserves the 24-bit stereo recording without MP3 loss, usually in a smaller file than WAV.</td></tr>
+    <tr><td>MP3</td><td>Sharing and convenient playback</td><td>High-quality variable bitrate. Much smaller, but lossy; keep a FLAC or WAV when the master matters.</td></tr>
+    <tr><td>WAV</td><td>Original PCM and broad editor compatibility</td><td>Uncompressed 24-bit stereo PCM. It is also the automatic safety format if compressed encoding fails.</td></tr>
+  </tbody></table></div>
   <p>The timer advances as audio chunks are secured. The meter shows the highest level reached, in dBFS. If it turns red or the completion message reports clipping, lower MASTER or the track levels and record again.</p>
-  <div class="note"><strong>Local and live:</strong> audio is encoded entirely in this browser and is never uploaded. Recording captures a performance in real time; it does not render a saved project automatically.</div>
-  <div class="warning"><strong>Ten-minute limit:</strong> recording stops and downloads automatically at ten minutes. A maximum-length file uses roughly 151 MiB at 44.1 kHz or 165 MiB at 48 kHz, plus temporary browser overhead. On a phone or low-memory device, make shorter takes. Do not close or reload the tab before stopping.</div>
-  <p>There is currently no pause, MP3 or FLAC export. Convert the WAV afterward if you need a compressed delivery copy; keep the WAV as the lossless master.</p>
+  <div class="note"><strong>Local, live and recoverable:</strong> audio is encoded entirely in a background worker in this browser and is never uploaded. Recording captures a performance in real time; it does not render a saved project automatically. If the selected compressed encoder cannot start or finish, GHOULBOX keeps the take and downloads it as WAV instead.</div>
+  <div class="warning"><strong>Ten-minute limit:</strong> recording stops and downloads automatically at ten minutes. GHOULBOX retains original PCM during compressed recording so it can make the WAV fallback. A maximum-length take represents roughly 151 MiB at 44.1 kHz or 165 MiB at 48 kHz, plus browser and encoder overhead. On a phone or low-memory device, make shorter takes. Do not close or reload the tab before the download begins.</div>
+  <p>FLAC and MP3 use self-hosted WebAssembly encoders, so the result does not depend on the browser providing those codecs. FLAC encoding is provided by libFLAC through libflac.js; MP3 encoding is provided by LAME through wasm-media-encoders. Source and licence details are in the project’s <a href="https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/blob/ghoulbox/LICENSING.md">licensing notes</a>.</p>
 </section>
 
 <section class="panel" id="display" data-rune="V">
   <h2>Focus Mode</h2>
   <p>Press <strong>Focus screen</strong>, or click the FM-1 screen itself, to hide the panel and place the 240 × 240 display against black. This is useful on a phone beside a MIDI keyboard, for projection, or when recording clean screen footage.</p>
-  <ul><li>Click or tap the enlarged screen to return.</li><li>On a keyboard, press <kbd>Esc</kbd> to return.</li><li>Audio, playback and MIDI continue while the panel is hidden.</li><li>If a WAV recording is running, leave Focus Mode before pressing Stop.</li></ul>
+  <ul><li>Click or tap the enlarged screen to return.</li><li>On a keyboard, press <kbd>Esc</kbd> to return.</li><li>Audio, playback and MIDI continue while the panel is hidden.</li><li>If a recording is running, leave Focus Mode before pressing Stop.</li></ul>
 </section>
 
 <section class="panel" id="trouble" data-rune="VI">
@@ -169,6 +175,9 @@ td:first-child { color: #fff5e4; font-family: ui-monospace, monospace; }
     <div class="mini"><h3>No downloaded file</h3><p>Check the browser’s download indicator and permission settings. On mobile, the file may appear in the system Files or Downloads app.</p></div>
     <div class="mini"><h3>Import is refused</h3><p>Use an unedited state file exported by this emulator. A hardware-editor backup is a different format and cannot be imported here.</p></div>
     <div class="mini"><h3>The recording clipped</h3><p>Reduce MASTER or individual track levels until the peak stays below 0 dBFS, then make another take.</p></div>
+    <div class="mini"><h3>I received a WAV instead</h3><p>The selected FLAC or MP3 encoder could not complete, so GHOULBOX preserved the take in its original PCM safety format. The status line includes the encoder error.</p></div>
+    <div class="mini"><h3>Finishing takes time</h3><p>Keep the tab open while the encoder closes the file and the browser prepares the download. Longer recordings and slower phones take more time.</p></div>
+    <div class="mini"><h3>No sound on iPhone or iPad</h3><p>If the synth reports that audio was paused or interrupted, tap <strong>Resume audio</strong>. After locking the device or changing apps, you may need to tap it again. If a Home Screen web app remains silent, open GHOULBOX in a regular Safari tab and switch it on there.</p></div>
   </div>
   <p class="privacy">Preferences, saves, recovery data and recorded audio stay on the device running the browser. Only the files you explicitly download leave browser storage.</p>
 </section>

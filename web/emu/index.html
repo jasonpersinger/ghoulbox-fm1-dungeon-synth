@@ -106,6 +106,15 @@ a { color: inherit; }
 .start button { font: inherit; font-size: 18px; padding: 12px 28px; background: #fff; color: #000; border: 0; cursor: pointer; }
 .start button:disabled { opacity: .4; cursor: progress; }
 .start p { margin: 0; max-width: 32em; text-align: center; color: #fff; }
+.audio-recovery { position: absolute; z-index: 4; left: 50%; top: 3%; transform: translateX(-50%); box-sizing: border-box;
+                  display: flex; align-items: center; gap: 12px; width: max-content; max-width: 92%; padding: 9px 10px 9px 14px;
+                  color: var(--bone); background: rgba(8, 8, 8, .94); border: 1px solid #6b4513;
+                  box-shadow: 0 0 0 2px #000, 0 0 0 3px var(--edge), 0 8px 24px rgba(0, 0, 0, .55); }
+.audio-recovery[hidden] { display: none; }
+.audio-recovery p { margin: 0; text-align: left; }
+.audio-recovery button { flex: 0 0 auto; min-height: 44px; padding: 8px 13px; border: 0; color: var(--night); background: var(--amber);
+                         font: 700 13px/1.2 DotGothic16, monospace; cursor: pointer; box-shadow: inset 0 -3px rgba(0, 0, 0, .32); }
+.audio-recovery button:disabled { opacity: .55; cursor: progress; }
 .keys, .utility, footer { margin-top: 22px; color: var(--bone); text-align: center; }
 a { color: var(--amber); }
 .keys span { white-space: nowrap; margin: 0 8px; }
@@ -129,6 +138,8 @@ footer small { font-size: 11px; opacity: .8; }
 .utility .primary { color: var(--night); background: var(--amber); font-weight: 700; }
 .recorder { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 5px 8px;
             border: 1px solid rgba(239, 223, 198, .2); background: rgba(0, 0, 0, .2); }
+.record-format { display: inline-flex; align-items: center; gap: 6px; color: #b9ac99; font-size: 12px; }
+.record-format select { min-height: 30px; padding: 4px 7px; }
 .recorder .record { color: #ffd9d2; border-color: #7c2c24; }
 .recorder.recording .record { color: #fff; background: #8f2018; border-color: #ff8c7f; }
 .recorder.recording .rec-dot { animation: rec-pulse 1.1s steps(2, end) infinite; }
@@ -159,6 +170,7 @@ body.focus-mode .device { width: 100vw; height: 100vh; aspect-ratio: auto !impor
 body.focus-mode .device canvas { position: fixed; left: 50% !important; top: 50% !important;
                                  width: min(100vw, 100vh) !important; height: min(100vw, 100vh) !important;
                                  transform: translate(-50%, -50%); cursor: zoom-out; }
+body.focus-mode .audio-recovery { position: fixed; top: max(16px, env(safe-area-inset-top)); }
 </style>
 </head>
 <body>
@@ -179,6 +191,9 @@ body.focus-mode .device canvas { position: fixed; left: 50% !important; top: 50%
   <svg id="panel" viewBox="0 0 1000 624" aria-hidden="true"></svg>
   <canvas id="screen" width="240" height="240" role="button" tabindex="0" aria-label="Screen; enter Focus Mode"></canvas>
   <div class="start" id="start"><button id="go" type="button">Switch on</button><p id="status" hidden></p></div>
+  <div class="audio-recovery" id="audio-recovery" hidden>
+    <p id="audio-recovery-status" role="status" aria-live="polite">Audio is paused.</p><button id="audio-resume" type="button">Resume audio</button>
+  </div>
 </div>
 <div class="torch r" aria-hidden="true"></div>
 </div>
@@ -198,12 +213,13 @@ body.focus-mode .device canvas { position: fixed; left: 50% !important; top: 50%
     <label>Knobs <select id="midi-knob-mode"><option value="absolute">Absolute 0–127</option><option value="relative">Relative 1 / 127</option></select></label>
     <label>Velocity <select id="midi-velocity"><option value="0">Keyboard velocity</option><option value="64">Fixed 64</option><option value="80">Fixed 80</option><option value="96">Fixed 96</option><option value="100">Fixed 100 (FM-1 keys)</option><option value="112">Fixed 112</option><option value="127">Fixed 127</option></select></label>
     <div class="recorder" id="recorder">
-      <button type="button" id="audio-record" class="record" aria-pressed="false" disabled><span class="rec-dot" aria-hidden="true"></span>Record WAV</button>
+      <label class="record-format">Format <select id="audio-format"><option value="flac">FLAC · lossless</option><option value="mp3">MP3 · sharing</option><option value="wav">WAV · original PCM</option></select></label>
+      <button type="button" id="audio-record" class="record" aria-pressed="false" disabled><span class="rec-dot" aria-hidden="true"></span><span class="record-label">Record FLAC</span></button>
       <button type="button" id="audio-stop" disabled>Stop &amp; download</button>
       <span class="rec-clock" id="rec-clock" aria-label="Recording time">00:00</span>
       <span class="rec-meter" id="rec-meter" aria-hidden="true"></span>
       <span class="rec-peak" id="rec-peak">−∞ dBFS</span>
-      <p class="rec-help">24-bit stereo · up to 10 minutes · captures everything heard, including the click · processed only in this browser</p>
+      <p class="rec-help">FLAC lossless · MP3 high-quality VBR · WAV original 24-bit PCM · up to 10 minutes · processed only in this browser</p>
     </div>
     <button type="button" id="state-export" class="primary" disabled>Export state</button>
     <button type="button" id="state-import" disabled>Import state</button>
@@ -232,7 +248,9 @@ import {
   PANEL_BUTTONS, PANEL_KNOBS, base64ToBytes, bytesToBase64, fixedVelocityMessage,
   makeEmulatorState, panelCcAction, panelNoteAction, readEmulatorState, stateCrc,
 } from "./emu_io.js";
+import { AUDIO_FORMATS, StreamingAudioEncoder } from "./audio_encode.js";
 import { WAV_FRAME_BYTES, recordingTime, wavHeader } from "./audio_export.js";
+import { resumeAudio, withTimeout } from "./audio_session.js";
 
 const NS = "http://www.w3.org/2000/svg";
 // panel.c's labels (bit = label) and encoder roles
@@ -304,7 +322,7 @@ function label(parent, x, y, s, size, font = SANS, ink = "var(--label)") {
 const KEYNAMES = ["F", "F♯", "G", "G♯", "A", "A♯", "B", "C", "C♯", "D", "D♯", "E"];
 const keyName = (k) => KEYNAMES[k % 12] + (3 + Math.floor((k + 5) / 12));
 
-let node = null, btnMask = 0, keyMask = 0, latched = 0, masterValue = 700, lastLeds = [0, 0, 0, 0, 0], layout = null;
+let audioContext = null, node = null, btnMask = 0, keyMask = 0, latched = 0, masterValue = 700, lastLeds = [0, 0, 0, 0, 0], layout = null;
 let requestId = 0, toolBusy = false, recording = null;
 const requests = new Map(), midiLast = new Map(), midiDiverted = new Set();
 const angle = Object.fromEntries(KNOBS.map((n) => [n, 0]));
@@ -677,6 +695,7 @@ const toolStatus = document.getElementById("tool-status"), stateExport = documen
 const stateImport = document.getElementById("state-import"), stateRecover = document.getElementById("state-recover");
 const stateFile = document.getElementById("state-file"), focusButton = document.getElementById("focus-mode");
 const recorder = document.getElementById("recorder"), audioRecord = document.getElementById("audio-record");
+const audioFormat = document.getElementById("audio-format"), recordLabel = audioRecord.querySelector(".record-label");
 const audioStop = document.getElementById("audio-stop"), recClock = document.getElementById("rec-clock");
 const recMeter = document.getElementById("rec-meter"), recPeak = document.getElementById("rec-peak");
 const toolSay = (s) => { toolStatus.textContent = s || ""; };
@@ -684,7 +703,8 @@ function toolsReady() {
   const busy = toolBusy || !!recording;
   stateExport.disabled = stateImport.disabled = busy || !node;
   audioRecord.disabled = toolBusy || !!recording || !node;
-  audioStop.disabled = !recording || recording.stopping;
+  audioFormat.disabled = busy;
+  audioStop.disabled = !recording?.active || recording.stopping;
   try { stateRecover.disabled = busy || !localStorage.getItem(RECOVERY); }
   catch { stateRecover.disabled = true; }
 }
@@ -766,15 +786,56 @@ function recordDisplay(frames = 0, rate = 44100, peak = 0, clipped = 0) {
   recPeak.textContent = peak > 0 ? `${(20 * Math.log10(peak)).toFixed(1)} dBFS` : "−∞ dBFS";
   recorder.classList.toggle("clipped", clipped > 0);
 }
+function formatName(format) { return AUDIO_FORMATS[format]?.label || "audio"; }
+function setRecordLabel() { recordLabel.textContent = `Record ${formatName(audioFormat.value)}`; }
+function wavBlob(take) {
+  return new Blob([wavHeader(take.rate, take.frames), ...take.wavParts], { type: AUDIO_FORMATS.wav.type });
+}
+function encoderFailed(take, error) {
+  if (take !== recording || take.encodingFailed) return;
+  take.encodingFailed = error?.message || String(error);
+  take.encoder?.close();
+  take.format = "wav";
+  toolSay(`Compressed encoder failed; this take is safely continuing as WAV. ${take.encodingFailed}`);
+}
+async function completeRecording(take, message) {
+  let blob, fallback = "";
+  try {
+    if (take.failed || take.frames !== message.frames) throw new Error(take.failed || "audio chunks were lost");
+    if (!take.frames) { take.encoder?.close(); toolSay("Nothing was recorded."); return; }
+    if (take.encoder && !take.encodingFailed) {
+      try { blob = await take.encoder.finish(); }
+      catch (error) { encoderFailed(take, error); }
+    }
+    if (!blob) {
+      blob = wavBlob(take);
+      fallback = take.requested !== "wav" ? ` WAV fallback saved: ${take.encodingFailed || "compressed encoding was unavailable"}.` : "";
+    }
+    const info = AUDIO_FORMATS[take.format], stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    downloadBlob(`GHOULBOX-recording-${stamp}.${info.extension}`, blob);
+    const clipped = take.clipped ? ` Warning: ${take.clipped} sample${take.clipped === 1 ? "" : "s"} clipped.` : "";
+    const limit = message.reason === "limit" ? `${Math.round(take.maxSeconds / 60)}-minute limit reached. ` : "";
+    toolSay(`${limit}${info.label} saved: ${recordingTime(take.frames, take.rate)}, ${(blob.size / 1048576).toFixed(1)} MB.${fallback}${clipped}`);
+  } catch (error) {
+    take.encoder?.close();
+    toolSay("Recording failed: " + (error?.message || error));
+  } finally {
+    if (recording === take) recording = null;
+    toolsReady();
+  }
+}
 function recordingMessage(m) {
   if (m.type === "record-started") {
     if (!recording) return true;
+    if (recording.encoder && recording.rate !== m.rate) encoderFailed(recording, new Error("Audio sample rate changed"));
     recording.rate = m.rate;
     recording.maxSeconds = m.maxSeconds;
     recording.active = true;
     recorder.classList.add("recording");
     audioRecord.setAttribute("aria-pressed", "true");
-    toolSay(`Recording 24-bit WAV locally — maximum ${Math.round(m.maxSeconds / 60)} minutes.`);
+    toolSay(recording.encodingFailed
+      ? `Recording WAV fallback locally — ${formatName(recording.requested)} unavailable: ${recording.encodingFailed}`
+      : `Recording ${formatName(recording.format)} locally — maximum ${Math.round(m.maxSeconds / 60)} minutes.`);
     toolsReady();
     return true;
   }
@@ -784,7 +845,11 @@ function recordingMessage(m) {
         m.frames <= 0 || m.bytes.length !== m.frames * WAV_FRAME_BYTES) {
       recording.failed = "The audio recorder returned an invalid chunk";
     } else {
-      recording.chunks.push(m.bytes);
+      recording.wavParts.push(new Blob([m.bytes]));
+      if (recording.encoder && !recording.encodingFailed) {
+        try { recording.encoder.encode(m.bytes, m.frames); }
+        catch (error) { encoderFailed(recording, error); }
+      }
       recording.frames += m.frames;
       recording.peak = Math.max(recording.peak, m.peak || 0);
       recording.clipped = m.clipped || 0;
@@ -795,28 +860,18 @@ function recordingMessage(m) {
   if (m.type === "record-stopped") {
     if (!recording) return true;
     const take = recording;
-    recording = null;
+    take.active = false; take.finishing = true;
     recorder.classList.remove("recording");
     audioRecord.setAttribute("aria-pressed", "false");
     take.peak = m.peak || 0; take.clipped = m.clipped || 0;
     recordDisplay(take.frames, take.rate, take.peak, take.clipped);
     toolsReady();
-    if (take.failed || take.frames !== m.frames) {
-      toolSay("Recording failed: " + (take.failed || "audio chunks were lost"));
-      return true;
-    }
-    if (!take.frames) { toolSay("Nothing was recorded."); return true; }
-    try {
-      const blob = new Blob([wavHeader(take.rate, take.frames), ...take.chunks], { type: "audio/wav" });
-      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-      downloadBlob(`GHOULBOX-recording-${stamp}.wav`, blob);
-      const clipped = take.clipped ? ` Warning: ${take.clipped} sample${take.clipped === 1 ? "" : "s"} clipped.` : "";
-      const limit = m.reason === "limit" ? `${Math.round(take.maxSeconds / 60)}-minute limit reached. ` : "";
-      toolSay(`${limit}WAV saved: ${recordingTime(take.frames, take.rate)}, ${(blob.size / 1048576).toFixed(1)} MB.${clipped}`);
-    } catch (err) { toolSay("Could not create the WAV: " + (err && err.message || err)); }
+    toolSay(`Finishing ${formatName(take.format)}…`);
+    void completeRecording(take, m);
     return true;
   }
   if (m.type === "record-error") {
+    recording?.encoder?.close();
     recording = null;
     recorder.classList.remove("recording");
     audioRecord.setAttribute("aria-pressed", "false");
@@ -825,10 +880,21 @@ function recordingMessage(m) {
   }
   return false;
 }
-audioRecord.addEventListener("click", () => {
+audioFormat.addEventListener("change", setRecordLabel);
+audioRecord.addEventListener("click", async () => {
   if (!node || recording) return;
-  recording = { chunks: [], frames: 0, rate: 44100, peak: 0, clipped: 0, active: false, stopping: false };
+  const requested = audioFormat.value;
+  const take = recording = { wavParts: [], frames: 0, rate: Math.round(audioContext.sampleRate), peak: 0, clipped: 0,
+                             requested, format: requested, encoder: null, active: false, stopping: false };
   recordDisplay(); toolsReady();
+  if (requested !== "wav") {
+    toolSay(`Preparing the ${formatName(requested)} encoder…`);
+    try {
+      take.encoder = await StreamingAudioEncoder.open(requested, take.rate);
+      take.encoder.onfailure = (error) => encoderFailed(take, error);
+    } catch (error) { encoderFailed(take, error); }
+  }
+  if (recording !== take || !node) { take.encoder?.close(); return; }
   node.port.postMessage({ type: "record-start" });
 });
 audioStop.addEventListener("click", () => {
@@ -839,6 +905,7 @@ audioStop.addEventListener("click", () => {
 addEventListener("beforeunload", (e) => {
   if (recording) { e.preventDefault(); e.returnValue = ""; }
 });
+setRecordLabel();
 
 for (const x of [...PANEL_KNOBS, ...PANEL_BUTTONS]) {
   const tr = document.createElement("tr"), td1 = document.createElement("td"), td2 = document.createElement("td"), td3 = document.createElement("td");
@@ -863,6 +930,50 @@ toolsReady();
 // ------------------------------------------------------------------ switching on
 const status = document.getElementById("status");
 const say = (t) => { status.textContent = t; status.hidden = !t; };
+const audioRecovery = document.getElementById("audio-recovery");
+const audioRecoveryStatus = document.getElementById("audio-recovery-status");
+const audioResume = document.getElementById("audio-resume");
+function audioRecoveryState(message = "") {
+  const needsGesture = !!audioContext && !!node && audioContext.state !== "running";
+  audioRecovery.hidden = !message && (!needsGesture || document.hidden);
+  if (audioRecovery.hidden) return;
+  audioRecoveryStatus.textContent = message || (audioContext.state === "interrupted"
+    ? "Audio was interrupted by the device."
+    : audioContext.state === "closed" ? "The browser ended this audio session."
+    : "Audio is paused by the browser.");
+  audioResume.textContent = audioContext.state === "closed" ? "Reload synth" : "Resume audio";
+  audioResume.disabled = false;
+}
+function discardAudio() {
+  const oldContext = audioContext, oldNode = node;
+  audioContext = null;
+  node = null;
+  if (oldNode) {
+    oldNode.port.onmessage = null;
+    try { oldNode.disconnect(); } catch { /* it was never connected */ }
+  }
+  if (oldContext) {
+    oldContext.onstatechange = null;
+    if (oldContext.state !== "closed") oldContext.close().catch(() => {});
+  }
+  audioRecoveryState();
+}
+audioResume.addEventListener("click", async () => {
+  const ac = audioContext;
+  if (!ac || !node) return;
+  if (ac.state === "closed") { location.reload(); return; }
+  audioResume.disabled = true;
+  audioRecoveryStatus.textContent = "Waking audio…";
+  try {
+    await resumeAudio(ac);
+    send({ type: "visible", on: !document.hidden });
+    audioRecoveryState();
+  } catch (error) {
+    audioResume.disabled = false;
+    audioRecoveryState("Audio did not resume. Tap again, or reload this page in a regular Safari tab.");
+    console.warn("GHOULBOX: could not resume audio", error);
+  }
+});
 async function switchOn() {
   const go = document.getElementById("go");
   go.disabled = true;
@@ -870,13 +981,19 @@ async function switchOn() {
   try {
     const runtime = pendingRuntime();
     const ac = new AudioContext({ sampleRate: 44100, latencyHint: "interactive" });
-    const [wasm] = await Promise.all([
+    audioContext = ac;
+    ac.onstatechange = () => { if (ac === audioContext) audioRecoveryState(); };
+    // resumeAudio calls resume() and starts its silent source now, while this click still has user activation.
+    const unlocked = resumeAudio(ac);
+    const [wasm] = await withTimeout(Promise.all([
       fetch("felucca.wasm").then((r) => { if (!r.ok) throw new Error(`felucca.wasm: ${r.status}`); return r.arrayBuffer(); }),
-      ac.audioWorklet.addModule("worklet.js")]);
+      ac.audioWorklet.addModule("worklet.js"),
+      unlocked,
+    ]), 15000, "The audio engine files took too long to load");
     node = new AudioWorkletNode(ac, "felucca", { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
     node.connect(ac.destination);
     let warned = false;
-    await new Promise((res, rej) => {
+    await withTimeout(new Promise((res, rej) => {
       node.port.onmessage = (e) => {
         const m = e.data;
         if (recordingMessage(m)) {
@@ -899,8 +1016,7 @@ async function switchOn() {
         }
       };
       node.port.postMessage({ type: "load", wasm, sectors: loadFlash(), runtime, master: masterValue }, [wasm]);
-    });
-    await ac.resume();
+    }), 10000, "The audio engine did not finish starting");
     document.getElementById("start").hidden = true;
     go.textContent = "On";
     if (ac.sampleRate !== 44100) console.warn(`Felucca: the browser plays at ${ac.sampleRate} Hz, the pitch is off by ${(1200 * Math.log2(ac.sampleRate / 44100)).toFixed(0)} cents.`);
@@ -910,7 +1026,7 @@ async function switchOn() {
     toolsReady();
     midiOn();
   } catch (err) {
-    node = null;
+    discardAudio();
     toolsReady();
     go.disabled = false;
     go.textContent = "Switch on";
@@ -918,7 +1034,11 @@ async function switchOn() {
   }
 }
 document.getElementById("go").addEventListener("click", switchOn);
-document.addEventListener("visibilitychange", () => send({ type: "visible", on: !document.hidden }));
+document.addEventListener("visibilitychange", () => {
+  send({ type: "visible", on: !document.hidden });
+  if (!document.hidden) audioRecoveryState();
+});
+addEventListener("pageshow", () => audioRecoveryState());
 </script>
 </body>
 </html>
