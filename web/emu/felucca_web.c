@@ -443,11 +443,42 @@ static uint32_t led_keys(const uint8_t *l)
         m |= led_on(l, 14u + k) << k;
     return m;
 }
+
+/* The hardware lights the key that was physically pressed; in the browser, also light the visible keys of the
+ * chord that press generated. Keep this overlay here rather than in ui_input.c so physical FM-1 behaviour is
+ * unchanged. kb_chord / kb_chord2 contain the notes actually started, so MONO, kits, voicings and notes clipped at
+ * the MIDI limits need no special cases. As play_leds does, use the lowest key when quantisation maps several keys
+ * to the same note, and omit chord tones outside the drawn keyboard. */
+static uint32_t web_note_key(const track_t *t, uint32_t note)
+{
+    uint32_t k;
+    for (k = 0; k < 27u; k++)
+        if (kb_map(t, k) == note)
+            return 1u << k;
+    return 0;
+}
+static uint32_t web_chord_keys(void)
+{
+    uint32_t held = web_key_mask & ~kb_layer, k, i, m = 0;
+    if (keys_own())
+        return 0;                                      /* do not draw over a layer, grid, NAME or SLICES map */
+    for (k = 0; k < 27u; k++) {
+        if (!((held >> k) & 1u))
+            continue;
+        if (kb_chn[k] > 1u)
+            for (i = 0; i < kb_chn[k]; i++)
+                m |= web_note_key(&trk[kb_trk[k] % NTRK], kb_chord[k][i]);
+        if (kb_trk2[k] && kb_chn2[k] > 1u)
+            for (i = 0; i < kb_chn2[k]; i++)
+                m |= web_note_key(&trk[(kb_trk2[k] - 1u) % NTRK], kb_chord2[k][i]);
+    }
+    return m;
+}
 EXPORT uint32_t web_lit_buttons(void)
 {
     return led_buttons(fm1_led) | ((fm1_led[LED_PLAY_GREEN >> 3] >> (LED_PLAY_GREEN & 7u)) & 1u) << 14;
 }
-EXPORT uint32_t web_lit_keys(void) { return led_keys(fm1_led); }
+EXPORT uint32_t web_lit_keys(void) { return led_keys(fm1_led) | web_chord_keys(); }
 EXPORT uint32_t web_dim_buttons(void) { return led_buttons(fm1_led_dim); }
 EXPORT uint32_t web_dim_keys(void) { return led_keys(fm1_led_dim); }
 EXPORT uint32_t web_dim_level(void) { return web_dim_lo; }
