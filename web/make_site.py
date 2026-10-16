@@ -87,8 +87,9 @@ def main(pkg, version, out):
                    check=True)
     fw_dir = out / "firmwares"                      # GHOULBOX: the FM-1 firmwares directory
     shutil.rmtree(fw_dir, ignore_errors=True)
-    shutil.copytree(HERE / "firmwares", fw_dir, ignore=shutil.ignore_patterns("audio-README.txt"))
-    (fw_dir / "audio").mkdir(exist_ok=True)
+    (fw_dir / "audio").mkdir(parents=True)          # (only the page's own files: drafts or notes kept beside them
+    for f in ("index.html", "firmwares.json", "catalog-snapshot.json"):   # in web/firmwares are never published)
+        shutil.copy(HERE / "firmwares" / f, fw_dir / f)
     shutil.copy(HERE / "firmwares" / "audio-README.txt", fw_dir / "audio" / "README.txt")
     emu = root / "build/emu"
     if (emu / "felucca.wasm").exists():
