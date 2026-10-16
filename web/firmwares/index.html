@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FM-1 Firmwares · GHOULBOX</title>
+  <meta name="description" content="A directory of free, open-source replacement firmwares for the M-VAVE FM-1 synthesizer.">
+  <meta name="theme-color" content="#080808">
+  <style>
+    :root {
+      --bone: #efdfc6;    /* main text */
+      --amber: #ef9a29;   /* links, highlights */
+      --ember: #ef4d42;   /* accents */
+      --night: #080808;   /* page background colour */
+      --plaque: rgba(8, 8, 8, .86);   /* card background */
+      color-scheme: dark;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: dark;
+      background-color: var(--night);
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background-color: var(--night);
+      background-image:
+        radial-gradient(ellipse 75% 70% at 50% 40%, transparent 35%, rgba(0, 0, 0, .78) 100%),
+        url("../webapp/art/wall.png");
+      background-size: 100% 100%, 256px 128px;
+      background-repeat: no-repeat, repeat;
+      background-attachment: fixed, fixed;
+      image-rendering: pixelated;
+      color: var(--bone);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: var(--amber);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      transition: color 0.12s ease;
+    }
+
+    a:hover {
+      color: #ffb752;
+    }
+
+    a:focus-visible, button:focus-visible {
+      outline: 2px solid var(--amber);
+      outline-offset: 3px;
+    }
+
+    .wrap {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 36px 20px 64px;
+    }
+
+    header {
+      margin-bottom: 36px;
+    }
+
+    .back-wrap {
+      margin: 0 0 20px 0;
+      font-size: 14px;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--amber);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    h1 {
+      margin: 0 0 16px 0;
+      font-size: clamp(32px, 5vw, 48px);
+      line-height: 1.15;
+      font-weight: 800;
+      color: var(--bone);
+      letter-spacing: -0.5px;
+      text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.9),
+        0 0 4px rgba(0, 0, 0, 0.8),
+        0 4px 12px rgba(0, 0, 0, 0.95);
+    }
+
+    .lead {
+      font-size: 17.5px;
+      line-height: 1.6;
+      max-width: 46em;
+      margin: 0 0 14px 0;
+      color: var(--bone);
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+    }
+
+    .hub-credit {
+      font-size: 14.5px;
+      line-height: 1.6;
+      max-width: 48em;
+      margin: 0;
+      color: rgba(239, 223, 198, 0.82);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+    }
+
+    /* Grid & Cards */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
+      gap: 32px 28px;
+      margin: 36px 0 54px;
+    }
+
+    .card {
+      background: var(--plaque);
+      box-shadow: 0 0 0 2px #6b4513, 0 0 0 4px #000, 0 0 0 6px #3a3a3e;
+      padding: 24px 20px 20px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .card-head {
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      margin: 0 0 4px 0;
+      font-size: 21px;
+      line-height: 1.25;
+      font-weight: 700;
+      color: var(--bone);
+      letter-spacing: -0.2px;
+      text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.9),
+        0 0 3px rgba(0, 0, 0, 0.8);
+    }
+
+    .card-author {
+      font-size: 13.5px;
+      color: rgba(239, 223, 198, 0.72);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    }
+
+    .card-desc {
+      margin: 0 0 20px 0;
+      font-size: 15px;
+      line-height: 1.5;
+      color: var(--bone);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+      flex-grow: 1;
+    }
+
+    /* Audio section */
+    .card-audio {
+      margin-top: auto;
+      padding-top: 14px;
+      margin-bottom: 16px;
+      border-top: 1px solid rgba(239, 223, 198, 0.12);
+    }
+
+    .audio-player {
+      width: 100%;
+      height: 34px;
+      display: block;
+      accent-color: var(--amber);
+    }
+
+    .audio-credit {
+      margin-top: 6px;
+      font-size: 12px;
+      color: rgba(239, 223, 198, 0.65);
+    }
+
+    .sample-soon {
+      display: inline-block;
+      font-size: 12.5px;
+      font-style: italic;
+      color: rgba(239, 223, 198, 0.55);
+      letter-spacing: 0.02em;
+    }
+
+    /* Buttons */
+    .card-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .slab-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 9px 14px;
+      background-color: var(--amber);
+      color: #080808;
+      font-size: 13.5px;
+      font-weight: 700;
+      text-decoration: none;
+      border: 0;
+      cursor: pointer;
+      line-height: 1;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+      transition: filter 0.1s ease, transform 0.08s ease;
+    }
+
+    .slab-btn:hover {
+      filter: brightness(1.12);
+      transform: translateY(-1px);
+      text-decoration: none;
+      color: #080808;
+    }
+
+    .slab-btn:active {
+      transform: translateY(1px);
+    }
+
+    .slab-btn.emu {
+      background-color: #f7a93b;
+    }
+
+    /* Loading & Error States */
+    .status-msg {
+      padding: 32px 20px;
+      text-align: center;
+      font-size: 17px;
+      color: var(--bone);
+      background: var(--plaque);
+      box-shadow: 0 0 0 2px #6b4513, 0 0 0 4px #000, 0 0 0 6px #3a3a3e;
+      margin: 40px auto;
+      max-width: 500px;
+    }
+
+    .status-msg.error {
+      color: var(--ember);
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid rgba(239, 223, 198, 0.16);
+      padding-top: 28px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: rgba(239, 223, 198, 0.72);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+    }
+
+    footer p {
+      margin: 0 0 10px 0;
+    }
+
+    footer p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 600px) {
+      .wrap {
+        padding: 24px 16px 48px;
+      }
+      .grid {
+        grid-template-columns: 1fr;
+        gap: 28px;
+      }
+      .card {
+        padding: 20px 16px 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <p class="back-wrap">
+        <a href="../" class="back-link">&larr; Back to GHOULBOX</a>
+      </p>
+      <h1>FM-1 Firmwares</h1>
+      <p class="lead">
+        A directory of free, open-source replacement firmwares for the M-VAVE FM-1 synthesizer.
+        Discover community creations, browse source code, test instruments directly in your browser, and listen to sound previews.
+      </p>
+      <p class="hub-credit">
+        Listings sourced from the <a href="https://fm1.designburgapps.com" target="_blank" rel="noopener">FM-1 Firmware Hub</a> by Sven Trogus.
+        To install, switch, or backup firmwares on your FM-1, connect your device via USB in Chrome or Edge and use the Firmware Hub.
+      </p>
+    </header>
+
+    <main id="firmwares-container">
+      <div id="status" class="status-msg">Loading firmware catalog...</div>
+      <div id="grid" class="grid" hidden></div>
+    </main>
+
+    <footer>
+      <p>
+        List from the FM-1 Firmware Hub catalog, fetched October 12, 2026. Each firmware belongs to its authors; links go to their own pages. Not affiliated with M-VAVE.
+      </p>
+      <p>
+        Are you a firmware author? To request corrections or send a sound sample, please open an issue at
+        <a href="https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/issues" target="_blank" rel="noopener">github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/issues</a>.
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      const statusEl = document.getElementById('status');
+      const gridEl = document.getElementById('grid');
+
+      function safeUrl(u) {                 // only https links from the data (and relative audio paths)
+        return typeof u === 'string' && /^https:\/\//.test(u) ? u : null;
+      }
+
+      function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      fetch('firmwares.json')
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error('Failed to load firmware data: HTTP ' + response.status);
+          }
+          return response.json();
+        })
+        .then(function (data) {
+          if (!Array.isArray(data) || data.length === 0) {
+            statusEl.textContent = 'No firmwares found.';
+            return;
+          }
+
+          // Sort alphabetically by name (fair to every firmware, GHOULBOX gets no special placement)
+          data.sort(function (a, b) {
+            return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+          });
+
+          gridEl.innerHTML = '';
+
+          data.forEach(function (fw) {
+            const card = document.createElement('article');
+            card.className = 'card';
+
+            // Header: Name and Author
+            const head = document.createElement('div');
+            head.className = 'card-head';
+
+            const title = document.createElement('h2');
+            title.className = 'card-title';
+            title.textContent = fw.name || '';
+            head.appendChild(title);
+
+            const author = document.createElement('div');
+            author.className = 'card-author';
+            author.textContent = 'by ' + (fw.author || 'Unknown');
+            head.appendChild(author);
+
+            card.appendChild(head);
+
+            // Description
+            const desc = document.createElement('p');
+            desc.className = 'card-desc';
+            desc.textContent = fw.description || '';
+            card.appendChild(desc);
+
+            // Audio Section
+            const audioSec = document.createElement('div');
+            audioSec.className = 'card-audio';
+
+            if (typeof fw.audio === 'string' && /^audio\/[a-z0-9._-]+\.mp3$/i.test(fw.audio)) {
+              const audioPlayer = document.createElement('audio');
+              audioPlayer.className = 'audio-player';
+              audioPlayer.controls = true;
+              audioPlayer.preload = 'none';
+              audioPlayer.src = fw.audio;
+              audioSec.appendChild(audioPlayer);
+
+              if (fw.audio_credit) {
+                const credit = document.createElement('div');
+                credit.className = 'audio-credit';
+                credit.textContent = 'Sample by ' + fw.audio_credit;
+                audioSec.appendChild(credit);
+              }
+            } else {
+              const soon = document.createElement('span');
+              soon.className = 'sample-soon';
+              soon.textContent = 'Sound sample coming soon';
+              audioSec.appendChild(soon);
+            }
+
+            card.appendChild(audioSec);
+
+            // Buttons: Source, Latest release, Try in browser
+            const btnWrap = document.createElement('div');
+            btnWrap.className = 'card-buttons';
+
+            if (safeUrl(fw.repo)) {
+              const srcBtn = document.createElement('a');
+              srcBtn.className = 'slab-btn';
+              srcBtn.href = safeUrl(fw.repo);
+              srcBtn.target = '_blank';
+              srcBtn.rel = 'noopener';
+              srcBtn.textContent = 'Source';
+              btnWrap.appendChild(srcBtn);
+            }
+
+            if (safeUrl(fw.release)) {
+              const relBtn = document.createElement('a');
+              relBtn.className = 'slab-btn';
+              relBtn.href = safeUrl(fw.release);
+              relBtn.target = '_blank';
+              relBtn.rel = 'noopener';
+              relBtn.textContent = 'Latest release';
+              btnWrap.appendChild(relBtn);
+            }
+
+            if (safeUrl(fw.emulator)) {
+              const emuBtn = document.createElement('a');
+              emuBtn.className = 'slab-btn emu';
+              emuBtn.href = safeUrl(fw.emulator);
+              emuBtn.target = '_blank';
+              emuBtn.rel = 'noopener';
+              emuBtn.textContent = 'Try in browser';
+              btnWrap.appendChild(emuBtn);
+            }
+
+            card.appendChild(btnWrap);
+            gridEl.appendChild(card);
+          });
+
+          statusEl.hidden = true;
+          gridEl.hidden = false;
+        })
+        .catch(function (err) {
+          statusEl.textContent = 'Error loading firmwares: ' + err.message;
+          statusEl.classList.add('error');
+        });
+    })();
+  </script>
+</body>
+</html>

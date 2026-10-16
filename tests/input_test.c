@@ -249,7 +249,8 @@ static void anim_test(void)
         char what[128];
         reset();
         fm1_led_dim_level(0);
-        FM1_PR(FM1_PA, FM1_IN) = FM1_PR(FM1_PB, FM1_IN) = 0xFFFFFFFFu;   /* rows open */
+        FM1_PR(FM1_PA, FM1_IN) = 0xFFFFFFFFu;   /* rows open */
+        FM1_PR(FM1_PB, FM1_IN) = 0xFFFFFFFFu;   /* (one register a statement: FM1_PR advances host_now) */
         memset(fm1_led, 0x1E, sizeof fm1_led);         /* (whatever was there: the start clears it) */
         memset(fm1_led_dim, 0x1E, sizeof fm1_led_dim);
         memset(fm1_led_breath, 0x02, sizeof fm1_led_breath);
@@ -470,7 +471,8 @@ static void idle_anim_test(void)
         char what[128];
         reset();
         fm1_led_dim_level(0);
-        FM1_PR(FM1_PA, FM1_IN) = FM1_PR(FM1_PB, FM1_IN) = 0xFFFFFFFFu;
+        FM1_PR(FM1_PA, FM1_IN) = 0xFFFFFFFFu;
+        FM1_PR(FM1_PB, FM1_IN) = 0xFFFFFFFFu;   /* (one register a statement: FM1_PR advances host_now) */
         host_step = 1u;
         host_bus = 1u;
         for (i = 0; i < FM1_NKEY; i++)                 /* each LED's column and row (as fm1_led_anim_start) */
@@ -817,7 +819,8 @@ int main(void)
                 pulse_min[c] = ~0u;
             reset();
             fm1_led_dim_level(lv);
-            FM1_PR(FM1_PA, FM1_IN) = FM1_PR(FM1_PB, FM1_IN) = 0xFFFFFFFFu;   /* rows open */
+            FM1_PR(FM1_PA, FM1_IN) = 0xFFFFFFFFu;   /* rows open */
+            FM1_PR(FM1_PB, FM1_IN) = 0xFFFFFFFFu;   /* (one register a statement: FM1_PR advances host_now) */
             memset(fm1_led, 0, sizeof fm1_led);
             memset(fm1_led_dim, 0, sizeof fm1_led_dim);
             fm1_led[3] = 1u << 2;                     /* lit: column 3 row 2 */
@@ -895,7 +898,8 @@ int main(void)
             char what[160];
             reset();
             fm1_led_dim_level(lo);
-            FM1_PR(FM1_PA, FM1_IN) = FM1_PR(FM1_PB, FM1_IN) = 0xFFFFFFFFu;
+            FM1_PR(FM1_PA, FM1_IN) = 0xFFFFFFFFu;
+            FM1_PR(FM1_PB, FM1_IN) = 0xFFFFFFFFu;   /* (one register a statement: FM1_PR advances host_now) */
             memset(fm1_led, 0, sizeof fm1_led);
             memset(fm1_led_dim, 0, sizeof fm1_led_dim);
             memset(fm1_led_breath, 0, sizeof fm1_led_breath);
@@ -1036,7 +1040,8 @@ int main(void)
             char what[160];
             reset();
             fm1_led_dim_level(lo);
-            FM1_PR(FM1_PA, FM1_IN) = FM1_PR(FM1_PB, FM1_IN) = 0xFFFFFFFFu;
+            FM1_PR(FM1_PA, FM1_IN) = 0xFFFFFFFFu;
+            FM1_PR(FM1_PB, FM1_IN) = 0xFFFFFFFFu;   /* (one register a statement: FM1_PR advances host_now) */
             memset(fm1_led, 0, sizeof fm1_led);
             memset(fm1_led_dim, 0, sizeof fm1_led_dim);
             memset(fm1_led_breath, 0, sizeof fm1_led_breath);
