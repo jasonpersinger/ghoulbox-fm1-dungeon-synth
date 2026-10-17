@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """GHOULBOX user guide: docs/guide/guide.html (+ the sound list from the firmware's own tables) -> a PDF.
-  python3 docs/guide/make_guide.py OUT.pdf      (needs build/host/desc.json: tests/run_tests.sh writes it; and Chrome)"""
+  python3 docs/guide/make_guide.py OUT.pdf      (needs build/host/desc.json: tests/run_tests.sh writes it; and Chrome)
+  python3 docs/guide/make_guide.py --print OUT.pdf   the printer-friendly one: print.css, dark ink on white"""
 import html, json, re, shutil, subprocess, sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+PRINT = "--print" in sys.argv[1:]
+args = [a for a in sys.argv[1:] if a != "--print"]
 ROOT = HERE.parents[1]
 d = json.loads((ROOT / "build/host/desc.json").read_text())
 gb = set()                                           # GHOULBOX's own presets: the generator's list, GURDY, FM6 F9.., SAMPLE 5..
@@ -34,10 +37,12 @@ for name in d["ORDER"]:
 assert total == 59, total
 table = '<table><tr><th>Engine</th><th>Sounds (in PRESETS order)</th></tr>' + "".join(rows) + "</table>"
 src = (HERE / "guide.html").read_text().replace("{{SOUNDS}}", table)
+if PRINT:
+    src = src.replace("</style>", "</style>\n<style>\n" + (HERE / "print.css").read_text() + "</style>", 1)
 tmp = HERE / ".guide.build.html"
 tmp.write_text(src)
 chrome = shutil.which("google-chrome-stable") or shutil.which("google-chrome") or shutil.which("chromium")
-out = Path(sys.argv[1] if len(sys.argv) > 1 else HERE / "GHOULBOX-User-Guide.pdf").resolve()
+out = Path(args[0] if args else HERE / "GHOULBOX-User-Guide.pdf").resolve()
 subprocess.run([chrome, "--headless=new", "--disable-gpu", "--no-pdf-header-footer", "--allow-file-access-from-files",
                 f"--print-to-pdf={out}", tmp.as_uri()], check=True, capture_output=True)
 tmp.unlink()
