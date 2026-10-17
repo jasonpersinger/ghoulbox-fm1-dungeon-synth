@@ -1131,6 +1131,7 @@ static void act(FILE *log, uint32_t step, const char *title, const act_t *a)
             a->say);
 }
 
+#ifndef LESSON_RENDER_NO_MAIN                          /* (tests/ambient_render.c: the player without the lessons' main) */
 int main(int argc, char **argv)
 {
     uint32_t n = argc > 1 ? (uint32_t)atoi(argv[1]) : 1u, s, i, total;
@@ -1176,3 +1177,4 @@ int main(int argc, char **argv)
     printf("%s: %.1f s\n", path, total / (double)FS);
     return 0;
 }
+#endif
