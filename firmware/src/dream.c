@@ -26,6 +26,10 @@ static struct {
     uint8_t passes, last, restart;
 } dream;
 
+/* the piece's key, chords and parts are no longer what the tracks hold (GHOULBOX 2.3.1): a project load (project.c
+ * project_restore_runtime), a sound or pattern load (ui.c load_end). EVOL's next change finds them back (dr_rebuild) */
+static void dream_forget(void) { dream.valid = 0; }
+
 static uint32_t dr_rnd(uint32_t n) { return n ? rng() % n : 0u; }
 
 static int dr_has(const char *s, const char *w)            /* the word w (up to a space) in s */

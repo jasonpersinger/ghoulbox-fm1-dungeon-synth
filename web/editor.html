@@ -2922,16 +2922,18 @@ function selfLoad(sound = false) {
 }
 const stepEdit = new Map(); /* index -> time of the last edit */
 
-/* parameter ids (firmware/src/core.h); used only when P_COUNT / G_COUNT match */
-const EXPECT = { pcount: 91, gcount: 27, pe0: 83 };
-/* the same layout without the chord keys (P_COUNT 89, P_E0 81), the FM operator ENVs too (69, 61) or the matrix
-   (firmware 1.0: 57, 49) */
-const knownLayout = (info) => info.gcount === EXPECT.gcount &&
-  [[99, 91], [91, 83], [89, 81], [69, 61], [57, 49]].some(([c, e]) => info.pcount === c && info.pe0 === e);
+/* parameter ids (firmware/src/core.h); the groups below only for a layout of these (P_COUNT, P_E0): 1.1 (99, 91), 1.0 (91,
+   83), without the chord keys (89, 81), the FM operator ENVs too (69, 61) or the matrix (firmware 1.0: 57, 49); GHOULBOX
+   2.3.1: 1.2 .. 1.4.1 (103 / 104 with SPREAD, P_E0 95 / 96), GHOULBOX 2.0 .. 2.2 (112, 104: TEMP) and 2.3 (113, 105:
+   RING); globals 27, GHOULBOX's 29 (AMB CRKL), 33 (KEYS), 37 (DREAM). Felucca 1.5 (111) keeps the id-order list: its
+   INSERT (96..102) has no group here */
+const knownLayout = (info) => [27, 29, 33, 37].includes(info.gcount) &&
+  [[113, 105], [112, 104], [104, 96], [103, 95], [99, 91], [91, 83], [89, 81], [69, 61], [57, 49]].some(([c, e]) => info.pcount === c && info.pe0 === e);
 const P = { LEVEL: 0, SLEN: 29 };
 const LAYOUT = (pe0, gc = 27) => [
   { t: "ENV", pages: [["ENV", 0, [1, 2, 3, 4]], ["ENV DEST", 0, [5, 6, 7, 8]]] },
-  { t: "LFO", pages: [["LFO", 0, [9, 10, 11, 12]], ["LFO DEST", 0, [13, 14, 15, 16]]] },
+  { t: "LFO", pages: [["LFO", 0, [9, 10, 11, 12]], ...(pe0 >= 95 ? [["LFO 2", 0, [91, 92, 93]]] : []),   /* 1.2: SYNC TRIG POL */
+    ["LFO DEST", 0, [13, 14, 15, 16]]] },
   ...(pe0 >= 61 ? [{ t: "MOD", mod: 49 }] : []),   /* the matrix: P_M1SRC 49 .. P_M4AMT 60, one row per slot */
   { t: "EDIT", engine: true, pages: [["EDIT 1", 0, [pe0, pe0 + 1, pe0 + 2, pe0 + 3]], ["EDIT 2", 0, [pe0 + 4, pe0 + 5, pe0 + 6, pe0 + 7]],
     ...(pe0 >= 91 && engName() === "DRUM" ? [["LANES", 0, P_LANES.slice(0, 4)], ["LANES 2", 0, P_LANES.slice(4)]] : []),   /* lane levels 83..90 */
@@ -2940,13 +2942,15 @@ const LAYOUT = (pe0, gc = 27) => [
                                                     FELUCCA_FM4=1 firmware only: DIGITAL retired, its engine is "-") */
     ...[0, 1, 2, 3].map((k) => [`OP${k + 1}`, 0, [61 + 5 * k, 62 + 5 * k, 63 + 5 * k, 64 + 5 * k]]),
     ["OP LVL", 0, [65, 70, 75, 80]]] }] : []),
-  { t: "VOICE", pages: [["LEVEL", 0, [0]], ["VOICE", 0, [37, 38, 41, 42]], ["VOICE 2", 0, [43, 44, 39, 40]]] },
+  { t: "VOICE", pages: [["LEVEL", 0, [0]], ["VOICE", 0, [37, 38, 41, 42]], ["VOICE 2", 0, [43, 44, 39, 40]],
+    ...(pe0 >= 96 ? [["VOICE 3", 0, [95]]] : [])] },   /* SPREAD 95 (#148) */
   { t: "FX", pages: [["FX", 0, [33, 34, 35, 36]], ["SLICER", 0, [45, 46, 47, 48]], ["DLY", 1, [4, 5, 6, 7]], ["REVERB", 1, [24, 8, 9]], ["CHORUS", 1, [10, 11]], ["TAPE", 1, gc >= 29 ? [25, 26, 27, 28] : [25, 26]]] },   /* G_RTYPE 24: ROOM / SPRING / HALL */
   { t: "SCL", pages: [["SCL", 0, [25, 26, 27, 28]], ...(pe0 >= 83 ? [["CHORD", 0, pe0 >= 104 ? [...P_CHORD, P_TEMP] : P_CHORD]] : [])] },   /* CHRD VOIC 81, 82; TEMP 103 */
   { t: "ARP", pages: [["ARP", 0, [17, 18, 19, 20]], ["ARP 2", 0, [21, 22, 23, 24]]] },
-  { t: "SEQ PATTERN", tab: "seqgroups", pages: [["PATTERN", 0, [29, 30, 31, 32]]] },
+  { t: "SEQ PATTERN", tab: "seqgroups", pages: [["PATTERN", 0, pe0 >= 95 ? [29, 30, 31, 32, 94] : [29, 30, 31, 32]]] },   /* QNTZ 94 */
   /* 1.2: as the device shows them: HOME > CLOCK (BPM SWG; CLK not here), MENU > AUDIO TUNE, MENU > MIDI > MIDI IN (G_ROUTE) */
-  { t: "GLOBAL", tab: "setgroups", pages: [["CLOCK", 1, [0, 1, 2]], ["AUDIO", 1, [3]], ["MIDI", 1, [14]]] },
+  { t: "GLOBAL", tab: "setgroups", pages: [["CLOCK", 1, [0, 1, 2]], ["AUDIO", 1, [3]], ["MIDI", 1, [14]],
+    ...(gc >= 33 ? [["KEYS", 1, [29, 30, 31, 32]]] : []), ...(gc >= 37 ? [["DREAM", 1, [33, 34, 35, 36]]] : [])] },   /* GHOULBOX */
 ];
 /* globals that are actions or placeholders on the device: buttons instead, or hidden */
 const G_SKIP = new Set(["SLOT", "NAME", "LOAD", "SAVE", "ENG", "SET", "CLRSQ", "INIT", "MIDI", "SYNC", "CPU", "CLK"]);
