@@ -6,16 +6,24 @@
 [Felucca](https://github.com/hugelton/Felucca) by Hügelton Instruments (1.4.1), tuned for dark ambient,
 medieval and fantasy synth music, from Old Tower and Hole Dweller to Mortiis-era dungeon synth.
 
-**Latest: 2.3.1.** [Play it in your browser](https://ghoulbox.messy.quest/) ·
+**Latest: 2.3.2.** [Play it in your browser](https://ghoulbox.messy.quest/) ·
 [install it](https://ghoulbox.messy.quest/webapp/installer/) ·
 [hear every sound](https://ghoulbox.messy.quest/sounds/) ·
 [watch DREAM, new in 2.3](https://youtu.be/LOAOYNm40zo) ·
-[learn it in five video lessons](https://www.youtube.com/playlist?list=PLMUs0QD7QfOw) ·
+[learn it in fifteen video lessons](https://www.youtube.com/playlist?list=PLMUs0QD7QfOw) ·
 [read the guide (PDF)](docs/guide/GHOULBOX-User-Guide-2.3.pdf)
 
 GHOULBOX is free and always will be. To support it: [Ko-fi](https://ko-fi.com/ghoulbox) · [merch](https://ghoulbox-shop.fourthwall.com/).
 
 ## What's new
+
+### 2.3.2
+
+- **A RING fix.** Muting a GURDY track with RING on (GLO's mute keys, the MIXER's MUTE, DREAM's) now silences its
+  drones; they used to ring on until the transport stopped.
+- **Ten new video lessons** ([the playlist](https://www.youtube.com/playlist?list=PLMUs0QD7QfOw)), 6 to 15: your own
+  tune, the harp arpeggio, ritual drums, sound design, the living pattern, two hands, the old ways, with a MIDI
+  keyboard or DAW, keeping and sharing your music, and a whole piece.
 
 ### 2.3.1
 
@@ -172,7 +180,7 @@ Felucca's sequencer, song mode, effects, editor and backups all work as they do 
 - **An old-RPG screen**: VT323 pixel type, stone windows, a sword cursor, flickering wall torches, and the
   CRYPT palette (stone, bone, torch amber, blood red), a blackletter wordmark and a skull at boot.
 
-Version 2.3.1 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
+Version 2.3.2 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
 
 **[User guide (PDF)](docs/guide/GHOULBOX-User-Guide-2.3.pdf):** a 53-page manual: the FM-1's hardware and
 installing; synth basics in plain words (oscillators, filters, envelopes, LFOs, effects, sequencing), each
