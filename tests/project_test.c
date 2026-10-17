@@ -420,7 +420,7 @@ int main(void)
         project_t a, c;
         project_store_t st, st2;
         uint32_t i, zero = 1;
-        bad += check("FUN10 name at the end of the reserved tail, the FM6 patches before it, after the data (8 spare: AMB, KEYS, 4)",
+        bad += check("FUN10 name at the end of the reserved tail, the FM6 patches before it, after the data (8 spare: AMB, KEYS, DREAM, 2)",
                      PROJ_NAME_OFF == 3824u && PROJ_FM6_OFF == 3312u && 68u + NTRK * (P_COUNT + 2u + NSTEP * 9u) +
                      sizeof(chain_config_t) + sizeof(motion_store_t) + 8u == PROJ_FM6_OFF);
         memset(&a, 0, sizeof a);

@@ -1295,6 +1295,14 @@ static void confirm_text(char *a, char *b)
     case CF_CLEAR_SONG:
         str_cpy(a, "CLEAR SONG ORDER?", 24);
         break;
+    case CF_DREAM:                                   /* GHOULBOX 2.3: "DREAM IN D DOR?" */
+        str_cpy(a, "DREAM IN ", 24);
+        str_cpy(a + str_len(a), N_GURDY_DRN[k % 12u], 4);
+        str_cpy(a + str_len(a), " ", 2);
+        str_cpy(a + str_len(a), N_DMOOD[clamp(song.g[G_DMOOD], 0, 5)], 6);
+        str_cpy(a + str_len(a), "?", 2);
+        str_cpy(b, "REPLACES ALL 4 TRACKS", 24);
+        break;
     case CF_INIT_SOUND:
         str_cpy(a, "INITIALIZE SOUND?", 24);
         break;

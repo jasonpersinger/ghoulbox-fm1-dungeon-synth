@@ -1743,6 +1743,8 @@ function makeMockDevice(opt = {}) {
     E("SPLT", ["G#3", "A3", "A#3", "B3", "C4", "C#4", "D4", "D#4", "E4", "F4", "F#4", "G4", "G#4", "A4", "A#4", "B4",
                "C5", "C#5", "D5", "D#5", "E5", "F5", "F#5", "G5"], 4),   /* GHOULBOX 2.1: HOME > KEYS) */
     E("OCT", ["-2", "-1", "0", "+1", "+2"], 2),
+    E("EVOL", ["OFF", "ON"], 0), D("DENS", F.INT, 1, 8, 4), D("DRFT", F.INT, 1, 8, 6),   /* G_DREAM .. G_DMOOD (ids 33..36; */
+    E("MOOD", ["MIN", "DOR", "PHRY", "HARM", "MAJ", "MIX"], 0),                          /* GHOULBOX 2.3: HOME > DREAM) */
   ];
   const NONE = D("-", F.INT, 0, 0, 0);
   const RATIO = [".5", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "14", "16"];
@@ -1887,7 +1889,7 @@ function makeMockDevice(opt = {}) {
   TP.push(D("-", F.INT, 0, 8, 0), D("-", F.INT, 0, 127, 64), D("-", F.INT, 0, 127, 96), D("-", F.INT, 0, 127, 96),   /* GHOULBOX: */
     D("-", F.INT, 0, 127, 127), D("-", F.INT, 0, 2, 0), D("-", F.INT, 0, 1, 0),   /* Felucca 1.5's 96..102, reserved */
     E("TEMP", ["EQUAL", "PYTH", "MEAN", "JUST"], 0), E("RING", ["OFF", "ON"], 0));   /* TEMP (103), RING (104, 2.3) */
-  const P_COUNT = 113, G_COUNT = 33, NSTEP = 64, P_E0 = 105, G_ENGSEL = 20, P_SLCR = 45;
+  const P_COUNT = 113, G_COUNT = 37, NSTEP = 64, P_E0 = 105, G_ENGSEL = 20, P_SLCR = 45;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const enumOrig = (d, v) => d.fmt === F.ENUM && d.names ? aliasOf(d.names, v - d.min) + d.min : v;   /* params.c enum_orig */
   /* four tracks (firmware v3), four synth parts (1.0); engine / preset / p / step below are the selected track's */
