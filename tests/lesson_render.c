@@ -15,7 +15,7 @@ enum { C_FX, C_SCL, C_ENV, C_LFO, C_EDIT, C_GLO, C_HOME, C_SAVE, C_ARP, C_SEQ, C
 static const char *const CNAME[] = {"FX", "SCL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ", "PLAY",
                                     "REC", "OCT-", "OCT+", "SELECT", "ALGORITHM", "PRESETS", "KNOB1", "KNOB2",
                                     "KNOB3", "KNOB4", "POWER", "KEY", "-"};
-enum { K_TAP, K_HOLD, K_TURN, K_SAY, K_KEY, K_GLOKEY, K_CHORD, K_PRESS, K_LETGO };   /* K_CHORD (lesson 7): three keys, arg a | b << 5 | c << 10;
+enum { K_TAP, K_HOLD, K_TURN, K_SAY, K_KEY, K_GLOKEY, K_CHORD, K_PRESS, K_LETGO, K_CRANK };   /* K_CHORD (lesson 7): three keys, arg a | b << 5 | c << 10;
    * (lesson 11) K_PRESS: the same three put down and kept down (the left hand), K_LETGO: they come up */   /* K_KEY: key arg held dur - 0.6 s; K_GLOKEY: GLO held,
                                                              * key arg tapped (a mute, track until-1 toggles) */
 /* what an action turns or taps until: */
@@ -47,6 +47,7 @@ typedef struct { const lstep_t *steps; float tail; uint8_t scene; } lesson_t;   
 #define PRESS_(a, b, c, s, d) {C_KEY, K_PRESS, U_CLICKS, (a) | (b) << 5 | (c) << 10, 0, s, d}
 #define PRESS(...) PRESS_(__VA_ARGS__)
 #define LETGO(s) {C_NONE, K_LETGO, U_CLICKS, 0, 0, s, 1.2f}
+#define CRANK(rate, s, d) {C_SELECT, K_CRANK, U_CLICKS, rate, 0, s, d}   /* (lesson 12) SELECT turned rate clicks a second */
 #define LATCH(k, trk, s) {C_KEY, K_GLOKEY, 0x10 | ((trk) + 1), k, 0, s, 0}   /* (lesson 11) GLO + a black key: the latch */
 
 /* ---------------------------------------------------------------- LESSON 1: THE DRONE */
@@ -567,6 +568,65 @@ static const lstep_t L11_STEPS[] = {
     {"Set up", SETUP}, {"One keyboard, two tracks", L11_KEYS}, {"Layer", L11_LAYER}, {"Split", L11_SPLIT},
     {"Hands free", L11_LATCH}, {"Keep it", L11_END}, {0, 0}};
 
+/* ---------------------------------------------------------------- LESSON 12: THE OLD WAYS */
+#define L12_REV 90                                     /* (the set-up's track 1 REV and track 4 LEVEL, put back) */
+#define L12_LEVEL 104
+#define MARCH 17                                       /* PATTERNS[17]: a stepping line, a rest after every note */
+#define L12_PHRASE(first) KEY(14, first, 1.0f), KEY(12, "F", 0.95f), KEY(11, "E", 0.95f), KEY(9, "D", 0.95f), \
+    KEY(7, "C", 0.95f), KEY(6, "B", 0.95f), KEY(7, "C: home", 1.9f)
+static const act_t L12_SCALES[] = {
+    TURN_TO(C_ALGO, U_TRACK, 0, 0, "Turn ALGORITHM to 1: HURDY GURDY"),
+    TAP(C_SCL, "Tap SCL"),
+    TURN_TO(C_K1, U_VALUE, 2, 0, "KNOB 1 (ROOT) to D"),
+    TURN_TO(C_K2, U_VALUE, 2, 0, "KNOB 2 (SCL) to MIN"),
+    TURN_TO(C_K3, U_VALUE, 2, 0, "KNOB 3 (QNT) to WHITE"),
+    L12_PHRASE("Play from G down: plain minor"),
+    TURN_TO(C_K2, U_VALUE, 7, 0, "Turn KNOB 2 (SCL) to HARM"),
+    L12_PHRASE("The same keys: a castle"),
+    TURN_TO(C_K2, U_VALUE, 17, 0, "Turn KNOB 2 to HUNG: Hungarian minor"),
+    L12_PHRASE("Gothic, haunted"),
+    TURN_TO(C_K2, U_VALUE, 2, 0, "KNOB 2 back to MIN"), END};
+static const act_t L12_TEMP[] = {
+    TAPS(C_SCL, "CHORD", "Tap SCL again: CHORD"),
+    TURN_TO(C_K3, U_VALUE, 1, 0, "Turn KNOB 3 (TEMP) to PYTH"),
+    SAY(C_NONE, "Pythagorean: tuned in pure fifths, as in old chant", 5),
+    L12_PHRASE("Listen to the drones: still, not beating"),
+    SAY(C_NONE, "MEAN and JUST: sweeter thirds, for slow chords", 4), END};
+static const act_t L12_RING[] = {
+    TAPS(C_SAVE, "PHRASES", "Tap SAVE until PHRASES"),
+    TURN_TO(C_K1, U_PICK, MARCH, 0, "Turn KNOB 1 to 18 MARCH"),
+    TAP(C_OCTUP, "Press OCT+: a step, a rest, a step"),
+    TAPS(C_HOME, "MIXER", "Tap HOME until the MIXER"),
+    TURN_TO(C_ALGO, U_TRACK, 3, 0, "Turn ALGORITHM to 4: the drone"),
+    TURN_TO(C_K1, U_VALUE, 0, 0, "Turn KNOB 1 (LEVEL) down: the gurdy alone"),
+    TURN_TO(C_ALGO, U_TRACK, 0, 0, "ALGORITHM back to 1"),
+    TURN_TO(C_K3, U_VALUE, 8, 0, "Turn KNOB 3 (REV) down: dry, to hear the gaps"),
+    TAPS(C_EDIT, "RING", "Tap EDIT until RING"),
+    TURN_TO(C_K1, U_VALUE, 0, 0, "Turn KNOB 1 (RING) OFF"),
+    SAY(C_NONE, "In every rest, the whole instrument stops", 6),
+    TURN_TO(C_K1, U_VALUE, 1, 0, "Turn KNOB 1 back ON"),
+    SAY(C_NONE, "The drones ring through: the wheel never stops", 6.5f), END};
+static const act_t L12_CRANK[] = {
+    TAPS(C_EDIT, "EDIT 2", "Tap EDIT until EDIT 2"),
+    TURN_TO(C_K2, U_VALUE, 5, 0, "Turn KNOB 2 (COUP) to CRANK"),
+    SAY(C_NONE, "SELECT is the crank now. Without it: silence", 5),
+    CRANK(24, "Turn SELECT steadily: the wheel turns", 6),
+    SAY(C_NONE, "Stop turning: the strings stop", 3),
+    CRANK(13, "Slowly: soft and dark", 4.5f),
+    CRANK(36, "Faster: louder and rougher", 4),
+    CRANK(24, "Steady again", 2.5f),
+    CRANK(55, "A sudden flick: the buzz kicks", 1.4f),
+    CRANK(24, "And steady", 3),
+    TURN_TO(C_K2, U_VALUE, 2, 0, "KNOB 2 (COUP) back to 1/8"),
+    TAPS(C_HOME, "MIXER", "Tap HOME until the MIXER"),
+    TURN_TO(C_K3, U_VALUE, L12_REV, 0, "KNOB 3 (REV) back up: into the hall"),
+    TURN_TO(C_ALGO, U_TRACK, 3, 0, "ALGORITHM to 4"),
+    TURN_TO(C_K1, U_VALUE, L12_LEVEL, 0, "KNOB 1 (LEVEL) back up: the drone returns"),
+    SAY(C_NONE, "Next: a MIDI keyboard, or a computer", 5), END};
+static const lstep_t L12_STEPS[] = {
+    {"Set up", SETUP}, {"Old scales", L12_SCALES}, {"Old tunings", L12_TEMP}, {"Drones that ring", L12_RING},
+    {"Turn the crank", L12_CRANK}, {0, 0}};
+
 /* ---------------------------------------------------------------- 6: DREAM (GHOULBOX 2.3: what's new, not a lesson) */
 static const act_t L6_FIND[] = {
     SAY(C_NONE, "GHOULBOX 2.3 can compose. This is DREAM", 4.5f),
@@ -611,7 +671,8 @@ static const lesson_t LESSONS[] = {{L1_STEPS, 9, 0} /* (a new FM-1: DUNGEON) */,
                                    {L8_STEPS, 8, 4} /* (index 9: LESSON 8, Ritual Drums) */,
                                    {L9_STEPS, 8, 4} /* (index 10: LESSON 9, Sound Design) */,
                                    {L10_STEPS, 8, 4} /* (index 11: LESSON 10, The Living Pattern) */,
-                                   {L11_STEPS, 8, 4} /* (index 12: LESSON 11, Two Hands) */};
+                                   {L11_STEPS, 8, 4} /* (index 12: LESSON 11, Two Hands) */,
+                                   {L12_STEPS, 8, 4} /* (index 13: LESSON 12, The Old Ways) */};
 
 /* ---------------------------------------------------------------- the player */
 static FILE *wav, *vid;
@@ -655,6 +716,7 @@ static void run(float sec)                             /* the device runs: audio
         now += CTL;
         if (now >= next_frame) {                       /* 30 fps; the input loop twice a frame, as on the device */
             fm1_ms = (uint32_t)((uint64_t)now * 1000u / FS);
+            fm1_in.frames = (uint32_t)((uint64_t)now * CRANK_FPS / FS);   /* (lesson 12: the input scan's frames, the crank's clock) */
             host_ticks += 16000u;
             ui_input();
             host_ticks += 16000u;
@@ -780,6 +842,15 @@ static void act(FILE *log, uint32_t step, const char *title, const act_t *a)
         run(held);
         fm1_in.notes &= ~m;
         spent += held;
+    } else if (a->kind == K_CRANK) {                   /* (lesson 12) the crank: SELECT's clicks, steady */
+        float gap = 1.0f / a->arg, left_s = dur - 0.6f - 0.05f;
+        way = 1;
+        for (; left_s >= gap; left_s -= gap) {
+            host_enc[panel.enc[EN_SELECT]] += panel.dir[EN_SELECT];
+            fm1_in.enc_dfr[panel.enc[EN_SELECT]] = fm1_in.frames;
+            run(gap);
+            spent += gap;
+        }
     } else if (a->kind == K_PRESS || a->kind == K_LETGO) {   /* (lesson 11) the left hand: down and kept, then up */
         if (a->kind == K_PRESS) {
             left = 1u << (a->arg & 31) | 1u << (a->arg >> 5 & 31) | 1u << (a->arg >> 10 & 31);
@@ -848,7 +919,7 @@ static void act(FILE *log, uint32_t step, const char *title, const act_t *a)
         snprintf(cname, sizeof cname, "%s", CNAME[used]);
     fprintf(log, "%.3f\t%.3f\t%s\t%s\t%u\t%s\t%s\n", t0, now / (float)FS, cname,
             a->kind == K_TAP ? "tap" : a->kind == K_HOLD ? "hold" : a->kind == K_KEY || a->kind == K_CHORD ? "key" : a->kind == K_PRESS ? "press" : a->kind == K_LETGO ? "letgo" :
-            a->kind == K_GLOKEY ? "glokey" : a->kind != K_TURN ? "say" :
+            a->kind == K_GLOKEY ? "glokey" : a->kind == K_CRANK ? "turn+" : a->kind != K_TURN ? "say" :
             a->ctl == C_OCTUP || a->ctl == C_OCTDN ? "tap" : way > 0 ? "turn+" : way < 0 ? "turn-" : "turn0", step, title,
             a->say);
 }
