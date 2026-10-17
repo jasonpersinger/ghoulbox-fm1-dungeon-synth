@@ -78,6 +78,8 @@ enum {                          /* per-track parameters */
     P_ITYPE, P_IA, P_IB, P_IC, P_IMIX,         /* GHOULBOX: Felucca 1.5's ids, reserved (nothing reads them): its INSERT, */
     P_FTYPE, P_ESYNC,                          /* ANALOG's filter TYPE and ENV SYNC, so a merge keeps their stored meaning */
     P_TEMP,                                    /* GHOULBOX: TEMP, the track's temperament from ROOT (dsp.c temper) */
+    P_RING,                                    /* GHOULBOX 2.3: RING, a GURDY's drones sound on through the sequencer's
+                                                * rests (eng_gurdy.c gurdy_rings) */
     P_E0, P_E1, P_E2, P_E3, P_E4, P_E5, P_E6, P_E7,
     P_COUNT
 };
@@ -163,6 +165,8 @@ typedef struct {
     uint8_t stage;               /* env: 0 off, 1 attack, 2 decay/sustain, 3 release */
     uint8_t side;                /* SPREAD (fx.c mix_spread): 0 left of PAN, 1 right; set as the voice starts */
     int8_t tfine;                /* GHOULBOX: TEMP's rest below 1/16 semitone (pitch16 has the whole steps), 1/4096 */
+    uint8_t ring;                /* GHOULBOX: RING (eng_gurdy.c), the GURDY's melody string's level after its note, 255 =
+                                  * still playing (the padding before env: no RAM per voice) */
     int32_t env;                 /* Q24 */
     int32_t env_out;             /* last control-rate amplitude, Q15 */
     int32_t pitch16, pitch_cur;  /* 1/16 semitone, with glide */

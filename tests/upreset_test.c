@@ -283,7 +283,7 @@ int main(void)
     up_params(&r, v, def);
     ok = P_SLCR == 45 && P_SLDEPTH + 1 == P_M1SRC && P_M4AMT + 1 == P_FM1_ATK && P_FM4_LEVEL + 1 == P_CHRD &&
          P_VOIC + 1 == P_LN0 && P_LN7 + 1 == P_LSYNC && P_SQNT + 1 == P_SPRD && P_SPRD + 1 == P_ITYPE && P_ITYPE + 6 == P_ESYNC &&
-         P_ESYNC + 1 == P_TEMP && P_TEMP + 1 == P_E0 && P_E0 == 104 && P_COUNT == 112;
+         P_ESYNC + 1 == P_TEMP && P_TEMP + 1 == P_RING && P_RING + 1 == P_E0 && P_E0 == 105 && P_COUNT == 113;
     for (i = 0; i < 45u; i++)
         ok &= v[i] == (int16_t)(2000 + i);
     for (i = P_SLCR; i < P_E0; i++)

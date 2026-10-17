@@ -512,7 +512,7 @@ static void test_spread(void)
 
     check("SPRD: a track parameter 0..127, default 0 (as before), at 95 (GHOULBOX: Felucca 1.5's seven, TEMP after it)",
           TP[P_SPRD].min == 0 && TP[P_SPRD].max == 127 && TP[P_SPRD].def == 0 && P_SPRD == 95 && P_SPRD + 1 == P_ITYPE &&
-          P_E0 == 104 && P_COUNT == 112 && str_eq(TP[P_SPRD].label, "SPRD") && motion_param(P_SPRD));
+          P_E0 == 105 && P_COUNT == 113 && str_eq(TP[P_SPRD].label, "SPRD") && motion_param(P_SPRD));
     h1 = phrase_child(0, 1, sp_mono0);
     h2 = phrase_child(0, 1, sp_mono127);
     check("MONO: SPRD 127 plays bit for bit as SPRD 0 (one voice: on PAN)", h1 && h1 == h2);

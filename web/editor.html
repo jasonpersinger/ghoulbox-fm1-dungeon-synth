@@ -1287,6 +1287,7 @@ const P_CHORD = [81, 82];                          /* core.h P_CHRD, P_VOIC (sin
 const P_LANES = [83, 84, 85, 86, 87, 88, 89, 90];   /* core.h P_LN0..P_LN7: the DRUM lane levels (since P_COUNT 99, P_E0 91) */
 const P_QNTZ = 94;                                  /* core.h P_SQNT: QUANTIZE, the track's (since P_COUNT 103, P_E0 95) */
 const P_TEMP = 103;                                 /* core.h P_TEMP: TEMP, the track's (GHOULBOX, since P_COUNT 112, P_E0 104) */
+const P_RING = 104;                                 /* core.h P_RING: RING, a GURDY's drones through the rests (GHOULBOX 2.3, since P_COUNT 113) */
 const trackOwn = (i, pe0) => TRACK_OWN.has(i) || (pe0 >= 83 && P_CHORD.includes(i)) || (pe0 >= 95 && i === P_QNTZ) ||
   (pe0 >= 104 && i === P_TEMP);
 /* play a patch without writing flash, as UP_LOAD would load it: the sound only. SET the engine (G_ENGSEL:
@@ -1885,8 +1886,8 @@ function makeMockDevice(opt = {}) {
     D("SPRD", F.PCT, 0, 127, 0));   /* SPREAD (95, #148) */
   TP.push(D("-", F.INT, 0, 8, 0), D("-", F.INT, 0, 127, 64), D("-", F.INT, 0, 127, 96), D("-", F.INT, 0, 127, 96),   /* GHOULBOX: */
     D("-", F.INT, 0, 127, 127), D("-", F.INT, 0, 2, 0), D("-", F.INT, 0, 1, 0),   /* Felucca 1.5's 96..102, reserved */
-    E("TEMP", ["EQUAL", "PYTH", "MEAN", "JUST"], 0));   /* TEMP (103) */
-  const P_COUNT = 112, G_COUNT = 33, NSTEP = 64, P_E0 = 104, G_ENGSEL = 20, P_SLCR = 45;
+    E("TEMP", ["EQUAL", "PYTH", "MEAN", "JUST"], 0), E("RING", ["OFF", "ON"], 0));   /* TEMP (103), RING (104, 2.3) */
+  const P_COUNT = 113, G_COUNT = 33, NSTEP = 64, P_E0 = 105, G_ENGSEL = 20, P_SLCR = 45;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const enumOrig = (d, v) => d.fmt === F.ENUM && d.names ? aliasOf(d.names, v - d.min) + d.min : v;   /* params.c enum_orig */
   /* four tracks (firmware v3), four synth parts (1.0); engine / preset / p / step below are the selected track's */
@@ -2931,7 +2932,8 @@ const LAYOUT = (pe0, gc = 27) => [
   { t: "LFO", pages: [["LFO", 0, [9, 10, 11, 12]], ["LFO DEST", 0, [13, 14, 15, 16]]] },
   ...(pe0 >= 61 ? [{ t: "MOD", mod: 49 }] : []),   /* the matrix: P_M1SRC 49 .. P_M4AMT 60, one row per slot */
   { t: "EDIT", engine: true, pages: [["EDIT 1", 0, [pe0, pe0 + 1, pe0 + 2, pe0 + 3]], ["EDIT 2", 0, [pe0 + 4, pe0 + 5, pe0 + 6, pe0 + 7]],
-    ...(pe0 >= 91 && engName() === "DRUM" ? [["LANES", 0, P_LANES.slice(0, 4)], ["LANES 2", 0, P_LANES.slice(4)]] : [])] },   /* lane levels 83..90 */
+    ...(pe0 >= 91 && engName() === "DRUM" ? [["LANES", 0, P_LANES.slice(0, 4)], ["LANES 2", 0, P_LANES.slice(4)]] : []),   /* lane levels 83..90 */
+    ...(pe0 >= 105 && engName() === "GURDY" ? [["RING", 0, [P_RING]]] : [])] },   /* GHOULBOX 2.3 */
   ...(pe0 >= 81 && engName() === "DIGITAL" ? [{ t: "OP ENV", pages: [   /* P_FM1_ATK 61: ATK DEC SUS REL LVL per operator (a
                                                     FELUCCA_FM4=1 firmware only: DIGITAL retired, its engine is "-") */
     ...[0, 1, 2, 3].map((k) => [`OP${k + 1}`, 0, [61 + 5 * k, 62 + 5 * k, 63 + 5 * k, 64 + 5 * k]]),

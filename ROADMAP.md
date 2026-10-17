@@ -44,6 +44,7 @@ at power-on (RESTORE LAST ON). All three from owners' requests.
 
 ## Next
 
+- RING: a GURDY's drones keep sounding through the sequencer's rests, as on a real hurdy-gurdy (an owner's request)
 - small screen polish
 
 ## Later

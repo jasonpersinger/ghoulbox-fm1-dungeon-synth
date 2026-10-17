@@ -145,8 +145,8 @@ static uint32_t voice_victim(const track_t *self, int soft, track_t **pp)
             uint32_t c;
             if (!v->active || v->stage == 4u)
                 continue;
-            if (!v->gate)
-                c = 1;                                  /* released */
+            if (!v->gate && v->stage == 3u)
+                c = 1;                                  /* released (GHOULBOX: not a GURDY's ringing drones: held) */
             else if (mode != V_POLY && i > 0)
                 c = 2;                                  /* extra UNISON, or a voice left by a mode / cap change */
             else if (!soft && mode == V_POLY && i != low && (nlt > LT_KEEP || !lt_voice(t, v)))
@@ -429,6 +429,15 @@ static void trk_note_on(track_t *t, uint32_t note, uint32_t vel)
     }
 }
 
+/* a note's end: the release, or (GHOULBOX 2.3: RING) a GURDY's drones ringing on at the sustain, the voice kept (gate 0,
+ * stage 1 / 2: only RING makes that); eng_gurdy.c fades its melody string and releases it once RING stops */
+static void voice_release(track_t *t, voice_t *v)
+{
+    v->gate = 0;
+    if (!gurdy_rings(t))
+        v->stage = 3;
+}
+
 static void trk_note_off(track_t *t, uint32_t note)
 {
     uint32_t i, k = 0, mode = trk_vmode(t);
@@ -449,19 +458,15 @@ static void trk_note_off(track_t *t, uint32_t note)
                 mono_play(t, next, t->v[0].vel, 0, t->p[P_GLIDE] != 0);
             } else {
                 for (i = 0; i < nv; i++)
-                    if (t->v[i].gate) {
-                        t->v[i].gate = 0;
-                        t->v[i].stage = 3;
-                    }
+                    if (t->v[i].gate)
+                        voice_release(t, &t->v[i]);
                 t->mono_note = 0;
             }
         }
     }
     for (i = 0; i < NVOICE; i++)                        /* a fallback above already has its new pitch */
-        if (t->v[i].note == note && t->v[i].gate) {
-            t->v[i].gate = 0;
-            t->v[i].stage = 3;
-        }
+        if (t->v[i].note == note && t->v[i].gate)
+            voice_release(t, &t->v[i]);
 }
 
 static void trk_all_off(track_t *t)

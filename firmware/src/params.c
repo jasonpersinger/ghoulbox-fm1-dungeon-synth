@@ -142,6 +142,7 @@ static const param_desc_t TP[P_COUNT] = {
     [P_FTYPE] = PD("-", F_INT, 0, 2, 0),
     [P_ESYNC] = PD("-", F_INT, 0, 1, 0),
     [P_TEMP] = PE("TEMP", N_TEMP, 0),             /* GHOULBOX: EQUAL = every note as before */
+    [P_RING] = PE("RING", N_ONOFF, 0),            /* GHOULBOX 2.3: GURDY's drones through the rests; OFF = as before */
 };
 
 static const param_desc_t GP[G_COUNT] = {
@@ -433,6 +434,7 @@ static const page_t PAGES[] = {
                                                                               * GHOULBOX: KNOB 3 TEMP */
     {"EDIT 1", FAM_EDIT, SC_ENGINE, GR_NONE, {P_E0, P_E1, P_E2, P_E3}},
     {"EDIT 2", FAM_EDIT, SC_ENGINE, GR_NONE, {P_E4, P_E5, P_E6, P_E7}},
+    {"RING", FAM_EDIT, SC_TRACK, GR_NONE, {P_RING, 0xFF, 0xFF, 0xFF}},   /* GHOULBOX 2.3: GURDY only (ui.c page_visible) */
     {"LANES", FAM_EDIT, SC_TRACK, GR_NONE, {P_LN0, P_LN1, P_LN2, P_LN3}},   /* DRUM only: the lane levels */
     {"LANES 2", FAM_EDIT, SC_TRACK, GR_NONE, {P_LN4, P_LN5, P_LN6, P_LN7}},
     {"SLICES", FAM_EDIT, SC_TRACK, GR_SLICES, {0xFF, 0xFF, 0xFF, 0xFF}},   /* SLICE only: the slices by hand (ui_slice.c) */
