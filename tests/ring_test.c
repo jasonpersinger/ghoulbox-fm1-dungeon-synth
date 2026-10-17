@@ -155,6 +155,18 @@ int main(void)
         level(t, 3000);
         ok &= !nactive(t);
         bad += check("the stop, or RING OFF, ends the ringing: the release, the voice ends", ok);
+        t = r_reset(0, 1, 1);                          /* a mute too: no next note comes to take the voice back */
+        trk_note_on(t, 62, 100);
+        level(t, 50);
+        trk_note_off(t, 62);
+        level(t, 50);
+        ok = t->v[0].stage == 2u;
+        t->p[P_MUTE] = 1;
+        level(t, 2);
+        ok &= t->v[0].stage == 3u;
+        level(t, 3000);
+        ok &= !nactive(t);
+        bad += check("  and a mute (GLO): the drones do not ring on, unheard notes never come", ok);
     }
 
     /* 7 */
