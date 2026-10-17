@@ -498,19 +498,21 @@ static int formats(void)
           (st.raw[68u + P_COUNT + 2u + 9u] & 0x80u) && !(st.raw[68u + P_COUNT + 2u + 12u] & 0x80u);   /* +7: bits 0..2 */
     bad += check("FUN10 round trip: 3840 bytes, nudges (bit 7 of the note bytes), 128 records, LFO 2, QUANTIZE", ok);
     /* a FUN10 of a 1.2 build before SPREAD (#148): 103 parameters (no P_SPRD, nor what came after it); one of 1.2 ..
-     * 1.4 (GHOULBOX up to 1.4.1): 104 (no Felucca 1.5's seven, no TEMP); one of Felucca 1.5: 111 (no TEMP). Their engine
-     * values and their motion (the lock on E3) as many ids lower. They load by count: SPREAD 0, the seven at Felucca
-     * 1.5's defaults, TEMP EQUAL, the rest as written */
-    for (uint32_t f = 0; f < 3u; f++) {
-        static const uint32_t FROM[3] = {P_SPRD, P_ITYPE, P_TEMP};
-        static const char *const WHAT[3] = {
+     * 1.4 (GHOULBOX up to 1.4.1): 104 (no Felucca 1.5's seven, no TEMP); one of Felucca 1.5: 111 (no TEMP); one of
+     * GHOULBOX 2.0 .. 2.2: 112 (no RING). Their engine values and their motion (the lock on E3) as many ids lower. They
+     * load by count: SPREAD 0, the seven at Felucca 1.5's defaults, TEMP EQUAL, RING OFF, the rest as written */
+    for (uint32_t f = 0; f < 4u; f++) {
+        static const uint32_t FROM[4] = {P_SPRD, P_ITYPE, P_TEMP, P_RING};
+        static const char *const WHAT[4] = {
             "a FUN10 of 103 parameters (1.2 before SPREAD): SPREAD 0, the seven reserved, TEMP EQUAL, engine values, motion",
             "a FUN10 of 104 parameters (1.2 .. 1.4.1): the seven reserved at their defaults, TEMP EQUAL, engine values, motion",
-            "a FUN10 of 111 parameters (Felucca 1.5): TEMP EQUAL, engine values and motion in place"};
+            "a FUN10 of 111 parameters (Felucca 1.5): TEMP EQUAL, engine values and motion in place",
+            "a FUN10 of 112 parameters (GHOULBOX 2.0 .. 2.2): RING OFF, engine values and motion in place"};
         static project_store_t so;
         uint32_t from = FROM[f], pi = 68u, po = 68u, tr, m0, drop = P_E0 - from;
         memset(&so, 0, sizeof so);
-        ok = proj_pack(&st, &a) && !a.t[0].p[P_SPRD] && !a.t[0].p[P_ITYPE] && !a.t[0].p[P_ESYNC] && !a.t[0].p[P_TEMP];
+        ok = proj_pack(&st, &a) && !a.t[0].p[P_SPRD] && !a.t[0].p[P_ITYPE] && !a.t[0].p[P_ESYNC] && !a.t[0].p[P_TEMP] &&
+             !a.t[0].p[P_RING];
         memcpy(so.raw, st.raw, 68u);
         so.raw[66] = (uint8_t)(P_COUNT - drop);
         for (tr = 0; tr < NTRK; tr++) {
@@ -531,8 +533,9 @@ static int formats(void)
         memcpy(so.raw + PROJ_FM6_OFF, st.raw + PROJ_FM6_OFF, PROJ_STORE_SIZE - 4u - PROJ_FM6_OFF);
         i = proj_hash(so.raw, PROJ_STORE_SIZE - 4u);
         memcpy(so.raw + PROJ_STORE_SIZE - 4u, &i, 4);
-        ok &= so.raw[66] == (uint8_t[]){103u, 104u, 111u}[f] && proj_import(&b, &so, sizeof so) && !memcmp(&a, &b, sizeof a) &&
-              b.t[2].p[P_E0 + 3] == 5 && b.t[1].p[P_IA] == 64 && b.t[1].p[P_IMIX] == 127 && b.t[1].p[P_TEMP] == 0;
+        ok &= so.raw[66] == (uint8_t[]){103u, 104u, 111u, 112u}[f] && proj_import(&b, &so, sizeof so) && !memcmp(&a, &b, sizeof a) &&
+              b.t[2].p[P_E0 + 3] == 5 && b.t[1].p[P_IA] == 64 && b.t[1].p[P_IMIX] == 127 && b.t[1].p[P_TEMP] == 0 &&
+              !b.t[1].p[P_RING];
         bad += check(WHAT[f], ok);
     }
     {   /* the song's sections (1.2): a slot per track, "-" silent, 5 bytes a row, 84 in all, right after the steps */

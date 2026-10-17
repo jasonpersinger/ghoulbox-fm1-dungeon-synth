@@ -69,8 +69,8 @@ int main(void)
     host_tracks_init();
     host_preset(t, 0, 0);                               /* ANALOG */
 
-    check("layout: P_TEMP after Felucca 1.5's seven (96..102), P_E0 104, P_COUNT 112",
-          P_TEMP == 103 && P_E0 == 104 && P_COUNT == 112);
+    check("layout: P_TEMP after Felucca 1.5's seven (96..102), then RING (2.3), P_E0 105, P_COUNT 113",
+          P_TEMP == 103 && P_RING == 104 && P_E0 == 105 && P_COUNT == 113);
     check("  the seven reserved at Felucca 1.5.1's defaults (INSRT 0, A 64, B 96, C 96, MIX 127, TYPE 0, ESYNC 0)",
           TP[96].def == 0 && TP[97].def == 64 && TP[98].def == 96 && TP[99].def == 96 && TP[100].def == 127 &&
           TP[101].def == 0 && TP[102].def == 0);

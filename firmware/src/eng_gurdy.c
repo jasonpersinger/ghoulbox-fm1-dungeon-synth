@@ -15,6 +15,9 @@
  *                    speed of full pressure
  *   the body         two wooden resonances (~270 Hz box, ~1.1 kHz nose), BODY of them against the dry strings
  * WOBL: the wheel's unevenness, a slow random wander of pitch and loudness.
+ * RING (GHOULBOX 2.3, the track's P_RING, its own page): the wheel goes on turning between the notes. While the
+ * transport runs, a note's end leaves the voice at its sustain (voice.c voice_release): the melody string and the
+ * trompette fade over the release (v->ring), the drones sound on until the next note, the stop, or RING OFF.
  * State: s[0..1] the box's SVF, s[2..3] the nose's, s[4] noise, s[5] the wander, s[6] samples since the
  * note-on (the strokes; COUP CRANK: the pressure, the stroke's envelope and the strokes it has seen), s[7] the
  * pressure low-pass. ph[0] chanterelle, ph[1] bourdon (x2: the trompette),
@@ -73,6 +76,15 @@ static int crank_track(const track_t *t)
     return t->eng_req % NENGINES == ENGI_GURDY && t->p[P_E5] == (int16_t)GURDY_CRANK;
 }
 
+/* RING: the drones ring through the rests: a GURDY track with RING ON while the transport runs (voice.c voice_release) */
+static int gurdy_rings(const track_t *t)
+{
+    return t->p[P_RING] && t->engine == ENGI_GURDY && song.playing;
+}
+
+/* the presets that ring (bit k: GURDY_PRESETS[k]; ui.c sound loads): HURDY GURDY, DRONE WHEEL, BAGPIPE */
+#define GURDY_RING 0x23u
+
 /* the bow's pressure (Q15) for the crank's speed: GEAR (WHL) is the speed of full pressure, 60 clicks/s (0) .. 12
  * (127); below 2 clicks/s none; linear between (a slow crank ~6 dB under a full one at half its speed) */
 static int32_t crank_pressure(int32_t gear)
@@ -86,6 +98,8 @@ static int32_t crank_pressure(int32_t gear)
 static void gurdy_note_on(track_t *t, voice_t *v)
 {
     v->s[6] = 0;                                        /* the strokes start with the note */
+    if (!v->env_out || v->ring == 255u)                 /* RING: the melody string plays; on drones still */
+        v->ring = 255;                                  /* sounding it comes back over the attack (no click) */
     if (t->p[P_E5] == (int16_t)GURDY_CRANK)             /* the crank: the wheel's pressure now (already turning: */
         v->s[6] = crank_pressure(t->p[P_E3]) | (int32_t)((uint32_t)crank.strokes << 24);   /* at once), no burst */
     if (!v->s[4])
@@ -114,7 +128,8 @@ static void gurdy_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const
                                                         /* GHOULBOX: the drones on TEMP's own degrees, not the note's */
     uint32_t ph0 = v->ph[0], ph1 = v->ph[1], ph2 = v->ph[2];
     int32_t b1 = v->s[0], b2 = v->s[1], n1 = v->s[2], n2 = v->s[3], nst = v->s[4], wob = v->s[5], cnt = v->s[6];
-    int32_t lp = v->s[7], kp = 6000 + whl * 200, fric = whl * 24, e0, e1, de, e, w, pr = 32767, dpr = 0;
+    int32_t lp = v->s[7], kp = 6000 + whl * 200, fric = whl * 24, e0, e1, de, e, w, pr = 32767, dpr = 0, g = 32767, dg = 0;
+    int rg;
     tsvf_t box, nose;
     /* the wheel's wander: a leaky random walk, once per block; pitch +-~12 ct and loudness +-~8 % at WOBL 127 */
     wob += (int32_t)(noise32(&nst) >> 22) - 512;
@@ -152,6 +167,24 @@ static void gurdy_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const
         a += n;
         e1 = a < fall ? 32767 - (int32_t)((a * kf) >> 8) : a >= per ? 32767 : 0;
     }
+    if (!v->gate && v->stage < 3u && !gurdy_rings(t))
+        v->stage = 3;                                   /* RING off, or the transport stopped: the drones' release */
+    rg = v->ring < 255u || (!v->gate && v->stage < 3u);
+    if (rg) {                                           /* RING: the melody string and the trompette fade over the */
+        uint32_t r = v->ring, k = (r * ENV_EXP[p[P_REL] & 127]) >> 16;   /* release's curve (Q8: a step a block at */
+        int32_t g1;                                     /* least, so ~0.2 s at most), back over the attack's */
+        if (!v->gate)
+            v->ring = (uint8_t)(r > (k ? k : 1u) ? r - (k ? k : 1u) : 0u);
+        else if ((k = ENV_LIN[p[P_ATK] & 127] >> 16) < 255u - r)
+            v->ring = (uint8_t)(r + (k ? k : 1u));
+        else
+            v->ring = 255;
+        g = (int32_t)(r << 7 | r >> 1);                 /* (Q15: 255 is 32767) */
+        g1 = (int32_t)((uint32_t)v->ring << 7 | (uint32_t)v->ring >> 1);
+        dg = (g1 - g) / (int32_t)n;
+        e0 = mulq15(e0, g);
+        e1 = mulq15(e1, g1);
+    }
     de = (e1 - e0) / (int32_t)n;
     e = e0;
     tsvf_coef(&box, 44 << 8, 70);                      /* ~270 Hz (CUTOFF_HZ: 30 Hz .. 16 kHz over 0..127) */
@@ -161,6 +194,10 @@ static void gurdy_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const
         s = osc_saw(ph0, inc);                          /* the chanterelle, through the pressure low-pass */
         lp += mulq15(s - lp, kp);
         x = lp + mulq15(nz, fric);                      /* .. and the rosin */
+        if (rg) {                                       /* RING: fading after its note */
+            x = mulq15(x, g);
+            g += dg;
+        }
         x += mulq15(osc_saw(ph1, dinc), dlvl) + mulq15(osc_saw(ph2, finc), flvl);   /* the drones */
         if (e > 0) {                                    /* the trompette: the dog chatters at each period's start */
             tr = osc_saw(ph1 << 1, dinc << 1);

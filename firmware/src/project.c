@@ -65,7 +65,8 @@
  * at its defaults (P_ITYPE .. P_ESYNC, 96..102: a merge of 1.5 keeps their meaning), and TEMP (P_TEMP, 103), before
  * the engine values (P_COUNT 112, P_E0 104; 12 spare, room for 3). A FUN10 of 1.2 .. 1.4.1 (104) or of Felucca 1.5
  * (111) loads by count: TEMP EQUAL, the seven at their defaults. Firmware before refuses a FUN10 of 112 (np >
- * P_COUNT): it shows EMPTY there. FUN9 / FUN8 / FUN7 load as before (their 64 records of 4 bytes read by proj_motion_v9, every
+ * P_COUNT): it shows EMPTY there. GHOULBOX 2.3: RING (P_RING, 104), P_COUNT 113, P_E0 105, the same way: a FUN10 of
+ * 2.0 .. 2.2 (112) loads with RING OFF; 2.2 and before refuse a FUN10 of 113 (EMPTY there). FUN9 / FUN8 / FUN7 load as before (their 64 records of 4 bytes read by proj_motion_v9, every
  * step's nudge 0: the timing they always had; parameters mapped by count, the four new ones at their defaults:
  * SYNC OFF, TRIG NOTE, POL BI, QUANTIZE ON, SPREAD 0, which play as before 1.2), and so do FUN6..FUN1. Firmware before 1.2
  * refuses a FUN10 everywhere (its size and magic are no format it knows): a slot holding one shows EMPTY there (the
@@ -163,11 +164,14 @@ _Static_assert(sizeof(project_v5_t) == 3352u && sizeof(project_v6_t) == 3388u, "
  * tail's last two before the patches: track parameters can still grow by two (8 bytes) before them */
 #define PROJ_AMB_OFF (PROJ_FM6_OFF - 2u)
 /* GHOULBOX 2.1: HOME > KEYS (G_KMODE .. G_KOCT), one little-endian word below the ambience: 0 (every FUN10 before:
- * KEYS OFF, its defaults) or 1 + MODE + 3 x (TRK + 4 x (OCT + 5 x SPLIT)), up to 1440. Track parameters can still
- * grow by two (8 bytes) before it */
+ * KEYS OFF, its defaults) or 1 + MODE + 3 x (TRK + 4 x (OCT + 5 x SPLIT)), up to 1440. Track parameters could
+ * grow by two (8 bytes) before it; RING (2.3) took one: one more (4 bytes) */
 #define PROJ_KEYS_OFF (PROJ_AMB_OFF - 2u)
+/* GHOULBOX 2.3: HOME > DREAM (G_DREAM .. G_DMOOD), one little-endian word below KEYS: 0 (every FUN10 before: its
+ * defaults) or 1 + EVOL + 2 x (DENS - 1 + 8 x (DRFT - 1 + 8 x MOOD)), up to 768. Two bytes left below it */
+#define PROJ_DREAM_OFF (PROJ_KEYS_OFF - 2u)
 typedef union { uint32_t align; uint8_t raw[PROJ_STORE_SIZE]; } project_store_t;
-_Static_assert(PROJ_NG == 27u && G_COUNT == PROJ_NG + 6u, "FUN7 globals retain original IDs; GHOULBOX's six in the tail");
+_Static_assert(PROJ_NG == 27u && G_COUNT == PROJ_NG + 10u, "FUN7 globals retain original IDs; GHOULBOX's ten in the tail");
 _Static_assert(sizeof(project_store_t) == 3840u && PROJ_STORE_V7 == sizeof(project_v6_t), "FUN10 / FUN7 sizes");
 typedef struct {                               /* a track of format 4, read only */
     int16_t p[PROJ_NP_V4];
@@ -635,7 +639,7 @@ static int proj_pack(project_store_t *out, const project_t *q)
             b[pos++] = (uint8_t)(s->probability | (r >> 1) << 7);
         }
     }
-    if (pos + sizeof q->chain + sizeof q->motion > PROJ_KEYS_OFF) return 0;
+    if (pos + sizeof q->chain + sizeof q->motion > PROJ_DREAM_OFF) return 0;
     memcpy(b + pos, &q->chain, sizeof q->chain); pos += sizeof q->chain;
     memcpy(b + pos, &q->motion, sizeof q->motion);
     b[PROJ_AMB_OFF] = (uint8_t)(q->g[G_AMB] + 1); b[PROJ_AMB_OFF + 1u] = (uint8_t)(q->g[G_CRKL] + 1);   /* GHOULBOX */
@@ -644,6 +648,12 @@ static int proj_pack(project_store_t *out, const project_t *q)
                      4u * ((uint32_t)clamp(q->g[G_KOCT], 0, 4) + 5u * (uint32_t)clamp(q->g[G_KSPLIT], 0, 23)));
         b[PROJ_KEYS_OFF] = (uint8_t)v;
         b[PROJ_KEYS_OFF + 1u] = (uint8_t)(v >> 8);
+    }
+    {   /* GHOULBOX 2.3: DREAM (PROJ_DREAM_OFF) */
+        uint32_t v = 1u + (uint32_t)clamp(q->g[G_DREAM], 0, 1) + 2u * ((uint32_t)clamp(q->g[G_DDENS] - 1, 0, 7) +
+                     8u * ((uint32_t)clamp(q->g[G_DDRFT] - 1, 0, 7) + 8u * (uint32_t)clamp(q->g[G_DMOOD], 0, 5)));
+        b[PROJ_DREAM_OFF] = (uint8_t)v;
+        b[PROJ_DREAM_OFF + 1u] = (uint8_t)(v >> 8);
     }
     memcpy(b + PROJ_FM6_OFF, q->fm6, sizeof q->fm6);
     {   /* the name (0-padded; stops at the first 0) */
@@ -700,8 +710,8 @@ static int proj_unpack(project_t *q, const uint8_t *b, uint32_t st)
     memcpy(&magic, b, 4); memcpy(&size, b + 4, 4); memcpy(&sum, b + st - 4u, 4);
     if (magic != (v7 ? PROJ_MAGIC_V7 : st == PROJ_STORE_V8 ? PROJ_MAGIC_V8 : st == PROJ_STORE_V9 ? PROJ_MAGIC_V9 : PROJ_MAGIC) ||
         size != st || sum != proj_hash(b, st - 4u) ||
-        np < 8u || np > P_COUNT || 68u + NTRK * (np + 2u + NSTEP * 9u) + chn + mot > end - (v10 ? 4u : 0u))   /* (FUN10:
-                                                         * GHOULBOX's ambience and KEYS, PROJ_AMB_OFF, PROJ_KEYS_OFF) */
+        np < 8u || np > P_COUNT || 68u + NTRK * (np + 2u + NSTEP * 9u) + chn + mot > end - (v10 ? 6u : 0u))   /* (FUN10:
+                                                         * GHOULBOX's ambience, KEYS and DREAM: PROJ_AMB_OFF ..) */
         return 0;
     memset(q, 0, sizeof *q); q->magic = PROJ_MAGIC; q->size = sizeof *q;
     memcpy(q->g, b + 8, PROJ_NG * sizeof q->g[0]); q->sel = b[62]; q->parts = b[63]; q->phys = b[64];
@@ -718,6 +728,15 @@ static int proj_unpack(project_t *q, const uint8_t *b, uint32_t st)
         v /= 4u;
         q->g[G_KOCT] = (int16_t)(v % 5u);
         q->g[G_KSPLIT] = (int16_t)(v / 5u > 23u ? 23u : v / 5u);
+    }
+    if (v10 && (b[PROJ_DREAM_OFF] | b[PROJ_DREAM_OFF + 1u])) {   /* GHOULBOX 2.3: DREAM (0: none stored, defaults) */
+        uint32_t v = (b[PROJ_DREAM_OFF] | (uint32_t)b[PROJ_DREAM_OFF + 1u] << 8) - 1u;
+        q->g[G_DREAM] = (int16_t)(v & 1u);
+        v >>= 1;
+        q->g[G_DDENS] = (int16_t)(v % 8u + 1u);
+        v /= 8u;
+        q->g[G_DDRFT] = (int16_t)(v % 8u + 1u);
+        q->g[G_DMOOD] = (int16_t)(v / 8u > 5u ? 0u : v / 8u);
     }
     if (v7 && (q->g[G_RTYPE] < 0 || q->g[G_RTYPE] > 1))   /* a FUN7 may still hold the old drum channel there */
         proj_rtype_room(q->g);

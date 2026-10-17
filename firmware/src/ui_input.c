@@ -1405,6 +1405,7 @@ static void ui_input(void)
 {
     midi_cc_apply();                                  /* GHOULBOX: MIDI CCs, in the main loop */
     crank_idle(fm1_in.frames);                        /* GHOULBOX: the crank slows and stops (every pass) */
+    dream_tick();                                     /* GHOULBOX 2.3: DREAM's EVOL (every pass) */
     uint32_t pressed = fm1_input_edges(0), notes = fm1_input_note_edges(), now = fm1_ticks(), id, b, k;
     uint32_t home, rec, save;
     uint32_t oct;
@@ -1566,6 +1567,9 @@ static void ui_input(void)
                 }
             } else if (kind == CF_CLEAR_SONG) {
                 if (!chain_busy()) { chain_defaults(&chain_config); ui.song_row = 0; ui_message("SONG CLEARED"); }
+            } else if (kind == CF_DREAM) {               /* GHOULBOX 2.3 */
+                dream.asked = 1;
+                dream_go(ui.confirm_trk);
             } else if (kind == CF_INIT_SOUND) {
                 if (!chain_busy()) { set_engine(TSEL->eng_req); ui_message("SOUND INIT"); }
             } else {
@@ -1658,6 +1662,8 @@ static void ui_input(void)
     lock_keys();                                        /* (a grid key on a hit let go: the hit goes) */
     if (song.grid == 3u) {
         song_keys(notes);
+    } else if (song.grid == 4u) {                       /* GHOULBOX 2.3: DREAM, a key composes */
+        dream_keys(notes);
     } else if (song.grid) {
         grid_keys(notes);
     } else if (song.seq_mode && cur_page()->graph == GR_ROLL) {   /* STEP */
