@@ -6,7 +6,7 @@
 [Felucca](https://github.com/hugelton/Felucca) by Hügelton Instruments (1.4.1), tuned for dark ambient,
 medieval and fantasy synth music, from Old Tower and Hole Dweller to Mortiis-era dungeon synth.
 
-**Latest: 2.3.** [Play it in your browser](https://ghoulbox.messy.quest/) ·
+**Latest: 2.3.1.** [Play it in your browser](https://ghoulbox.messy.quest/) ·
 [install it](https://ghoulbox.messy.quest/webapp/installer/) ·
 [hear every sound](https://ghoulbox.messy.quest/sounds/) ·
 [watch the 2.0 demo](https://youtu.be/NMSw1_wnCwQ) ·
@@ -16,6 +16,14 @@ medieval and fantasy synth music, from Old Tower and Hole Dweller to Mortiis-era
 GHOULBOX is free and always will be. To support it: [Ko-fi](https://ko-fi.com/ghoulbox) · [merch](https://ghoulbox-shop.fourthwall.com/).
 
 ## What's new
+
+### 2.3.1
+
+- **A DREAM fix.** With EVOL on, a project loaded after a dream could be changed using the earlier dream's key and
+  parts. DREAM now starts again from what the loaded project's tracks hold (and after a sound change, from the new
+  sound).
+- **The web editor's groups are back.** Since 1.2 the editor showed GHOULBOX's controls as one long list; it now
+  shows them grouped again (Sound, Sequencer, Settings), with RING, KEYS and DREAM.
 
 ### 2.3
 
@@ -164,7 +172,7 @@ Felucca's sequencer, song mode, effects, editor and backups all work as they do 
 - **An old-RPG screen**: VT323 pixel type, stone windows, a sword cursor, flickering wall torches, and the
   CRYPT palette (stone, bone, torch amber, blood red), a blackletter wordmark and a skull at boot.
 
-Version 2.3 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
+Version 2.3.1 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
 
 **[User guide (PDF)](docs/guide/GHOULBOX-User-Guide-2.3.pdf):** a 53-page manual: the FM-1's hardware and
 installing; synth basics in plain words (oscillators, filters, envelopes, LFOs, effects, sequencing), each

@@ -1357,6 +1357,44 @@ function fm6TabNoBank() {
     "FM6 tab: the hint (send to a track, then SAVE on the device), no B slots in the help");
 }
 
+/* ------------------------------------------ editor groups: the known layouts --- */
+{   /* GHOULBOX 2.3.1 (Codex's review): the curated groups (LAYOUT) for every layout knownLayout takes, every parameter
+       on them (none only in the id-order list it replaces): 1.2 .. 1.4.1, GHOULBOX 2.0 .. 2.2, 2.3 */
+  const lay = html.slice(html.indexOf("/* parameter ids (firmware/src/core.h)"), html.indexOf("/* globals that are actions"));
+  const L = vm.runInNewContext(proto + lay + `
+;let ENG = "ANALOG"; const engName = () => ENG;
+({ knownLayout, LAYOUT, setEng: (e) => { ENG = e; } })`, { console, TextEncoder, TextDecoder, setTimeout, clearTimeout });
+  const ids = (pe0, gc, s) => {
+    const out = new Set();
+    for (const eng of ["ANALOG", "DRUM", "GURDY"]) {
+      L.setEng(eng);
+      for (const g of L.LAYOUT(pe0, gc)) {
+        if (g.mod != null && !s) for (let k = 0; k < 12; k++) out.add(g.mod + k);
+        for (const [, sc, list] of g.pages || []) if (sc === s) list.forEach((i) => out.add(i));
+      }
+    }
+    return out;
+  };
+  const all = (n, skip) => Array.from({ length: n }, (_, i) => i).filter((i) => !skip(i));
+  for (const [pc, pe0, gc, what] of [[113, 105, 37, "2.3"], [112, 104, 33, "2.1 / 2.2"], [112, 104, 29, "2.0"], [104, 96, 27, "1.2 .. 1.4.1"]]) {
+    const p = ids(pe0, gc, 0), g = ids(pe0, gc, 1);
+    const missP = all(pe0, (i) => (i >= 61 && i <= 80) || (i >= 96 && i <= 102)).filter((i) => !p.has(i));   /* (DIGITAL's
+                                                         operator ENVs: a FELUCCA_FM4 firmware's; Felucca 1.5's seven: reserved) */
+    const missG = all(gc, (i) => [12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23].includes(i)).filter((i) => !g.has(i));   /* (MIDI
+                                                         SYNC CPU and the actions: G_SKIP's) */
+    ok(L.knownLayout({ pcount: pc, pe0, gcount: gc }) && !missP.length && !missG.length,
+      `editor groups: GHOULBOX ${what} (${pc}, ${pe0}, ${gc} globals) known, every parameter on a group` +
+      (missP.length || missG.length ? ` (missing ${missP} / ${missG})` : ""));
+  }
+  ok(!L.knownLayout({ pcount: 111, pe0: 103, gcount: 27 }) && L.knownLayout({ pcount: 99, pe0: 91, gcount: 27 }),
+    "editor groups: Felucca 1.5 (111: its INSERT) keeps the id-order list; 1.1 the groups as before");
+  L.setEng("GURDY");
+  const ring = L.LAYOUT(105, 37).find((g) => g.engine).pages.find((x) => x[0] === "RING");
+  L.setEng("ANALOG");
+  ok(ring && ring[2][0] === 104 && !L.LAYOUT(105, 37).find((g) => g.engine).pages.find((x) => x[0] === "RING"),
+    "editor groups: RING (104) on a GURDY track's EDIT only");
+}
+
 /* ------------------------------------------------- editor tabs and strings --- */
 async function editorSong() {
   const m = E.makeMockDevice({ auto: false });

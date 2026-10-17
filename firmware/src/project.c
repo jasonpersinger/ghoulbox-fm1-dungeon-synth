@@ -1050,6 +1050,7 @@ static int project_restore_runtime(const project_t *input)
     fm1_irq_off();                                      /* the audio ISR must not see half a project */
     seq_stop();
     transport_req = 0;
+    dream_forget();                                     /* GHOULBOX 2.3.1: EVOL rebuilds from this project's tracks */
     chain_config = p->chain;
     motion = p->motion;
     memset(motion_active, 0, sizeof motion_active);

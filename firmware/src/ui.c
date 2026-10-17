@@ -822,10 +822,12 @@ static void load_begin(track_t *t, uint32_t what)
     load_motion_hold(t, what);
 }
 
+static void dream_forget(void);                   /* (dream.c, below) */
 static void load_end(track_t *t)
 {
     if (--undo_depth)
         return;
+    dream_forget();                               /* GHOULBOX 2.3.1: DREAM's parts follow the sounds now there */
     if (load_mo & 1u) {                           /* a sound load: the motion on the common parameters stays */
         (void)motion_sound_loaded(t, load_from, t->eng_req);
         if ((load_mo & 2u) && motion_count(t))

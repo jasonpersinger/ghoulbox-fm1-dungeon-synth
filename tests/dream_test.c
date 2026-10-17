@@ -253,6 +253,34 @@ int main(void)
         bad += check("after a load: the key, the scale and the chords found back from the tracks",
                      dream.valid && dream.root == 5u && dream.scl == DR_MOOD_SCL[song.g[G_DMOOD]] && !memcmp(deg, dream.deg, 4));
     }
+    {   /* 2.3.1 (Codex's review): a project loaded after a dream, then EVOL: its own key and parts, not the dream's; a sound
+         * load forgets the dream too */
+        project_t q;
+        uint32_t pass;
+        scene(1);                                      /* project A: CRYPT's sounds dreamed in A Phrygian */
+        song.g[G_DMOOD] = 2;
+        rng_state = 99;
+        dream_compose(9);
+        project_capture(&q);
+        scene(0);                                      /* then a dream in D on DUNGEON's sounds */
+        song.g[G_DMOOD] = 0;
+        dream_compose(2);
+        ok = dream.valid && dream.root == 2u;
+        project_restore_runtime(&q);                   /* load A */
+        ok &= !dream.valid;
+        song.g[G_DREAM] = 1; song.g[G_DDRFT] = 8; song.playing = 1;
+        for (pass = 0; pass < 3u; pass++) {
+            trk[0].seq_idx = 40; dream_tick(); trk[0].seq_idx = 0; dream_tick();
+        }
+        ok &= dream.valid && dream.root == 9u && dream.scl == DR_MOOD_SCL[2] && dream.role[0] == DR_DRONE &&
+              dream.role[3] == DR_PERC && piece_ok("A after load");
+        song.playing = 0;
+        scene(0);
+        dream_compose(2);
+        apply_preset_to(&trk[1], 0);
+        ok &= !dream.valid;
+        bad += check("a project loaded after a dream: EVOL works from its own key, chords and parts; a sound load too", ok);
+    }
     {   /* EVOL over patterns of any scale (after a load, the tracks' own SCL: 5 .. 12 tones): no hang (the alarm), in key */
         uint32_t scl, pass;
         alarm(60);
