@@ -20,7 +20,7 @@ enum { K_TAP, K_HOLD, K_TURN, K_SAY, K_KEY, K_GLOKEY, K_CHORD, K_PRESS, K_LETGO,
                                                              * key arg tapped (a mute, track until-1 toggles) */
 /* what an action turns or taps until: */
 enum { U_CLICKS, U_TRACK, U_SOUND, U_PICK, U_PAGE, U_ROW, U_TAB, U_VALUE, U_SCENE, U_RESTORE,   /* U_RESTORE: arg 1 OFF */
-       U_AFTERNOTE, U_EVADD, U_EVNOTE, U_EVCHANCE, U_ACT, U_STEPTIME };   /* U_STEPTIME: the cursor step's TIME */   /* (lesson 6) U_AFTERNOTE: the SEQ cursor on a rest just
+       U_AFTERNOTE, U_EVADD, U_EVNOTE, U_EVCHANCE, U_ACT, U_STEPTIME, U_SONGROW, U_SONGTRK };   /* (lesson 15: SONG's row, its track) */   /* U_STEPTIME: the cursor step's TIME */   /* (lesson 6) U_AFTERNOTE: the SEQ cursor on a rest just
                                                     * after a note; on AUTOMATION: + ADD's row, its step a note, CHANCE;
                                                     * U_ACT: the action of KNOB arg picked. A K_TURN with U_CLICKS turns arg
                                                     * clicks (signed) */
@@ -717,6 +717,64 @@ static const lstep_t L14_STEPS[] = {
     {"Set up", SETUP}, {"Something to keep", L14_TUNE}, {"Save it, name it", L14_SAVE}, {"Load it back", L14_LOAD},
     {"Undo", L14_UNDO}, {"Share it", L14_SHARE}, {"Wake with your music", L14_WAKE}, {0, 0}};
 
+/* ---------------------------------------------------------------- LESSON 15: THE WHOLE PIECE */
+static const act_t L15_A[] = {
+    SAY(C_NONE, "Four sounds: gurdy, crypt pad, monks, drone wheel", 4.5f),
+    TAPS(C_HOME, "DREAM", "Tap HOME until DREAM"),
+    SAY(C_K4, "KNOB 4 (MOOD): MIN", 3),
+    KEY(9, "D: a piece in D minor", 2.5f),
+    TAP(C_OCTUP, "It asks first: OCT+ for yes"),
+    SAY(C_NONE, "Section A: the FM-1 writes it for these four sounds", 9),
+    SAY(C_NONE, "As in Lesson 6: edit any part you like", 5), END};
+static const act_t L15_SAVEA[] = {
+    TAP(C_PLAY, "Press PLAY to stop"),
+    TAPS(C_SAVE, "PROJECT", "Tap SAVE until PROJECT"),
+    TURN_TO(C_K1, U_VALUE, 1, 0, "KNOB 1 (SLOT) is on 1: A"),
+    TURN_TO(C_K4, U_ACT, 4, 0, "Turn KNOB 4 (SAVE) right"),
+    TAP(C_OCTUP, "Press OCT+"),
+    TAP(C_OCTUP, "OCT+ again: saved as A"), END};
+static const act_t L15_B[] = {
+    TAPS(C_HOME, "DREAM", "Tap HOME until DREAM"),
+    TURN_TO(C_K4, U_VALUE, 3, 0, "Turn KNOB 4 (MOOD) to HARM"),
+    KEY(9, "D again: the same key, a darker mood", 2.5f),
+    SAY(C_NONE, "Section B: harmonic minor, the castle", 10), END};
+static const act_t L15_SAVEB[] = {
+    TAP(C_PLAY, "Press PLAY to stop"),
+    TAPS(C_SAVE, "PROJECT", "Tap SAVE until PROJECT"),
+    TURN_TO(C_K1, U_VALUE, 2, 0, "Turn KNOB 1 (SLOT) to 2: B"),
+    TURN_TO(C_K4, U_ACT, 4, 0, "Turn KNOB 4 (SAVE) right"),
+    TAP(C_OCTUP, "Press OCT+"),
+    TAP(C_OCTUP, "OCT+ again: saved as B"), END};
+static const act_t L15_SONG[] = {
+    TAPS(C_GLO, "SONG", "Tap GLO: the SONG page"),
+    SAY(C_NONE, "A song: sections in a row. A is project 1, B project 2", 5),
+    KEY(4, "Press the A key, the lowest A: section 1 plays A", 1.8f),
+    TURN_TO(C_K1, U_SONGROW, 1, 0, "Turn KNOB 1 to the next row, + ADD"),
+    KEY(6, "Press the B key: section 2, track 1 on B", 1.8f),
+    TURN_TO(C_K2, U_SONGTRK, 1, 0, "Turn KNOB 2 (TRACK) to 2"),
+    KEY(6, "B key: the pad on B too", 1.6f),
+    TURN_TO(C_K2, U_SONGTRK, 2, 0, "KNOB 2 to 3"),
+    KEY(6, "B key: the monks on B", 1.6f),
+    SAY(C_NONE, "Track 4 stays on A: the same drone through both", 5),
+    SAY(C_K4, "KNOB 4 (REPS): play a section more than once", 4), END};
+static const act_t L15_PLAY[] = {
+    TAP(C_PLAY, "Press PLAY: the song from the top"),
+    SAY(C_NONE, "Section A", 12),
+    SAY(C_NONE, "Sit back. This is your piece", 13),
+    SAY(C_NONE, "Section B: the castle, over the same drone", 15),
+    SAY(C_NONE, "Then round again: A, then B", 8), END};
+static const act_t L15_END[] = {
+    HOLD(C_HOME, "Hold HOME: the menu"),
+    TURN_TO(C_ALGO, U_TAB, MTAB_SYSTEM, 0, "Turn ALGORITHM to the SYSTEM tab"),
+    TURN_TO(C_PRESETS, U_ROW, MI_RESTORE, 0, "Turn PRESETS to RESTORE LAST"),
+    TURN_TO(C_OCTUP, U_RESTORE, 0, 0, "Press OCT+ until it says ON"),
+    TAP(C_HOME, "Tap HOME to close the menu"),
+    SAY(C_NONE, "From one low note to a whole piece. Thank you for playing", 7), END};
+static const lstep_t L15_STEPS[] = {
+    {"Set up", SETUP}, {"Dream section A", L15_A}, {"Keep it as A", L15_SAVEA}, {"Dream section B", L15_B},
+    {"Keep it as B", L15_SAVEB}, {"Make a song", L15_SONG}, {"Play the whole piece", L15_PLAY},
+    {"The end", L15_END}, {0, 0}};
+
 /* ---------------------------------------------------------------- 6: DREAM (GHOULBOX 2.3: what's new, not a lesson) */
 static const act_t L6_FIND[] = {
     SAY(C_NONE, "GHOULBOX 2.3 can compose. This is DREAM", 4.5f),
@@ -764,7 +822,8 @@ static const lesson_t LESSONS[] = {{L1_STEPS, 9, 0} /* (a new FM-1: DUNGEON) */,
                                    {L11_STEPS, 8, 4} /* (index 12: LESSON 11, Two Hands) */,
                                    {L12_STEPS, 8, 4} /* (index 13: LESSON 12, The Old Ways) */,
                                    {L13_STEPS, 8, 4} /* (index 14: LESSON 13, With a MIDI Keyboard or DAW) */,
-                                   {L14_STEPS, 8, 4} /* (index 15: LESSON 14, Keep and Share Your Music) */};
+                                   {L14_STEPS, 8, 4} /* (index 15: LESSON 14, Keep and Share Your Music) */,
+                                   {L15_STEPS, 10, 4} /* (index 16: LESSON 15, The Whole Piece) */};
 
 /* ---------------------------------------------------------------- (lesson 13) what a computer sends over USB-MIDI */
 static uint32_t mpk(uint32_t st, uint32_t d1, uint32_t d2) { return (st >> 4) | st << 8 | d1 << 16 | d2 << 24; }
@@ -914,6 +973,8 @@ static int reached(const act_t *a)
     case U_EVCHANCE: return ui.ev_id == (a->arg ? EV_RATCH : EV_CHANCE);   /* (lesson 10: arg 1, RATCH) */
     case U_ACT: return ui.act == a->arg;
     case U_STEPTIME: return TSEL->step[ui.cursor].time == a->arg;
+    case U_SONGROW: return ui.song_row == a->arg;
+    case U_SONGTRK: return ui.song_trk == a->arg;
     }
     return 0;
 }
