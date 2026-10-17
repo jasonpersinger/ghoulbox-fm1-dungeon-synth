@@ -76,10 +76,11 @@ static int crank_track(const track_t *t)
     return t->eng_req % NENGINES == ENGI_GURDY && t->p[P_E5] == (int16_t)GURDY_CRANK;
 }
 
-/* RING: the drones ring through the rests: a GURDY track with RING ON while the transport runs (voice.c voice_release) */
+/* RING: the drones ring through the rests: a GURDY track with RING ON while the transport runs (voice.c voice_release),
+ * not muted (a muted track plays no next note: its drones would ring on, and GLO's mute would not silence them) */
 static int gurdy_rings(const track_t *t)
 {
-    return t->p[P_RING] && t->engine == ENGI_GURDY && song.playing;
+    return t->p[P_RING] && !t->p[P_MUTE] && t->engine == ENGI_GURDY && song.playing;
 }
 
 /* the presets that ring (bit k: GURDY_PRESETS[k]; ui.c sound loads): HURDY GURDY, DRONE WHEEL, BAGPIPE */
