@@ -483,6 +483,40 @@ static const lstep_t L9_STEPS[] = {
     {"Set up", SETUP}, {"A pad to shape", L9_PAD}, {"Bright and dark", L9_FILTER}, {"Where sound starts", L9_OSC},
     {"Keep your sound", L9_KEEP}, {0, 0}};
 
+/* ---------------------------------------------------------------- LESSON 10: THE LIVING PATTERN */
+static const act_t L10_TUNE[] = {
+    TURN_TO(C_ALGO, U_TRACK, 0, 0, "Turn ALGORITHM to 1: HURDY GURDY"),
+    TURN_TO(C_K1, U_PICK, BALLAD, 0, "Still on PHRASES: turn KNOB 1 to 15 BALLAD"),
+    TAP(C_OCTUP, "Press OCT+ to load it: the tune from Lesson 2"),
+    TAP(C_HOME, "Tap HOME: the gurdy's main controls"),
+    SAY(C_NONE, "The same every time round. Let's make it move", 5), END};
+static const act_t L10_REC[] = {
+    TAP(C_REC, "Tap REC: track 1 records, knobs too"),
+    TURN_TO(C_K1, U_VALUE, 0, 0, "Turn KNOB 1 (BUZZ) down slowly"),
+    SAY(C_NONE, "Wait a moment", 2.5f),
+    TURN_TO(C_K1, U_VALUE, 127, 0, "Then all the way up"),
+    TAP(C_REC, "Tap REC again: recording stops"),
+    SAY(C_NONE, "Hands off. The buzz comes and goes by itself", 10),
+    SAY(C_NONE, "Your knob move is part of the pattern now", 6), END};
+static const act_t L10_SEE[] = {
+    TAPS(C_SEQ, "AUTOMATION", "Tap SEQ until AUTOMATION"),
+    SAY(C_NONE, "Each row: a step, and BUZZ's value there", 6),
+    SAY(C_NONE, "Change one with the knobs, or EDIT to remove it", 5), END};
+static const act_t L10_RATCH[] = {
+    TURN_TO(C_K1, U_EVADD, 0, 0, "Turn KNOB 1 to the last row: + ADD"),
+    TURN_TO(C_K2, U_EVNOTE, 0, 0, "KNOB 2 picks the step: step 1 has a note"),
+    TURN_TO(C_K3, U_EVCHANCE, 1, 0, "Turn KNOB 3 left to RATCH"),
+    TAP(C_OCTUP, "Press OCT+: that note plays twice"),
+    TURN(C_K4, 1, "Turn KNOB 4 right: three times"),
+    SAY(C_NONE, "A quick flourish, like a player's ornament", 10),
+    SAY(C_NONE, "With Lesson 6's CHANCE: a tune that never quite repeats", 6), END};
+static const act_t L10_END[] = {
+    SAY(C_NONE, "Record any knob this way: the filter, the reverb send", 6),
+    SAY(C_NONE, "Next: two sounds at once, on one keyboard", 6), END};
+static const lstep_t L10_STEPS[] = {
+    {"Set up", SETUP}, {"A tune", L10_TUNE}, {"Record a knob", L10_REC}, {"See it", L10_SEE},
+    {"An ornament", L10_RATCH}, {"Make it move", L10_END}, {0, 0}};
+
 /* ---------------------------------------------------------------- 6: DREAM (GHOULBOX 2.3: what's new, not a lesson) */
 static const act_t L6_FIND[] = {
     SAY(C_NONE, "GHOULBOX 2.3 can compose. This is DREAM", 4.5f),
@@ -525,7 +559,8 @@ static const lesson_t LESSONS[] = {{L1_STEPS, 9, 0} /* (a new FM-1: DUNGEON) */,
                                    {L6T_STEPS, 8, 4} /* (index 7: LESSON 6, Your Own Tune) */,
                                    {L7_STEPS, 8, 4} /* (index 8: LESSON 7, The Harp Arpeggio) */,
                                    {L8_STEPS, 8, 4} /* (index 9: LESSON 8, Ritual Drums) */,
-                                   {L9_STEPS, 8, 4} /* (index 10: LESSON 9, Sound Design) */};
+                                   {L9_STEPS, 8, 4} /* (index 10: LESSON 9, Sound Design) */,
+                                   {L10_STEPS, 8, 4} /* (index 11: LESSON 10, The Living Pattern) */};
 
 /* ---------------------------------------------------------------- the player */
 static FILE *wav, *vid;
@@ -623,7 +658,7 @@ static int reached(const act_t *a)
                               (TSEL->step[ui.cursor - 1u].time == ST_NOTE && TSEL->step[ui.cursor - 1u].n));
     case U_EVADD: { uint16_t rw[EV_ROWS]; uint32_t n; return (ev_cur(rw, &n) >> 8) == EVK_ADD; }
     case U_EVNOTE: return TSEL->step[ui.ev_step].time == ST_NOTE && TSEL->step[ui.ev_step].n;
-    case U_EVCHANCE: return ui.ev_id == EV_CHANCE;
+    case U_EVCHANCE: return ui.ev_id == (a->arg ? EV_RATCH : EV_CHANCE);   /* (lesson 10: arg 1, RATCH) */
     case U_ACT: return ui.act == a->arg;
     case U_STEPTIME: return TSEL->step[ui.cursor].time == a->arg;
     }
