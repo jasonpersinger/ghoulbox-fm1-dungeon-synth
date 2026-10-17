@@ -42,10 +42,18 @@ ambience (AMB, CRKL), three dungeon scales and a USB rescue for a firmware that 
 Two sounds from the keys (KEYS: LAYER and SPLIT), note and chord names on the screen, and the last session back
 at power-on (RESTORE LAST ON). All three from owners' requests.
 
+## Done: 2.2
+
+Room to grow: the firmware's free space went from 4.5 KB to 23.8 KB (the artwork and labels stored compressed, a
+smaller FM6 table), with USB audio at 44.1 kHz only.
+
+## Done: 2.3
+
+DREAM, ambient music the FM-1 composes from your four sounds and keeps changing slowly, and RING, a GURDY's drones
+sounding on through the sequencer's rests as on a real hurdy-gurdy (an owner's request).
+
 ## Next
 
-- RING: a GURDY's drones keep sounding through the sequencer's rests, as on a real hurdy-gurdy (an owner's request)
-- DREAM: ambient music the FM-1 composes from your four sounds, and keeps changing slowly
 - small screen polish
 
 ## Later
