@@ -22,6 +22,10 @@
 #ifndef FELUCCA_UAC
 #define FELUCCA_UAC 1            /* USB audio input: the master output, 16-bit stereo 44.1 kHz (usb.c) */
 #endif
+#ifndef FELUCCA_UAC_48K
+#define FELUCCA_UAC_48K 0        /* GHOULBOX 2.2: 44.1 kHz only (usb.c's default offers 48 too); its resampler's 8 KB
+                                    went to app-slot headroom (tools/build.py SLOT_SPARE) */
+#endif
 #ifndef FELUCCA_UAC_TONE
 #define FELUCCA_UAC_TONE 0       /* bench: the USB input sends test triangles instead of the music */
 #endif
