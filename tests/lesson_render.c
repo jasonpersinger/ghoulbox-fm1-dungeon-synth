@@ -18,7 +18,11 @@ static const char *const CNAME[] = {"FX", "SCL", "ENV", "LFO", "EDIT", "GLO", "H
 enum { K_TAP, K_HOLD, K_TURN, K_SAY, K_KEY, K_GLOKEY };   /* K_KEY: key arg held dur - 0.6 s; K_GLOKEY: GLO held,
                                                              * key arg tapped (a mute, track until-1 toggles) */
 /* what an action turns or taps until: */
-enum { U_CLICKS, U_TRACK, U_SOUND, U_PICK, U_PAGE, U_ROW, U_TAB, U_VALUE, U_SCENE, U_RESTORE };   /* U_RESTORE: arg 1 OFF */
+enum { U_CLICKS, U_TRACK, U_SOUND, U_PICK, U_PAGE, U_ROW, U_TAB, U_VALUE, U_SCENE, U_RESTORE,   /* U_RESTORE: arg 1 OFF */
+       U_AFTERNOTE, U_EVADD, U_EVNOTE, U_EVCHANCE, U_ACT, U_STEPTIME };   /* U_STEPTIME: the cursor step's TIME */   /* (lesson 6) U_AFTERNOTE: the SEQ cursor on a rest just
+                                                    * after a note; on AUTOMATION: + ADD's row, its step a note, CHANCE;
+                                                    * U_ACT: the action of KNOB arg picked. A K_TURN with U_CLICKS turns arg
+                                                    * clicks (signed) */
 typedef struct {
     uint8_t ctl, kind, until; int16_t arg;            /* U_CLICKS: arg clicks (signed); U_VALUE: the knob's value */
     const char *name;                                  /* U_SOUND / U_PAGE: the name to reach */
@@ -36,6 +40,7 @@ typedef struct { const lstep_t *steps; float tail; uint8_t scene; } lesson_t;   
 #define KEY(k, s, d) {C_KEY, K_KEY, U_CLICKS, k, 0, s, d}
 #define MUTE(k, trk, s) {C_KEY, K_GLOKEY, (trk) + 1, k, 0, s, 0}
 #define END {C_NONE, 0, 0, 0, 0, 0, 0}
+#define TURN(c, n, s) {c, K_TURN, U_CLICKS, n, 0, s, 0}
 
 /* ---------------------------------------------------------------- LESSON 1: THE DRONE */
 #define PEDAL 16                                       /* PATTERNS[16]: one low D, held (engines.c) */
@@ -292,6 +297,51 @@ static const lstep_t L5_STEPS[] = {
     {"The whole dungeon", L5_DUNGEON}, {"Balance", L5_BALANCE}, {"The cassette", L5_TAPE},
     {"Play the mutes", L5_MUTES}, {"Record it", L5_RECORD}, {"Keep your music", L5_KEEP}, {0, 0}};
 
+/* ---------------------------------------------------------------- LESSON 6: YOUR OWN TUNE */
+static const act_t L6T_KEY[] = {
+    TURN_TO(C_ALGO, U_TRACK, 0, 0, "Turn ALGORITHM to 1: HURDY GURDY"),
+    TAP(C_SCL, "Tap SCL: as in Lesson 2"),
+    TURN_TO(C_K1, U_VALUE, 2, 0, "KNOB 1 (ROOT) to D"),
+    TURN_TO(C_K2, U_VALUE, 2, 0, "KNOB 2 (SCL) to MIN"),
+    TURN_TO(C_K3, U_VALUE, 2, 0, "KNOB 3 (QNT) to WHITE: no wrong notes"),
+    SAY(C_NONE, "The white keys from C play D minor", 4.5f), END};
+static const act_t L6T_REC[] = {
+    TAP(C_REC, "Tap REC: track 1 records what you play"),
+    SAY(C_NONE, "It is already playing. Play along, slowly", 3),
+    KEY(14, "G. Hold each note a moment", 1.7f),   /* (WHITE: G plays A, F G, E F, C D; one pass: 6.7 s) */
+    KEY(12, "F", 1.45f),
+    KEY(11, "E", 1.45f),
+    KEY(7, "C: it plays D, home", 1.95f),
+    SAY(C_NONE, "What you play is written into the steps", 5), END};
+static const act_t L6T_LISTEN[] = {
+    TAP(C_REC, "Tap REC again: recording stops"),
+    SAY(C_NONE, "The tune plays itself, every time round", 9),
+    SAY(C_NONE, "Not quite right? Play over it again: it adds", 5), END};
+static const act_t L6T_FIX[] = {
+    TAP(C_SEQ, "Tap SEQ: the STEP page, your notes"),
+    TURN_TO(C_PRESETS, U_AFTERNOTE, 0, 0, "Turn PRESETS: the cursor to the step after a note"),
+    TURN_TO(C_K3, U_STEPTIME, ST_TIE, 0, "Turn KNOB 3 (TIME) to TIE: the note holds longer"),
+    SAY(C_NONE, "Listen: that note now rings through the next step", 8), END};
+static const act_t L6T_CHANCE[] = {
+    TAPS(C_SEQ, "AUTOMATION", "Tap SEQ again: AUTOMATION"),
+    TURN_TO(C_K1, U_EVADD, 0, 0, "Turn KNOB 1 to the last row: + ADD"),
+    TURN_TO(C_K2, U_EVNOTE, 0, 0, "Turn KNOB 2 to a step with a note"),
+    TURN_TO(C_K3, U_EVCHANCE, 0, 0, "KNOB 3 shows CHANCE"),
+    TAP(C_OCTUP, "Press OCT+: that note plays half the time"),
+    SAY(C_NONE, "Now each pass is a little different", 12), END};
+static const act_t L6T_KEEP[] = {
+    TAP(C_PLAY, "Press PLAY to stop: saving needs it stopped"),
+    TAPS(C_SAVE, "PROJECT", "Tap SAVE until PROJECT"),
+    SAY(C_K1, "KNOB 1 is the slot: 1 of 4", 4),
+    TURN_TO(C_K4, U_ACT, 4, 0, "Turn KNOB 4 (SAVE) right to pick it"),
+    TAP(C_OCTUP, "Press OCT+"),
+    SAY(C_NONE, "Name it with the keys, as on a phone. Or skip it", 6),
+    TAP(C_OCTUP, "Press OCT+ to save"),
+    SAY(C_NONE, "Your tune is kept. To load it: KNOB 3 (LOAD) here", 6), END};
+static const lstep_t L6T_STEPS[] = {
+    {"Set up", SETUP}, {"The key", L6T_KEY}, {"Record it", L6T_REC}, {"Listen back", L6T_LISTEN},
+    {"Hold a note longer", L6T_FIX}, {"Let it breathe", L6T_CHANCE}, {"Keep it", L6T_KEEP}, {0, 0}};
+
 /* ---------------------------------------------------------------- 6: DREAM (GHOULBOX 2.3: what's new, not a lesson) */
 static const act_t L6_FIND[] = {
     SAY(C_NONE, "GHOULBOX 2.3 can compose. This is DREAM", 4.5f),
@@ -330,7 +380,8 @@ static const lstep_t L6_STEPS[] = {
     {"Make it yours", L6_YOURS}, {0, 0}};
 
 static const lesson_t LESSONS[] = {{L1_STEPS, 9, 0} /* (a new FM-1: DUNGEON) */, {L2_STEPS, 8, 4}, {L3_STEPS, 8, 4}, {L4_STEPS, 8, 4}, {L5_STEPS, 8, 4},
-                                   {L6_STEPS, 8, 0} /* (2.3's DREAM, on DUNGEON) */};
+                                   {L6_STEPS, 8, 0} /* (index 6: 2.3's DREAM video, on DUNGEON) */,
+                                   {L6T_STEPS, 8, 4} /* (index 7: LESSON 6, Your Own Tune) */};
 
 /* ---------------------------------------------------------------- the player */
 static FILE *wav, *vid;
@@ -419,6 +470,14 @@ static int reached(const act_t *a)
     case U_SCENE: return ui_scene == a->arg;
     case U_RESTORE: return ((ui_prefs & PREF_RESTORE_OFF) != 0u) == (a->arg != 0);
     case U_VALUE: return (v = knob_value((uint32_t)(a->ctl - C_K1))) && *v == a->arg;
+    case U_AFTERNOTE: return ui.cursor > 0 && TSEL->step[ui.cursor].time == ST_REST && TSEL->step[ui.cursor].n == 0 &&
+                             (TSEL->step[ui.cursor - 1u].time == ST_TIE ||   /* (a held note's end) */
+                              (TSEL->step[ui.cursor - 1u].time == ST_NOTE && TSEL->step[ui.cursor - 1u].n));
+    case U_EVADD: { uint16_t rw[EV_ROWS]; uint32_t n; return (ev_cur(rw, &n) >> 8) == EVK_ADD; }
+    case U_EVNOTE: return TSEL->step[ui.ev_step].time == ST_NOTE && TSEL->step[ui.ev_step].n;
+    case U_EVCHANCE: return ui.ev_id == EV_CHANCE;
+    case U_ACT: return ui.act == a->arg;
+    case U_STEPTIME: return TSEL->step[ui.cursor].time == a->arg;
     }
     return 0;
 }
@@ -430,6 +489,10 @@ static int direction(const act_t *a)                   /* which way to turn to g
         return *v < a->arg ? 1 : -1;
     if (a->until == U_TRACK)
         return song.sel < a->arg ? 1 : -1;
+    if (a->until == U_EVCHANCE)                        /* (+ ADD: CHANCE RATCH NUDGE come before the parameters) */
+        return -1;
+    if (a->until == U_STEPTIME)                        /* (NOTE TIE REST) */
+        return TSEL->step[ui.cursor].time < a->arg ? 1 : -1;
     if (a->until == U_PICK)
         return ui.ppick < a->arg ? 1 : -1;
     if (a->until == U_ROW)                             /* (the menu keeps a tab's last row: either way) */
@@ -439,7 +502,11 @@ static int direction(const act_t *a)                   /* which way to turn to g
 
 static void stuck(uint32_t step, const act_t *a)
 {
-    fprintf(stderr, "step %u: \"%s\" never got there\n", step, a->say);
+    fprintf(stderr, "step %u: \"%s\" never got there (page %s, track %u, cursor %u, LEN %d:", step, a->say,
+            ui.home ? "HOME" : PAGES[ui.page].title, song.sel + 1u, ui.cursor, TSEL->p[P_SLEN]);
+    for (uint32_t i = 0; i < 16u; i++)
+        fprintf(stderr, " %c%u", "NTR"[TSEL->step[i].time % 3u], TSEL->step[i].n ? TSEL->step[i].note[0] : 0u);
+    fprintf(stderr, ")\n");
     exit(1);
 }
 
@@ -478,6 +545,16 @@ static void act(FILE *log, uint32_t step, const char *title, const act_t *a)
         spent += 1.5f;
         if (trk[a->until - 1].p[P_MUTE] == was)
             stuck(step, a);
+    } else if (a->kind == K_TURN && a->until == U_CLICKS) {   /* (lesson 6) a few clicks, as many as arg */
+        uint32_t e = (uint32_t)(a->ctl - C_SELECT + EN_SELECT), m = (uint32_t)(a->arg > 0 ? a->arg : -a->arg);
+        if (a->ctl >= C_K1)
+            lit_slot = a->ctl - C_K1;
+        way = a->arg > 0 ? 1 : -1;
+        for (; m; m--) {
+            host_enc[panel.enc[e]] += way * panel.dir[e];
+            run(0.4f);
+            spent += 0.4f;
+        }
     } else if (a->kind == K_TURN) {
         uint32_t e = (uint32_t)(a->ctl - C_SELECT + EN_SELECT);
         float click;                                   /* a value sweeps; a list steps, the first steps seen */
