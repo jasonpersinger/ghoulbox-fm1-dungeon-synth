@@ -667,6 +667,56 @@ static const lstep_t L13_STEPS[] = {
     {"Set up", SETUP}, {"Plug in", L13_PLUG}, {"Channels", L13_CHANNELS}, {"The computer plays", L13_DAW},
     {"Knobs from afar", L13_CC}, {"Follow its clock", L13_CLOCK}, {"Record it", L13_REC}, {0, 0}};
 
+/* ---------------------------------------------------------------- LESSON 14: KEEP AND SHARE YOUR MUSIC */
+#define ARPEGGIO 19                                    /* PATTERNS[19]: broken chords (here: the wrong one) */
+static const act_t L14_TUNE[] = {
+    TURN_TO(C_ALGO, U_TRACK, 0, 0, "Turn ALGORITHM to 1: HURDY GURDY"),
+    TURN_TO(C_K1, U_PICK, BALLAD, 0, "Still on PHRASES: turn KNOB 1 to 15 BALLAD"),
+    TAP(C_OCTUP, "Press OCT+ to load it"),
+    SAY(C_NONE, "A drone and a tune: worth keeping", 5), END};
+static const act_t L14_SAVE[] = {
+    TAP(C_PLAY, "Press PLAY to stop: saving needs it stopped"),
+    TAPS(C_SAVE, "PROJECT", "Tap SAVE until PROJECT"),
+    TURN_TO(C_K1, U_VALUE, 2, 0, "Turn KNOB 1 (SLOT) to 2: slot B"),
+    TURN_TO(C_K4, U_ACT, 4, 0, "Turn KNOB 4 (SAVE) right to pick it"),
+    TAP(C_OCTUP, "Press OCT+: the NAME screen"),
+    TURN(C_K3, 3, "Turn KNOB 3: a random name, a new one each click"),
+    SAY(C_NONE, "Or type one: the white keys, as on a phone", 5),
+    TAP(C_OCTUP, "Press OCT+ to save"),
+    SAY(C_NONE, "Slot B keeps all of it: sounds, notes, tempo, effects", 5), END};
+static const act_t L14_LOAD[] = {
+    SAY(C_POWER, "Switch the FM-1 off, then on again", 5),
+    SAY(C_NONE, "RESTORE LAST is OFF: it starts empty", 4),
+    TAPS(C_SAVE, "PROJECT", "Tap SAVE until PROJECT"),
+    TURN_TO(C_K1, U_VALUE, 2, 0, "Turn KNOB 1 (SLOT) to 2: B, your name"),
+    TURN_TO(C_K3, U_ACT, 3, 0, "Turn KNOB 3 (LOAD) right"),
+    TAP(C_OCTUP, "Press OCT+ to load it"),
+    TAP(C_PLAY, "Press PLAY"),
+    SAY(C_NONE, "All of it back, just as you left it", 6), END};
+static const act_t L14_UNDO[] = {
+    TAPS(C_SAVE, "PHRASES", "Tap SAVE until PHRASES"),
+    TURN_TO(C_K1, U_PICK, ARPEGGIO, 0, "Turn KNOB 1 to 20 ARPEGGIO"),
+    TAP(C_OCTUP, "Press OCT+: it asks first"),
+    TAP(C_OCTUP, "OCT+ again for yes"),
+    SAY(C_NONE, "Say that was a mistake: the tune is gone", 5),
+    HOLD(C_SAVE, "Hold SAVE: undo"),
+    SAY(C_NONE, "The tune is back. Hold SAVE again to redo", 6), END};
+static const act_t L14_SHARE[] = {
+    SAY(C_NONE, "On a computer, the web editor saves a backup of everything", 5.5f),
+    SAY(C_NONE, "Record it as in Lessons 5 and 13", 4),
+    SAY(C_NONE, "Share it: Bandcamp, YouTube, a cassette", 4.5f),
+    SAY(C_NONE, "Tag it dungeon synth, FM-1, GHOULBOX: people look", 5), END};
+static const act_t L14_WAKE[] = {
+    HOLD(C_HOME, "Hold HOME: the menu"),
+    TURN_TO(C_ALGO, U_TAB, MTAB_SYSTEM, 0, "Turn ALGORITHM to the SYSTEM tab"),
+    TURN_TO(C_PRESETS, U_ROW, MI_RESTORE, 0, "Turn PRESETS to RESTORE LAST"),
+    TURN_TO(C_OCTUP, U_RESTORE, 0, 0, "Press OCT+ until it says ON"),
+    TAP(C_HOME, "Tap HOME to close the menu"),
+    SAY(C_NONE, "It wakes with what you were playing. Next: the whole piece", 6), END};
+static const lstep_t L14_STEPS[] = {
+    {"Set up", SETUP}, {"Something to keep", L14_TUNE}, {"Save it, name it", L14_SAVE}, {"Load it back", L14_LOAD},
+    {"Undo", L14_UNDO}, {"Share it", L14_SHARE}, {"Wake with your music", L14_WAKE}, {0, 0}};
+
 /* ---------------------------------------------------------------- 6: DREAM (GHOULBOX 2.3: what's new, not a lesson) */
 static const act_t L6_FIND[] = {
     SAY(C_NONE, "GHOULBOX 2.3 can compose. This is DREAM", 4.5f),
@@ -713,7 +763,8 @@ static const lesson_t LESSONS[] = {{L1_STEPS, 9, 0} /* (a new FM-1: DUNGEON) */,
                                    {L10_STEPS, 8, 4} /* (index 11: LESSON 10, The Living Pattern) */,
                                    {L11_STEPS, 8, 4} /* (index 12: LESSON 11, Two Hands) */,
                                    {L12_STEPS, 8, 4} /* (index 13: LESSON 12, The Old Ways) */,
-                                   {L13_STEPS, 8, 4} /* (index 14: LESSON 13, With a MIDI Keyboard or DAW) */};
+                                   {L13_STEPS, 8, 4} /* (index 14: LESSON 13, With a MIDI Keyboard or DAW) */,
+                                   {L14_STEPS, 8, 4} /* (index 15: LESSON 14, Keep and Share Your Music) */};
 
 /* ---------------------------------------------------------------- (lesson 13) what a computer sends over USB-MIDI */
 static uint32_t mpk(uint32_t st, uint32_t d1, uint32_t d2) { return (st >> 4) | st << 8 | d1 << 16 | d2 << 24; }
