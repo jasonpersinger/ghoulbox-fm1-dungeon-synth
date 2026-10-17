@@ -15,10 +15,15 @@ enum { C_FX, C_SCL, C_ENV, C_LFO, C_EDIT, C_GLO, C_HOME, C_SAVE, C_ARP, C_SEQ, C
 static const char *const CNAME[] = {"FX", "SCL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ", "PLAY",
                                     "REC", "OCT-", "OCT+", "SELECT", "ALGORITHM", "PRESETS", "KNOB1", "KNOB2",
                                     "KNOB3", "KNOB4", "POWER", "KEY", "-"};
-enum { K_TAP, K_HOLD, K_TURN, K_SAY, K_KEY, K_GLOKEY };   /* K_KEY: key arg held dur - 0.6 s; K_GLOKEY: GLO held,
+enum { K_TAP, K_HOLD, K_TURN, K_SAY, K_KEY, K_GLOKEY, K_CHORD, K_PRESS, K_LETGO, K_CRANK, K_MIDI };   /* K_CHORD (lesson 7): three keys, arg a | b << 5 | c << 10;
+   * (lesson 11) K_PRESS: the same three put down and kept down (the left hand), K_LETGO: they come up */   /* K_KEY: key arg held dur - 0.6 s; K_GLOKEY: GLO held,
                                                              * key arg tapped (a mute, track until-1 toggles) */
 /* what an action turns or taps until: */
-enum { U_CLICKS, U_TRACK, U_SOUND, U_PICK, U_PAGE, U_ROW, U_TAB, U_VALUE, U_SCENE, U_RESTORE };   /* U_RESTORE: arg 1 OFF */
+enum { U_CLICKS, U_TRACK, U_SOUND, U_PICK, U_PAGE, U_ROW, U_TAB, U_VALUE, U_SCENE, U_RESTORE,   /* U_RESTORE: arg 1 OFF */
+       U_AFTERNOTE, U_EVADD, U_EVNOTE, U_EVCHANCE, U_ACT, U_STEPTIME, U_SONGROW, U_SONGTRK };   /* (lesson 15: SONG's row, its track) */   /* U_STEPTIME: the cursor step's TIME */   /* (lesson 6) U_AFTERNOTE: the SEQ cursor on a rest just
+                                                    * after a note; on AUTOMATION: + ADD's row, its step a note, CHANCE;
+                                                    * U_ACT: the action of KNOB arg picked. A K_TURN with U_CLICKS turns arg
+                                                    * clicks (signed) */
 typedef struct {
     uint8_t ctl, kind, until; int16_t arg;            /* U_CLICKS: arg clicks (signed); U_VALUE: the knob's value */
     const char *name;                                  /* U_SOUND / U_PAGE: the name to reach */
@@ -36,6 +41,16 @@ typedef struct { const lstep_t *steps; float tail; uint8_t scene; } lesson_t;   
 #define KEY(k, s, d) {C_KEY, K_KEY, U_CLICKS, k, 0, s, d}
 #define MUTE(k, trk, s) {C_KEY, K_GLOKEY, (trk) + 1, k, 0, s, 0}
 #define END {C_NONE, 0, 0, 0, 0, 0, 0}
+#define TURN(c, n, s) {c, K_TURN, U_CLICKS, n, 0, s, 0}
+#define CHORD_(a, b, c, s, d) {C_KEY, K_CHORD, U_CLICKS, (a) | (b) << 5 | (c) << 10, 0, s, d}
+#define CHORD(...) CHORD_(__VA_ARGS__)                   /* (so a chord #define spreads into its three keys) */
+#define PRESS_(a, b, c, s, d) {C_KEY, K_PRESS, U_CLICKS, (a) | (b) << 5 | (c) << 10, 0, s, d}
+#define PRESS(...) PRESS_(__VA_ARGS__)
+#define LETGO(s) {C_NONE, K_LETGO, U_CLICKS, 0, 0, s, 1.2f}
+#define CRANK(rate, s, d) {C_SELECT, K_CRANK, U_CLICKS, rate, 0, s, d}   /* (lesson 12) SELECT turned rate clicks a second */
+#define MIDI(script, s, d) {C_NONE, K_MIDI, U_CLICKS, script, 0, s, d}   /* (lesson 13) a computer's MIDI over USB */
+enum { MS_CONNECT, MS_CHORDS, MS_BOTH, MS_CC, MS_CLOCK, MS_STOP };   /* its scripts (midi_script) */
+#define LATCH(k, trk, s) {C_KEY, K_GLOKEY, 0x10 | ((trk) + 1), k, 0, s, 0}   /* (lesson 11) GLO + a black key: the latch */
 
 /* ---------------------------------------------------------------- LESSON 1: THE DRONE */
 #define PEDAL 16                                       /* PATTERNS[16]: one low D, held (engines.c) */
@@ -292,13 +307,577 @@ static const lstep_t L5_STEPS[] = {
     {"The whole dungeon", L5_DUNGEON}, {"Balance", L5_BALANCE}, {"The cassette", L5_TAPE},
     {"Play the mutes", L5_MUTES}, {"Record it", L5_RECORD}, {"Keep your music", L5_KEEP}, {0, 0}};
 
-static const lesson_t LESSONS[] = {{L1_STEPS, 9, 0} /* (a new FM-1: DUNGEON) */, {L2_STEPS, 8, 4}, {L3_STEPS, 8, 4}, {L4_STEPS, 8, 4}, {L5_STEPS, 8, 4}};
+/* ---------------------------------------------------------------- LESSON 6: YOUR OWN TUNE */
+static const act_t L6T_KEY[] = {
+    TURN_TO(C_ALGO, U_TRACK, 0, 0, "Turn ALGORITHM to 1: HURDY GURDY"),
+    TAP(C_SCL, "Tap SCL: as in Lesson 2"),
+    TURN_TO(C_K1, U_VALUE, 2, 0, "KNOB 1 (ROOT) to D"),
+    TURN_TO(C_K2, U_VALUE, 2, 0, "KNOB 2 (SCL) to MIN"),
+    TURN_TO(C_K3, U_VALUE, 2, 0, "KNOB 3 (QNT) to WHITE: no wrong notes"),
+    SAY(C_NONE, "The white keys from C play D minor", 4.5f), END};
+static const act_t L6T_REC[] = {
+    TAP(C_REC, "Tap REC: track 1 records what you play"),
+    SAY(C_NONE, "It is already playing. Play along, slowly", 3),
+    KEY(14, "G. Hold each note a moment", 1.7f),   /* (WHITE: G plays A, F G, E F, C D; one pass: 6.7 s) */
+    KEY(12, "F", 1.45f),
+    KEY(11, "E", 1.45f),
+    KEY(7, "C: it plays D, home", 1.95f),
+    SAY(C_NONE, "What you play is written into the steps", 5), END};
+static const act_t L6T_LISTEN[] = {
+    TAP(C_REC, "Tap REC again: recording stops"),
+    SAY(C_NONE, "The tune plays itself, every time round", 9),
+    SAY(C_NONE, "Not quite right? Play over it again: it adds", 5), END};
+static const act_t L6T_FIX[] = {
+    TAP(C_SEQ, "Tap SEQ: the STEP page, your notes"),
+    TURN_TO(C_PRESETS, U_AFTERNOTE, 0, 0, "Turn PRESETS: the cursor to the step after a note"),
+    TURN_TO(C_K3, U_STEPTIME, ST_TIE, 0, "Turn KNOB 3 (TIME) to TIE: the note holds longer"),
+    SAY(C_NONE, "Listen: that note now rings through the next step", 8), END};
+static const act_t L6T_CHANCE[] = {
+    TAPS(C_SEQ, "AUTOMATION", "Tap SEQ again: AUTOMATION"),
+    TURN_TO(C_K1, U_EVADD, 0, 0, "Turn KNOB 1 to the last row: + ADD"),
+    TURN_TO(C_K2, U_EVNOTE, 0, 0, "Turn KNOB 2 to a step with a note"),
+    TURN_TO(C_K3, U_EVCHANCE, 0, 0, "KNOB 3 shows CHANCE"),
+    TAP(C_OCTUP, "Press OCT+: that note plays half the time"),
+    SAY(C_NONE, "Now each pass is a little different", 12), END};
+static const act_t L6T_KEEP[] = {
+    TAP(C_PLAY, "Press PLAY to stop: saving needs it stopped"),
+    TAPS(C_SAVE, "PROJECT", "Tap SAVE until PROJECT"),
+    SAY(C_K1, "KNOB 1 is the slot: 1 of 4", 4),
+    TURN_TO(C_K4, U_ACT, 4, 0, "Turn KNOB 4 (SAVE) right to pick it"),
+    TAP(C_OCTUP, "Press OCT+"),
+    SAY(C_NONE, "Name it with the keys, as on a phone. Or skip it", 6),
+    TAP(C_OCTUP, "Press OCT+ to save"),
+    SAY(C_NONE, "Your tune is kept. To load it: KNOB 3 (LOAD) here", 6), END};
+static const lstep_t L6T_STEPS[] = {
+    {"Set up", SETUP}, {"The key", L6T_KEY}, {"Record it", L6T_REC}, {"Listen back", L6T_LISTEN},
+    {"Hold a note longer", L6T_FIX}, {"Let it breathe", L6T_CHANCE}, {"Keep it", L6T_KEEP}, {0, 0}};
+
+/* ---------------------------------------------------------------- LESSON 7: THE HARP ARPEGGIO */
+#define DMIN 7, 11, 14                                 /* (WHITE in D minor: C E G play D F A) */
+#define BFLAT 4, 7, 11                                 /* A C E: B-flat D F */
+#define CMAJ 6, 9, 12                                  /* B D F: C E G */
+static const act_t L7_HARP[] = {
+    TURN_TO(C_ALGO, U_TRACK, 0, 0, "Turn ALGORITHM to 1"),
+    TAP(C_SCL, "Tap SCL: as in Lesson 2"),
+    TURN_TO(C_PRESETS, U_SOUND, 0, "FOLK HARP", "Turn PRESETS to FOLK HARP"),
+    TURN_TO(C_K1, U_VALUE, 2, 0, "KNOB 1 (ROOT) to D"),
+    TURN_TO(C_K2, U_VALUE, 2, 0, "KNOB 2 (SCL) to MIN"),
+    TURN_TO(C_K3, U_VALUE, 2, 0, "KNOB 3 (QNT) to WHITE: no wrong notes"),
+    CHORD(DMIN, "Hold C, E and G together: D minor", 3.5f),
+    SAY(C_NONE, "A chord, all at once. A harpist rolls it", 4), END};
+static const act_t L7_ARP[] = {
+    TAP(C_ARP, "Tap ARP"),
+    TURN_TO(C_K1, U_VALUE, 3, 0, "Turn KNOB 1 (MODE) to UPDN: up, then down"),
+    TURN_TO(C_K2, U_VALUE, 1, 0, "Turn KNOB 2 (RATE) to 1/8"),
+    TURN_TO(C_K3, U_VALUE, 2, 0, "Turn KNOB 3 (OCT) to 2: two octaves"),
+    CHORD(DMIN, "Hold C, E and G again: the harp rolls", 9),
+    SAY(C_NONE, "One note at a time, in time with the drone", 4), END};
+static const act_t L7_CHORDS[] = {
+    CHORD(DMIN, "Hold C, E, G: D minor", 5.5f),
+    CHORD(BFLAT, "The same shape on A, C, E: B-flat", 5.5f),
+    CHORD(CMAJ, "On B, D, F: C major", 5.5f),
+    CHORD(DMIN, "Back to C, E, G: home", 6),
+    SAY(C_NONE, "Three shapes, one hand: a whole dungeon ballad", 4.5f), END};
+static const act_t L7_HOLD[] = {
+    TAPS(C_ARP, "ARP 2", "Tap ARP again: ARP 2"),
+    TURN_TO(C_K3, U_VALUE, 1, 0, "Turn KNOB 3 (HOLD) to ON"),
+    CHORD(DMIN, "Play C, E, G, then let go", 1.5f),
+    SAY(C_NONE, "It keeps playing: hands free", 6),
+    CHORD(BFLAT, "Play A, C, E: the new chord takes over", 1.5f),
+    SAY(C_NONE, "Change the chord whenever you like", 6),
+    CHORD(DMIN, "C, E, G: back home", 1.5f), END};
+static const act_t L7_SHAPE[] = {
+    TURN_TO(C_K2, U_VALUE, 70, 0, "Turn KNOB 2 (PROB) down: some notes rest"),
+    SAY(C_NONE, "Like a player, not a machine", 7),
+    TAPS(C_ARP, "ARP", "Tap ARP: back to the first page"),
+    TURN_TO(C_K4, U_VALUE, 20, 0, "Turn KNOB 4 (GATE) down: short, plucked"),
+    SAY(C_NONE, "Each string just touched", 6),
+    TURN_TO(C_K1, U_VALUE, 4, 0, "Turn KNOB 1 (MODE) to RND: random order"),
+    SAY(C_NONE, "Wind through the strings", 8), END};
+static const act_t L7_END[] = {
+    TURN_TO(C_K1, U_VALUE, 3, 0, "KNOB 1 (MODE) back to UPDN"),
+    TURN_TO(C_K4, U_VALUE, 64, 0, "KNOB 4 (GATE) back to the middle"),
+    SAY(C_NONE, "The arpeggiator works on any sound: try the LUTE", 5),
+    SAY(C_NONE, "Next: drums for a ritual", 5), END};
+static const lstep_t L7_STEPS[] = {
+    {"Set up", SETUP}, {"A harp", L7_HARP}, {"Roll the chord", L7_ARP}, {"Change chords", L7_CHORDS},
+    {"Hands free", L7_HOLD}, {"Shape it", L7_SHAPE}, {"Leave it playing", L7_END}, {0, 0}};
+
+/* ---------------------------------------------------------------- LESSON 8: RITUAL DRUMS */
+/* the DRUM grid (seq.c key_place): white keys from F are steps 1..16; black keys 1..8 the lanes, 9 ACC */
+#define LN_FRAME 1
+#define LN_TIMP 13
+#define LN_SHAKR 8
+static const act_t L8_KIT[] = {
+    TURN_TO(C_ALGO, U_TRACK, 2, 0, "Turn ALGORITHM to 3"),
+    TAPS(C_HOME, "MIXER", "Tap HOME until the MIXER"),
+    TURN_TO(C_PRESETS, U_SOUND, 0, "TOMB DRUMS", "Turn PRESETS to TOMB DRUMS"),
+    SAY(C_NONE, "Low, slow drums, far back in the hall", 4), END};
+static const act_t L8_GRID[] = {
+    TAP(C_SEQ, "Tap SEQ: on a drum track, a drum grid"),
+    SAY(C_NONE, "The white keys are the steps: 16 of them, left to right", 5),
+    SAY(C_NONE, "The black keys pick the drum", 4),
+    KEY(LN_FRAME, "1st black key, FRAME, the frame drum", 1.6f),
+    KEY(0, "1st white key, step 1: a hit", 1.6f),
+    KEY(6, "4th white key, step 4", 1.6f),
+    KEY(14, "9th white key, step 9", 1.6f),
+    SAY(C_NONE, "BOOM . . boom . . . . BOOM: a slow heartbeat", 8), END};
+static const act_t L8_MORE[] = {
+    KEY(LN_TIMP, "6th black key, TIMP, the timpani", 1.6f),
+    KEY(21, "13th white key, step 13", 1.6f),
+    KEY(24, "15th white key, step 15", 1.6f),
+    SAY(C_NONE, "The timpani rolls into the next round", 7),
+    KEY(LN_SHAKR, "4th black key, SHAKR, a shaker", 1.6f),
+    KEY(7, "5th white key, step 5", 1.6f),
+    KEY(16, "10th white key, step 10", 1.6f),
+    SAY(C_NONE, "Few hits, far apart: that is a ritual", 8), END};
+static const act_t L8_ACCENT[] = {
+    KEY(LN_FRAME, "1st black key, back to the frame drum", 1.6f),
+    TURN(C_K1, -1, "Turn KNOB 1 (STEP) left: the cursor back to step 9"),
+    TURN(C_K4, 1, "Turn KNOB 4 (ACC) right: step 9 hits harder"),
+    SAY(C_NONE, "The big beat of the procession", 7), END};
+static const act_t L8_HALL[] = {
+    TAPS(C_FX, "FX", "Tap FX: the track's sends"),
+    TURN_TO(C_K4, U_VALUE, 120, 0, "Turn KNOB 4 (REV) up: deep in the hall"),
+    SAY(C_NONE, "Drums from somewhere under the castle", 8), END};
+static const act_t L8_PLAY[] = {
+    MUTE(5, 2, "Hold GLO, tap the 3rd black key, the drums stop"),
+    SAY(C_NONE, "Just the drone again", 6),
+    MUTE(5, 2, "Again: the procession returns"),
+    SAY(C_NONE, "As in Lesson 5: bring them in when the piece needs them", 7),
+    SAY(C_NONE, "Next: shape a sound of your own", 5), END};
+static const lstep_t L8_STEPS[] = {
+    {"Set up", SETUP}, {"A drum kit", L8_KIT}, {"The drum grid", L8_GRID}, {"More drums", L8_MORE},
+    {"One beat harder", L8_ACCENT}, {"Into the hall", L8_HALL}, {"Bring them in", L8_PLAY}, {0, 0}};
+
+/* ---------------------------------------------------------------- LESSON 9: SOUND DESIGN */
+static const act_t L9_PAD[] = {
+    TURN_TO(C_ALGO, U_TRACK, 1, 0, "Turn ALGORITHM to 2: CRYPT PAD"),
+    TURN_TO(C_K1, U_PICK, DIRGE, 0, "Still on PHRASES: turn KNOB 1 to 14 DIRGE"),
+    TAP(C_OCTUP, "Press OCT+ to load it: the chords from Lesson 3"),
+    TAP(C_HOME, "Tap HOME: the sound's main controls"),
+    SAY(C_NONE, "Now we change the sound itself, not the notes", 5), END};
+static const act_t L9_FILTER[] = {
+    TURN_TO(C_K1, U_VALUE, 10, 0, "Turn KNOB 1 (CUT) down: dark, behind a wall"),
+    SAY(C_NONE, "The filter takes the bright part away", 5),
+    TURN_TO(C_K1, U_VALUE, 95, 0, "Turn KNOB 1 up: bright and close"),
+    TURN_TO(C_K2, U_VALUE, 100, 0, "Turn KNOB 2 (RES) up: the filter rings"),
+    SAY(C_NONE, "A whistle at the edge of the sound", 5),
+    TURN_TO(C_K1, U_VALUE, 50, 0, "KNOB 1 (CUT) to the middle"),
+    TURN_TO(C_K2, U_VALUE, 45, 0, "KNOB 2 (RES) down a little"), END};
+static const act_t L9_OSC[] = {
+    TAP(C_EDIT, "Tap EDIT: the engine's own controls"),
+    SAY(C_NONE, "OSC: where the sound starts", 3.5f),
+    TURN_TO(C_K1, U_VALUE, 1, 0, "Turn KNOB 1 (WAVE) to SQR: hollow, reedy"),
+    SAY(C_NONE, "Like a clarinet in a crypt", 5),
+    TURN_TO(C_K1, U_VALUE, 4, 0, "Turn KNOB 1 to PWM: it keeps moving"),
+    SAY(C_NONE, "Rich and restless", 5),
+    TURN_TO(C_K2, U_VALUE, 40, 0, "Turn KNOB 2 (DTN) up: two oscillators apart"),
+    SAY(C_NONE, "Wider, and a little uneasy", 5),
+    TURN_TO(C_K4, U_VALUE, 45, 0, "Turn KNOB 4 (NOIS) up: breath in the pipes"),
+    SAY(C_NONE, "A sound no preset had", 6), END};
+static const act_t L9_KEEP[] = {
+    TAP(C_PLAY, "Press PLAY to stop: saving needs it stopped"),
+    TAPS(C_SAVE, "USER", "Tap SAVE until USER"),
+    SAY(C_K1, "KNOB 1 is the slot: 32 of them for your sounds", 4),
+    SAY(C_K4, "An empty slot: KNOB 4 (SAVE) is already picked", 4),
+    TAP(C_OCTUP, "Press OCT+"),
+    SAY(C_NONE, "Name it with the keys, as on a phone. Or skip it", 6),
+    TAP(C_OCTUP, "Press OCT+ to save"),
+    SAY(C_NONE, "U01 is yours: KNOB 2 (LOAD) puts it on any track", 6),
+    TAP(C_PLAY, "Press PLAY: play on"),
+    SAY(C_NONE, "Next: make it change over time, by itself", 6), END};
+static const lstep_t L9_STEPS[] = {
+    {"Set up", SETUP}, {"A pad to shape", L9_PAD}, {"Bright and dark", L9_FILTER}, {"Where sound starts", L9_OSC},
+    {"Keep your sound", L9_KEEP}, {0, 0}};
+
+/* ---------------------------------------------------------------- LESSON 10: THE LIVING PATTERN */
+static const act_t L10_TUNE[] = {
+    TURN_TO(C_ALGO, U_TRACK, 0, 0, "Turn ALGORITHM to 1: HURDY GURDY"),
+    TURN_TO(C_K1, U_PICK, BALLAD, 0, "Still on PHRASES: turn KNOB 1 to 15 BALLAD"),
+    TAP(C_OCTUP, "Press OCT+ to load it: the tune from Lesson 2"),
+    TAP(C_HOME, "Tap HOME: the gurdy's main controls"),
+    SAY(C_NONE, "The same every time round. Let's make it move", 5), END};
+static const act_t L10_REC[] = {
+    TAP(C_REC, "Tap REC: track 1 records, knobs too"),
+    TURN_TO(C_K1, U_VALUE, 0, 0, "Turn KNOB 1 (BUZZ) down slowly"),
+    SAY(C_NONE, "Wait a moment", 2.5f),
+    TURN_TO(C_K1, U_VALUE, 127, 0, "Then all the way up"),
+    TAP(C_REC, "Tap REC again: recording stops"),
+    SAY(C_NONE, "Hands off. The buzz comes and goes by itself", 10),
+    SAY(C_NONE, "Your knob move is part of the pattern now", 6), END};
+static const act_t L10_SEE[] = {
+    TAPS(C_SEQ, "AUTOMATION", "Tap SEQ until AUTOMATION"),
+    SAY(C_NONE, "Each row: a step, and BUZZ's value there", 6),
+    SAY(C_NONE, "Change one with the knobs, or EDIT to remove it", 5), END};
+static const act_t L10_RATCH[] = {
+    TURN_TO(C_K1, U_EVADD, 0, 0, "Turn KNOB 1 to the last row: + ADD"),
+    TURN_TO(C_K2, U_EVNOTE, 0, 0, "KNOB 2 picks the step: step 1 has a note"),
+    TURN_TO(C_K3, U_EVCHANCE, 1, 0, "Turn KNOB 3 left to RATCH"),
+    TAP(C_OCTUP, "Press OCT+: that note plays twice"),
+    TURN(C_K4, 1, "Turn KNOB 4 right: three times"),
+    SAY(C_NONE, "A quick flourish, like a player's ornament", 10),
+    SAY(C_NONE, "With Lesson 6's CHANCE: a tune that never quite repeats", 6), END};
+static const act_t L10_END[] = {
+    SAY(C_NONE, "Record any knob this way: the filter, the reverb send", 6),
+    SAY(C_NONE, "Next: two sounds at once, on one keyboard", 6), END};
+static const lstep_t L10_STEPS[] = {
+    {"Set up", SETUP}, {"A tune", L10_TUNE}, {"Record a knob", L10_REC}, {"See it", L10_SEE},
+    {"An ornament", L10_RATCH}, {"Make it move", L10_END}, {0, 0}};
+
+/* ---------------------------------------------------------------- LESSON 11: TWO HANDS */
+#define LH_DMIN 0, 4, 9                                /* (below SPLT E4) F3 A3 D4: D minor */
+#define LH_BFLAT 0, 5, 9                               /* F3 A#3 D4: B-flat */
+#define LH_GMIN 2, 5, 9                                /* G3 A#3 D4: G minor */
+static const act_t L11_KEYS[] = {
+    TURN_TO(C_ALGO, U_TRACK, 0, 0, "Turn ALGORITHM to 1: HURDY GURDY"),
+    TAPS(C_HOME, "KEYS", "Tap HOME until KEYS: after MIXER and CLOCK"),
+    SAY(C_NONE, "KEYS: one keyboard, two tracks", 4), END};
+static const act_t L11_LAYER[] = {
+    TURN_TO(C_K1, U_VALUE, 1, 0, "Turn KNOB 1 (MODE) to LAYER"),
+    TURN_TO(C_K2, U_VALUE, 1, 0, "Turn KNOB 2 (TRK) to T2: CRYPT PAD"),
+    KEY(9, "D: the gurdy and the pad together", 2.2f), KEY(12, "F", 1.4f), KEY(16, "A", 1.4f),
+    KEY(14, "G", 1.4f), KEY(12, "F", 1.4f), KEY(11, "E", 1.4f), KEY(9, "D", 2.4f),
+    TURN_TO(C_K4, U_VALUE, 1, 0, "Turn KNOB 4 (OCT) to -1: the pad an octave down"),
+    KEY(16, "A", 1.6f), KEY(14, "G", 1.4f), KEY(12, "F", 1.4f), KEY(9, "D", 2.6f),
+    SAY(C_NONE, "A tune doubled, low and soft underneath", 4), END};
+static const act_t L11_SPLIT[] = {
+    TURN_TO(C_K1, U_VALUE, 2, 0, "Turn KNOB 1 (MODE) to SPLIT"),
+    TURN_TO(C_K4, U_VALUE, 2, 0, "KNOB 4 (OCT) back to 0"),
+    TURN_TO(C_K3, U_VALUE, 8, 0, "Turn KNOB 3 (SPLT) to E4: the split point"),
+    SAY(C_NONE, "Below E: the pad, left hand. From E up: the gurdy", 5),
+    PRESS(LH_DMIN, "Left hand: F, A, D, and keep holding", 2.2f),
+    KEY(16, "Right hand: A", 1.4f), KEY(14, "G", 1.4f), KEY(12, "F", 1.4f), KEY(14, "G", 1.4f), KEY(16, "A", 2.2f),
+    LETGO("Let go"),
+    PRESS(LH_BFLAT, "Left hand: F, A#, D: B-flat", 2.2f),
+    KEY(21, "Right hand: high D", 1.4f), KEY(19, "C", 1.4f), KEY(17, "A#", 1.4f), KEY(16, "A", 2.4f),
+    LETGO("Let go"),
+    SAY(C_NONE, "Chords in one hand, a tune in the other", 4), END};
+static const act_t L11_LATCH[] = {
+    LATCH(15, 1, "Hold GLO, tap the 7th black key: track 2 latches"),
+    CHORD(LH_DMIN, "Left hand: F, A, D, then let go", 1.6f),
+    SAY(C_NONE, "The chord rings on by itself", 4),
+    KEY(16, "Both hands free for the tune: A", 1.6f), KEY(17, "A#", 1.4f), KEY(16, "A", 1.4f), KEY(14, "G", 1.4f),
+    KEY(12, "F", 1.4f), KEY(14, "G", 2.4f),
+    CHORD(LH_GMIN, "A new chord replaces it: G, A#, D", 1.6f),
+    KEY(17, "A#", 1.6f), KEY(16, "A", 1.4f), KEY(14, "G", 2.6f),
+    LATCH(15, 1, "Hold GLO, the 7th black key again: unlatched"),
+    SAY(C_NONE, "Latch a chord, then play over it as long as you like", 5), END};
+static const act_t L11_END[] = {
+    SAY(C_NONE, "KEYS is saved with the project", 4),
+    SAY(C_NONE, "Next: the old ways, the gurdy and old tunings", 5), END};
+static const lstep_t L11_STEPS[] = {
+    {"Set up", SETUP}, {"One keyboard, two tracks", L11_KEYS}, {"Layer", L11_LAYER}, {"Split", L11_SPLIT},
+    {"Hands free", L11_LATCH}, {"Keep it", L11_END}, {0, 0}};
+
+/* ---------------------------------------------------------------- LESSON 12: THE OLD WAYS */
+#define L12_REV 90                                     /* (the set-up's track 1 REV and track 4 LEVEL, put back) */
+#define L12_LEVEL 104
+#define MARCH 17                                       /* PATTERNS[17]: a stepping line, a rest after every note */
+#define L12_PHRASE(first) KEY(14, first, 1.0f), KEY(12, "F", 0.95f), KEY(11, "E", 0.95f), KEY(9, "D", 0.95f), \
+    KEY(7, "C", 0.95f), KEY(6, "B", 0.95f), KEY(7, "C: home", 1.9f)
+static const act_t L12_SCALES[] = {
+    TURN_TO(C_ALGO, U_TRACK, 0, 0, "Turn ALGORITHM to 1: HURDY GURDY"),
+    TAP(C_SCL, "Tap SCL"),
+    TURN_TO(C_K1, U_VALUE, 2, 0, "KNOB 1 (ROOT) to D"),
+    TURN_TO(C_K2, U_VALUE, 2, 0, "KNOB 2 (SCL) to MIN"),
+    TURN_TO(C_K3, U_VALUE, 2, 0, "KNOB 3 (QNT) to WHITE"),
+    L12_PHRASE("Play from G down: plain minor"),
+    TURN_TO(C_K2, U_VALUE, 7, 0, "Turn KNOB 2 (SCL) to HARM"),
+    L12_PHRASE("The same keys: a castle"),
+    TURN_TO(C_K2, U_VALUE, 17, 0, "Turn KNOB 2 to HUNG: Hungarian minor"),
+    L12_PHRASE("Gothic, haunted"),
+    TURN_TO(C_K2, U_VALUE, 2, 0, "KNOB 2 back to MIN"), END};
+static const act_t L12_TEMP[] = {
+    TAPS(C_SCL, "CHORD", "Tap SCL again: CHORD"),
+    TURN_TO(C_K3, U_VALUE, 1, 0, "Turn KNOB 3 (TEMP) to PYTH"),
+    SAY(C_NONE, "Pythagorean: tuned in pure fifths, as in old chant", 5),
+    L12_PHRASE("Listen to the drones: still, not beating"),
+    SAY(C_NONE, "MEAN and JUST: sweeter thirds, for slow chords", 4), END};
+static const act_t L12_RING[] = {
+    TAPS(C_SAVE, "PHRASES", "Tap SAVE until PHRASES"),
+    TURN_TO(C_K1, U_PICK, MARCH, 0, "Turn KNOB 1 to 18 MARCH"),
+    TAP(C_OCTUP, "Press OCT+: a step, a rest, a step"),
+    TAPS(C_HOME, "MIXER", "Tap HOME until the MIXER"),
+    TURN_TO(C_ALGO, U_TRACK, 3, 0, "Turn ALGORITHM to 4: the drone"),
+    TURN_TO(C_K1, U_VALUE, 0, 0, "Turn KNOB 1 (LEVEL) down: the gurdy alone"),
+    TURN_TO(C_ALGO, U_TRACK, 0, 0, "ALGORITHM back to 1"),
+    TURN_TO(C_K3, U_VALUE, 8, 0, "Turn KNOB 3 (REV) down: dry, to hear the gaps"),
+    TAPS(C_EDIT, "RING", "Tap EDIT until RING"),
+    TURN_TO(C_K1, U_VALUE, 0, 0, "Turn KNOB 1 (RING) OFF"),
+    SAY(C_NONE, "In every rest, the whole instrument stops", 6),
+    TURN_TO(C_K1, U_VALUE, 1, 0, "Turn KNOB 1 back ON"),
+    SAY(C_NONE, "The drones ring through: the wheel never stops", 6.5f), END};
+static const act_t L12_CRANK[] = {
+    TAPS(C_EDIT, "EDIT 2", "Tap EDIT until EDIT 2"),
+    TURN_TO(C_K2, U_VALUE, 5, 0, "Turn KNOB 2 (COUP) to CRANK"),
+    SAY(C_NONE, "SELECT is the crank now. Without it: silence", 5),
+    CRANK(24, "Turn SELECT steadily: the wheel turns", 6),
+    SAY(C_NONE, "Stop turning: the strings stop", 3),
+    CRANK(13, "Slowly: soft and dark", 4.5f),
+    CRANK(36, "Faster: louder and rougher", 4),
+    CRANK(24, "Steady again", 2.5f),
+    CRANK(55, "A sudden flick: the buzz kicks", 1.4f),
+    CRANK(24, "And steady", 3),
+    TURN_TO(C_K2, U_VALUE, 2, 0, "KNOB 2 (COUP) back to 1/8"),
+    TAPS(C_HOME, "MIXER", "Tap HOME until the MIXER"),
+    TURN_TO(C_K3, U_VALUE, L12_REV, 0, "KNOB 3 (REV) back up: into the hall"),
+    TURN_TO(C_ALGO, U_TRACK, 3, 0, "ALGORITHM to 4"),
+    TURN_TO(C_K1, U_VALUE, L12_LEVEL, 0, "KNOB 1 (LEVEL) back up: the drone returns"),
+    SAY(C_NONE, "Next: a MIDI keyboard, or a computer", 5), END};
+static const lstep_t L12_STEPS[] = {
+    {"Set up", SETUP}, {"Old scales", L12_SCALES}, {"Old tunings", L12_TEMP}, {"Drones that ring", L12_RING},
+    {"Turn the crank", L12_CRANK}, {0, 0}};
+
+/* ---------------------------------------------------------------- LESSON 13: WITH A MIDI KEYBOARD OR DAW */
+static const act_t L13_PLUG[] = {
+    MIDI(MS_CONNECT, "Connect a USB data cable to a computer", 4),
+    SAY(C_NONE, "No driver: the FM-1 is a MIDI instrument for any DAW", 5),
+    SAY(C_NONE, "A MIDI keyboard works the same way, or by the MIDI IN socket", 5), END};
+static const act_t L13_CHANNELS[] = {
+    HOLD(C_HOME, "Hold HOME: the menu"),
+    TURN_TO(C_ALGO, U_TAB, MTAB_MIDI, 0, "Turn ALGORITHM to the MIDI tab"),
+    TURN_TO(C_PRESETS, U_ROW, MI_MIDIIN, 0, "MIDI IN: the tab's one row"),
+    SAY(C_NONE, "CH1-4: MIDI channel 1 plays track 1, 2 track 2...", 5),
+    SAY(C_NONE, "SEL: every channel plays the track you select", 4.5f),
+    TAP(C_HOME, "Tap HOME to close the menu"), END};
+static const act_t L13_DAW[] = {
+    TURN_TO(C_ALGO, U_TRACK, 1, 0, "Turn ALGORITHM to 2: CRYPT PAD"),
+    MIDI(MS_CHORDS, "The DAW plays chords on channel 2: the crypt pad", 7.5f),
+    MIDI(MS_BOTH, "And a tune on channel 1: the hurdy-gurdy", 14.5f),
+    SAY(C_NONE, "Write the parts in the computer, hear the FM-1's sounds", 5), END};
+static const act_t L13_CC[] = {
+    SAY(C_K1, "On HOME, KNOB 1 is the pad's CUT", 3.5f),
+    MIDI(MS_CC, "A controller's knob sends CC 21: it turns CUT", 14.5f),
+    SAY(C_NONE, "CC 21 to 24 are the four knobs here. The guide lists the rest", 5), END};
+static const act_t L13_CLOCK[] = {
+    TAPS(C_HOME, "CLOCK", "Tap HOME until CLOCK"),
+    TURN_TO(C_K3, U_VALUE, 1, 0, "Turn KNOB 3 (CLK) to USB"),
+    SAY(C_NONE, "Now the computer's clock leads. None yet: it waits", 4.5f),
+    MIDI(MS_CLOCK, "The DAW presses play at 90 BPM: the FM-1 follows", 10),
+    MIDI(MS_STOP, "The DAW stops: so does the FM-1", 3.5f),
+    TURN_TO(C_K3, U_VALUE, 0, 0, "KNOB 3 (CLK) back to INT"),
+    TURN_TO(C_K1, U_VALUE, 72, 0, "KNOB 1 (BPM) back to 72"),
+    TAP(C_PLAY, "Press PLAY"), END};
+static const act_t L13_REC[] = {
+    SAY(C_NONE, "The same cable carries the sound: a USB audio input", 5),
+    SAY(C_NONE, "Record it in the DAW, next to your other parts", 5),
+    SAY(C_NONE, "Next: keep your music, and share it", 5), END};
+static const lstep_t L13_STEPS[] = {
+    {"Set up", SETUP}, {"Plug in", L13_PLUG}, {"Channels", L13_CHANNELS}, {"The computer plays", L13_DAW},
+    {"Knobs from afar", L13_CC}, {"Follow its clock", L13_CLOCK}, {"Record it", L13_REC}, {0, 0}};
+
+/* ---------------------------------------------------------------- LESSON 14: KEEP AND SHARE YOUR MUSIC */
+#define ARPEGGIO 19                                    /* PATTERNS[19]: broken chords (here: the wrong one) */
+static const act_t L14_TUNE[] = {
+    TURN_TO(C_ALGO, U_TRACK, 0, 0, "Turn ALGORITHM to 1: HURDY GURDY"),
+    TURN_TO(C_K1, U_PICK, BALLAD, 0, "Still on PHRASES: turn KNOB 1 to 15 BALLAD"),
+    TAP(C_OCTUP, "Press OCT+ to load it"),
+    SAY(C_NONE, "A drone and a tune: worth keeping", 5), END};
+static const act_t L14_SAVE[] = {
+    TAP(C_PLAY, "Press PLAY to stop: saving needs it stopped"),
+    TAPS(C_SAVE, "PROJECT", "Tap SAVE until PROJECT"),
+    TURN_TO(C_K1, U_VALUE, 2, 0, "Turn KNOB 1 (SLOT) to 2: slot B"),
+    TURN_TO(C_K4, U_ACT, 4, 0, "Turn KNOB 4 (SAVE) right to pick it"),
+    TAP(C_OCTUP, "Press OCT+: the NAME screen"),
+    TURN(C_K3, 3, "Turn KNOB 3: a random name, a new one each click"),
+    SAY(C_NONE, "Or type one: the white keys, as on a phone", 5),
+    TAP(C_OCTUP, "Press OCT+ to save"),
+    SAY(C_NONE, "Slot B keeps all of it: sounds, notes, tempo, effects", 5), END};
+static const act_t L14_LOAD[] = {
+    SAY(C_POWER, "Switch the FM-1 off, then on again", 5),
+    SAY(C_NONE, "RESTORE LAST is OFF: it starts empty", 4),
+    TAPS(C_SAVE, "PROJECT", "Tap SAVE until PROJECT"),
+    TURN_TO(C_K1, U_VALUE, 2, 0, "Turn KNOB 1 (SLOT) to 2: B, your name"),
+    TURN_TO(C_K3, U_ACT, 3, 0, "Turn KNOB 3 (LOAD) right"),
+    TAP(C_OCTUP, "Press OCT+ to load it"),
+    TAP(C_PLAY, "Press PLAY"),
+    SAY(C_NONE, "All of it back, just as you left it", 6), END};
+static const act_t L14_UNDO[] = {
+    TAPS(C_SAVE, "PHRASES", "Tap SAVE until PHRASES"),
+    TURN_TO(C_K1, U_PICK, ARPEGGIO, 0, "Turn KNOB 1 to 20 ARPEGGIO"),
+    TAP(C_OCTUP, "Press OCT+: it asks first"),
+    TAP(C_OCTUP, "OCT+ again for yes"),
+    SAY(C_NONE, "Say that was a mistake: the tune is gone", 5),
+    HOLD(C_SAVE, "Hold SAVE: undo"),
+    SAY(C_NONE, "The tune is back. Hold SAVE again to redo", 6), END};
+static const act_t L14_SHARE[] = {
+    SAY(C_NONE, "On a computer, the web editor saves a backup of everything", 5.5f),
+    SAY(C_NONE, "Record it as in Lessons 5 and 13", 4),
+    SAY(C_NONE, "Share it: Bandcamp, YouTube, a cassette", 4.5f),
+    SAY(C_NONE, "Tag it dungeon synth, FM-1, GHOULBOX: people look", 5), END};
+static const act_t L14_WAKE[] = {
+    HOLD(C_HOME, "Hold HOME: the menu"),
+    TURN_TO(C_ALGO, U_TAB, MTAB_SYSTEM, 0, "Turn ALGORITHM to the SYSTEM tab"),
+    TURN_TO(C_PRESETS, U_ROW, MI_RESTORE, 0, "Turn PRESETS to RESTORE LAST"),
+    TURN_TO(C_OCTUP, U_RESTORE, 0, 0, "Press OCT+ until it says ON"),
+    TAP(C_HOME, "Tap HOME to close the menu"),
+    SAY(C_NONE, "It wakes with what you were playing. Next: the whole piece", 6), END};
+static const lstep_t L14_STEPS[] = {
+    {"Set up", SETUP}, {"Something to keep", L14_TUNE}, {"Save it, name it", L14_SAVE}, {"Load it back", L14_LOAD},
+    {"Undo", L14_UNDO}, {"Share it", L14_SHARE}, {"Wake with your music", L14_WAKE}, {0, 0}};
+
+/* ---------------------------------------------------------------- LESSON 15: THE WHOLE PIECE */
+static const act_t L15_A[] = {
+    SAY(C_NONE, "Four sounds: gurdy, crypt pad, monks, drone wheel", 4.5f),
+    TAPS(C_HOME, "DREAM", "Tap HOME until DREAM"),
+    SAY(C_K4, "KNOB 4 (MOOD): MIN", 3),
+    KEY(9, "D: a piece in D minor", 2.5f),
+    TAP(C_OCTUP, "It asks first: OCT+ for yes"),
+    SAY(C_NONE, "Section A: the FM-1 writes it for these four sounds", 9),
+    SAY(C_NONE, "As in Lesson 6: edit any part you like", 5), END};
+static const act_t L15_SAVEA[] = {
+    TAP(C_PLAY, "Press PLAY to stop"),
+    TAPS(C_SAVE, "PROJECT", "Tap SAVE until PROJECT"),
+    TURN_TO(C_K1, U_VALUE, 1, 0, "KNOB 1 (SLOT) is on 1: A"),
+    TURN_TO(C_K4, U_ACT, 4, 0, "Turn KNOB 4 (SAVE) right"),
+    TAP(C_OCTUP, "Press OCT+"),
+    TAP(C_OCTUP, "OCT+ again: saved as A"), END};
+static const act_t L15_B[] = {
+    TAPS(C_HOME, "DREAM", "Tap HOME until DREAM"),
+    TURN_TO(C_K4, U_VALUE, 3, 0, "Turn KNOB 4 (MOOD) to HARM"),
+    KEY(9, "D again: the same key, a darker mood", 2.5f),
+    SAY(C_NONE, "Section B: harmonic minor, the castle", 10), END};
+static const act_t L15_SAVEB[] = {
+    TAP(C_PLAY, "Press PLAY to stop"),
+    TAPS(C_SAVE, "PROJECT", "Tap SAVE until PROJECT"),
+    TURN_TO(C_K1, U_VALUE, 2, 0, "Turn KNOB 1 (SLOT) to 2: B"),
+    TURN_TO(C_K4, U_ACT, 4, 0, "Turn KNOB 4 (SAVE) right"),
+    TAP(C_OCTUP, "Press OCT+"),
+    TAP(C_OCTUP, "OCT+ again: saved as B"), END};
+static const act_t L15_SONG[] = {
+    TAPS(C_GLO, "SONG", "Tap GLO: the SONG page"),
+    SAY(C_NONE, "A song: sections in a row. A is project 1, B project 2", 5),
+    KEY(4, "Press the A key, the lowest A: section 1 plays A", 1.8f),
+    TURN_TO(C_K1, U_SONGROW, 1, 0, "Turn KNOB 1 to the next row, + ADD"),
+    KEY(6, "Press the B key: section 2, track 1 on B", 1.8f),
+    TURN_TO(C_K2, U_SONGTRK, 1, 0, "Turn KNOB 2 (TRACK) to 2"),
+    KEY(6, "B key: the pad on B too", 1.6f),
+    TURN_TO(C_K2, U_SONGTRK, 2, 0, "KNOB 2 to 3"),
+    KEY(6, "B key: the monks on B", 1.6f),
+    SAY(C_NONE, "Track 4 stays on A: the same drone through both", 5),
+    SAY(C_K4, "KNOB 4 (REPS): play a section more than once", 4), END};
+static const act_t L15_PLAY[] = {
+    TAP(C_PLAY, "Press PLAY: the song from the top"),
+    SAY(C_NONE, "Section A", 12),
+    SAY(C_NONE, "Sit back. This is your piece", 13),
+    SAY(C_NONE, "Section B: the castle, over the same drone", 15),
+    SAY(C_NONE, "Then round again: A, then B", 8), END};
+static const act_t L15_END[] = {
+    HOLD(C_HOME, "Hold HOME: the menu"),
+    TURN_TO(C_ALGO, U_TAB, MTAB_SYSTEM, 0, "Turn ALGORITHM to the SYSTEM tab"),
+    TURN_TO(C_PRESETS, U_ROW, MI_RESTORE, 0, "Turn PRESETS to RESTORE LAST"),
+    TURN_TO(C_OCTUP, U_RESTORE, 0, 0, "Press OCT+ until it says ON"),
+    TAP(C_HOME, "Tap HOME to close the menu"),
+    SAY(C_NONE, "From one low note to a whole piece. Thank you for playing", 7), END};
+static const lstep_t L15_STEPS[] = {
+    {"Set up", SETUP}, {"Dream section A", L15_A}, {"Keep it as A", L15_SAVEA}, {"Dream section B", L15_B},
+    {"Keep it as B", L15_SAVEB}, {"Make a song", L15_SONG}, {"Play the whole piece", L15_PLAY},
+    {"The end", L15_END}, {0, 0}};
+
+/* ---------------------------------------------------------------- 6: DREAM (GHOULBOX 2.3: what's new, not a lesson) */
+static const act_t L6_FIND[] = {
+    SAY(C_NONE, "GHOULBOX 2.3 can compose. This is DREAM", 4.5f),
+    TAPS(C_HOME, "DREAM", "Tap HOME until DREAM: after MIXER, CLOCK, KEYS"),
+    SAY(C_NONE, "Four knobs: EVOL, DENS, DRFT and MOOD", 4.5f), END};
+static const act_t L6_FIRST[] = {
+    SAY(C_K4, "KNOB 4 is the MOOD: MIN, a minor key", 4),
+    KEY(9, "D. The piece will be in D", 2.5f),
+    SAY(C_NONE, "It asks first: it replaces all four tracks", 4),
+    TAP(C_OCTUP, "Press OCT+ for yes"),
+    SAY(C_NONE, "The FM-1 writes a piece for its four sounds", 8),
+    SAY(C_NONE, "A drone holds D, the pad and the monks the chords", 10),
+    SAY(C_NONE, "The hurdy-gurdy sings a phrase, then answers it", 10),
+    SAY(C_NONE, "Each note has a chance: no two passes are the same", 10), END};
+static const act_t L6_EVOLVE[] = {
+    TURN_TO(C_K3, U_VALUE, 8, 0, "Turn KNOB 3 (DRFT) to 8: a change every pass"),
+    TURN_TO(C_K1, U_VALUE, 1, 0, "Turn KNOB 1 (EVOL) to ON"),
+    SAY(C_NONE, "Now it changes by itself as it plays", 10),
+    SAY(C_NONE, "A new chord, a new phrase, a part resting", 14),
+    SAY(C_NONE, "The drone and the first phrase stay: the same piece", 14),
+    SAY(C_NONE, "Leave it running for as long as you like", 10), END};
+static const act_t L6_MOOD[] = {
+    TURN_TO(C_K2, U_VALUE, 6, 0, "Turn KNOB 2 (DENS) to 6: busier"),
+    TURN_TO(C_K4, U_VALUE, 2, 0, "Turn KNOB 4 (MOOD) to PHRY: darker"),
+    KEY(4, "A. A new piece in A Phrygian", 2.5f),
+    SAY(C_NONE, "At once this time: no question after the first", 8),
+    SAY(C_NONE, "Same sounds, a new key and mood: a new piece", 12),
+    SAY(C_NONE, "EVOL is still on: it keeps changing", 12), END};
+static const act_t L6_YOURS[] = {
+    SAY(C_NONE, "DREAM writes ordinary patterns: edit them, save them", 6),
+    SAY(C_NONE, "Choose other sounds first: they dream other parts", 6),
+    SAY(C_NONE, "Also new: RING keeps a gurdy's drones through rests", 6),
+    SAY(C_NONE, "Free at ghoulbox.messy.quest", 6), END};
+static const lstep_t L6_STEPS[] = {
+    {"Find DREAM", L6_FIND}, {"A piece in D", L6_FIRST}, {"Let it change", L6_EVOLVE}, {"Another mood", L6_MOOD},
+    {"Make it yours", L6_YOURS}, {0, 0}};
+
+static const lesson_t LESSONS[] = {{L1_STEPS, 9, 0} /* (a new FM-1: DUNGEON) */, {L2_STEPS, 8, 4}, {L3_STEPS, 8, 4}, {L4_STEPS, 8, 4}, {L5_STEPS, 8, 4},
+                                   {L6_STEPS, 8, 0} /* (index 6: 2.3's DREAM video, on DUNGEON) */,
+                                   {L6T_STEPS, 8, 4} /* (index 7: LESSON 6, Your Own Tune) */,
+                                   {L7_STEPS, 8, 4} /* (index 8: LESSON 7, The Harp Arpeggio) */,
+                                   {L8_STEPS, 8, 4} /* (index 9: LESSON 8, Ritual Drums) */,
+                                   {L9_STEPS, 8, 4} /* (index 10: LESSON 9, Sound Design) */,
+                                   {L10_STEPS, 8, 4} /* (index 11: LESSON 10, The Living Pattern) */,
+                                   {L11_STEPS, 8, 4} /* (index 12: LESSON 11, Two Hands) */,
+                                   {L12_STEPS, 8, 4} /* (index 13: LESSON 12, The Old Ways) */,
+                                   {L13_STEPS, 8, 4} /* (index 14: LESSON 13, With a MIDI Keyboard or DAW) */,
+                                   {L14_STEPS, 8, 4} /* (index 15: LESSON 14, Keep and Share Your Music) */,
+                                   {L15_STEPS, 10, 4} /* (index 16: LESSON 15, The Whole Piece) */};
+
+/* ---------------------------------------------------------------- (lesson 13) what a computer sends over USB-MIDI */
+static uint32_t mpk(uint32_t st, uint32_t d1, uint32_t d2) { return (st >> 4) | st << 8 | d1 << 16 | d2 << 24; }
+static void mnote(uint32_t ch, uint32_t n, float on, float off, float t0, float t1, uint32_t vel)
+{
+    if (on >= t0 && on < t1)
+        midi_in_event(mpk(0x90u | ch, n, vel));
+    if (off >= t0 && off < t1)
+        midi_in_event(mpk(0x80u | ch, n, 0));
+}
+/* the events of script id with times in [t0, t1) (seconds into it) */
+static void midi_script(uint32_t id, float t0, float t1)
+{
+    static const uint8_t CH[4][3] = {{50, 53, 57}, {46, 50, 53}, {48, 52, 55}, {50, 53, 57}};   /* Dm Bb C Dm */
+    static const uint8_t TUNE[8] = {69, 67, 65, 64, 62, 65, 64, 62};
+    static const float TT[9] = {0, 1.4f, 2.4f, 3.4f, 4.4f, 6.8f, 8.2f, 9.6f, 13.2f};
+    uint32_t i, k;
+    if (id == MS_CONNECT) {
+        usb.config = 1;
+        usb.suspended = 0;
+    } else if (id == MS_CHORDS || id == MS_BOTH || id == MS_CC) {   /* channel 2: four chords, 3.4 s each */
+        for (i = 0; i < 4u; i++)
+            for (k = 0; k < 3u; k++)
+                mnote(1, CH[i][k], i * 3.4f, i * 3.4f + 3.3f, t0, t1, 90);
+        if (id == MS_BOTH)                              /* channel 1: a tune over them */
+            for (i = 0; i < 8u; i++)
+                mnote(0, TUNE[i], TT[i], TT[i + 1] - 0.1f, t0, t1, 100);
+        if (id == MS_CC)                                /* a controller's knob, CC 21 on channel 2: down, then up */
+            for (i = 0; i < 120u; i++) {
+                float t = 0.5f + i * 0.1f;
+                uint32_t v = i < 40u ? 60u - i * 3u / 2u : i < 100u ? (i - 40u) * 2u : 120u;
+                if (t >= t0 && t < t1)
+                    midi_in_event(mpk(0xB1u, 21, v > 127u ? 127u : v));
+            }
+    } else if (id == MS_CLOCK) {                        /* Start, then the clock at 90 BPM (24 a beat: 36 a second) */
+        if (t0 <= 0.0f)
+            midi_in_event(0x0Fu | 0xFAu << 8);
+        for (i = 0; i < 1000u; i++) {
+            float t = 0.05f + i / 36.0f;
+            if (t >= t0 && t < t1)
+                midi_in_event(0x0Fu | 0xF8u << 8);
+        }
+    } else if (id == MS_STOP) {
+        if (t0 <= 0.0f)
+            midi_in_event(0x0Fu | 0xFCu << 8);
+    }
+}
 
 /* ---------------------------------------------------------------- the player */
 static FILE *wav, *vid;
 static uint32_t now, next_frame;                       /* samples */
 static int32_t lit_slot = -1;                          /* the card of the knob being turned */
 static int dark;                                       /* the FM-1 switched off: a black screen */
+static uint32_t left;                                  /* (lesson 11) the keys K_PRESS holds down */
 
 static void frame_out(void)
 {
@@ -335,6 +914,7 @@ static void run(float sec)                             /* the device runs: audio
         now += CTL;
         if (now >= next_frame) {                       /* 30 fps; the input loop twice a frame, as on the device */
             fm1_ms = (uint32_t)((uint64_t)now * 1000u / FS);
+            fm1_in.frames = (uint32_t)((uint64_t)now * CRANK_FPS / FS);   /* (lesson 12: the input scan's frames, the crank's clock) */
             host_ticks += 16000u;
             ui_input();
             host_ticks += 16000u;
@@ -358,6 +938,10 @@ static int16_t *knob_value(uint32_t slot)
 {
     int16_t *v = 0;
     const page_t *pg = &PAGES[ui.page];
+    if (ui.home && !ui.menu) {                         /* (lesson 9) HOME: the engine's four main controls */
+        home_param(slot, &v);
+        return v;
+    }
     if (ui.home || ui.menu)
         return 0;
     if (pg->scope == SC_TRK) {                         /* the MIXER: LEVEL PAN REV MUTE of the track */
@@ -381,6 +965,16 @@ static int reached(const act_t *a)
     case U_SCENE: return ui_scene == a->arg;
     case U_RESTORE: return ((ui_prefs & PREF_RESTORE_OFF) != 0u) == (a->arg != 0);
     case U_VALUE: return (v = knob_value((uint32_t)(a->ctl - C_K1))) && *v == a->arg;
+    case U_AFTERNOTE: return ui.cursor > 0 && TSEL->step[ui.cursor].time == ST_REST && TSEL->step[ui.cursor].n == 0 &&
+                             (TSEL->step[ui.cursor - 1u].time == ST_TIE ||   /* (a held note's end) */
+                              (TSEL->step[ui.cursor - 1u].time == ST_NOTE && TSEL->step[ui.cursor - 1u].n));
+    case U_EVADD: { uint16_t rw[EV_ROWS]; uint32_t n; return (ev_cur(rw, &n) >> 8) == EVK_ADD; }
+    case U_EVNOTE: return TSEL->step[ui.ev_step].time == ST_NOTE && TSEL->step[ui.ev_step].n;
+    case U_EVCHANCE: return ui.ev_id == (a->arg ? EV_RATCH : EV_CHANCE);   /* (lesson 10: arg 1, RATCH) */
+    case U_ACT: return ui.act == a->arg;
+    case U_STEPTIME: return TSEL->step[ui.cursor].time == a->arg;
+    case U_SONGROW: return ui.song_row == a->arg;
+    case U_SONGTRK: return ui.song_trk == a->arg;
     }
     return 0;
 }
@@ -392,6 +986,10 @@ static int direction(const act_t *a)                   /* which way to turn to g
         return *v < a->arg ? 1 : -1;
     if (a->until == U_TRACK)
         return song.sel < a->arg ? 1 : -1;
+    if (a->until == U_EVCHANCE)                        /* (+ ADD: CHANCE RATCH NUDGE come before the parameters) */
+        return -1;
+    if (a->until == U_STEPTIME)                        /* (NOTE TIE REST) */
+        return TSEL->step[ui.cursor].time < a->arg ? 1 : -1;
     if (a->until == U_PICK)
         return ui.ppick < a->arg ? 1 : -1;
     if (a->until == U_ROW)                             /* (the menu keeps a tab's last row: either way) */
@@ -401,7 +999,11 @@ static int direction(const act_t *a)                   /* which way to turn to g
 
 static void stuck(uint32_t step, const act_t *a)
 {
-    fprintf(stderr, "step %u: \"%s\" never got there\n", step, a->say);
+    fprintf(stderr, "step %u: \"%s\" never got there (page %s, track %u, cursor %u, LEN %d:", step, a->say,
+            ui.home ? "HOME" : PAGES[ui.page].title, song.sel + 1u, ui.cursor, TSEL->p[P_SLEN]);
+    for (uint32_t i = 0; i < 16u; i++)
+        fprintf(stderr, " %c%u", "NTR"[TSEL->step[i].time % 3u], TSEL->step[i].n ? TSEL->step[i].note[0] : 0u);
+    fprintf(stderr, ")\n");
     exit(1);
 }
 
@@ -428,17 +1030,62 @@ static void act(FILE *log, uint32_t step, const char *title, const act_t *a)
     } else if (a->kind == K_KEY) {                     /* a key held, as a player would */
         float held = dur - 0.6f - 0.05f;
         fm1_in.notes |= 1u << a->arg;
+        host_notes |= 1u << a->arg;                    /* (its press, as the UI sees one: DREAM's keys) */
         run(held);
         fm1_in.notes &= ~(1u << a->arg);
         spent += held;
-    } else if (a->kind == K_GLOKEY) {                  /* GLO held for its layer, a black key: a track's mute */
-        int16_t was = trk[a->until - 1].p[P_MUTE];
+    } else if (a->kind == K_CHORD) {                   /* (lesson 7) three keys held together */
+        uint32_t m = 1u << (a->arg & 31) | 1u << (a->arg >> 5 & 31) | 1u << (a->arg >> 10 & 31);
+        float held = dur - 0.6f - 0.05f;
+        fm1_in.notes |= m;
+        host_notes |= m;
+        run(held);
+        fm1_in.notes &= ~m;
+        spent += held;
+    } else if (a->kind == K_MIDI) {                    /* (lesson 13) the computer plays: its events as time passes */
+        float t = 0, slice = 1.0f / 240.0f, left_s = dur - 0.6f - 0.05f;
+        for (; t < left_s; t += slice) {
+            midi_script((uint32_t)a->arg, t, t + slice);
+            run(slice);
+        }
+        spent += left_s;
+    } else if (a->kind == K_CRANK) {                   /* (lesson 12) the crank: SELECT's clicks, steady */
+        float gap = 1.0f / a->arg, left_s = dur - 0.6f - 0.05f;
+        way = 1;
+        for (; left_s >= gap; left_s -= gap) {
+            host_enc[panel.enc[EN_SELECT]] += panel.dir[EN_SELECT];
+            fm1_in.enc_dfr[panel.enc[EN_SELECT]] = fm1_in.frames;
+            run(gap);
+            spent += gap;
+        }
+    } else if (a->kind == K_PRESS || a->kind == K_LETGO) {   /* (lesson 11) the left hand: down and kept, then up */
+        if (a->kind == K_PRESS) {
+            left = 1u << (a->arg & 31) | 1u << (a->arg >> 5 & 31) | 1u << (a->arg >> 10 & 31);
+            fm1_in.notes |= left;
+            host_notes |= left;
+        } else {
+            fm1_in.notes &= ~left;
+            left = 0;
+        }
+    } else if (a->kind == K_GLOKEY) {                  /* GLO held for its layer, a black key: a track's mute (or latch) */
+        uint32_t tr = (a->until & 15u) - 1u, latch = a->until & 0x10u;
+        int16_t was = latch ? lt[tr].on : trk[tr].p[P_MUTE];
         btn(C_GLO, 1); run(0.9f);
         fm1_in.notes |= 1u << a->arg; run(0.2f); fm1_in.notes &= ~(1u << a->arg); run(0.4f);
         btn(C_GLO, 0);
         spent += 1.5f;
-        if (trk[a->until - 1].p[P_MUTE] == was)
+        if ((latch ? lt[tr].on : trk[tr].p[P_MUTE]) == was)
             stuck(step, a);
+    } else if (a->kind == K_TURN && a->until == U_CLICKS) {   /* (lesson 6) a few clicks, as many as arg */
+        uint32_t e = (uint32_t)(a->ctl - C_SELECT + EN_SELECT), m = (uint32_t)(a->arg > 0 ? a->arg : -a->arg);
+        if (a->ctl >= C_K1)
+            lit_slot = a->ctl - C_K1;
+        way = a->arg > 0 ? 1 : -1;
+        for (; m; m--) {
+            host_enc[panel.enc[e]] += way * panel.dir[e];
+            run(0.4f);
+            spent += 0.4f;
+        }
     } else if (a->kind == K_TURN) {
         uint32_t e = (uint32_t)(a->ctl - C_SELECT + EN_SELECT);
         float click;                                   /* a value sweeps; a list steps, the first steps seen */
@@ -471,13 +1118,15 @@ static void act(FILE *log, uint32_t step, const char *title, const act_t *a)
     if (spent < dur)
         run(dur - spent);
     lit_slot = -1;
-    if (a->ctl == C_KEY)
+    if (a->kind == K_CHORD || a->kind == K_PRESS)
+        snprintf(cname, sizeof cname, "KEY%d+%d+%d", a->arg & 31, a->arg >> 5 & 31, a->arg >> 10 & 31);
+    else if (a->ctl == C_KEY)
         snprintf(cname, sizeof cname, "%sKEY%d", a->kind == K_GLOKEY ? "GLO+" : "", a->arg);
     else
         snprintf(cname, sizeof cname, "%s", CNAME[used]);
     fprintf(log, "%.3f\t%.3f\t%s\t%s\t%u\t%s\t%s\n", t0, now / (float)FS, cname,
-            a->kind == K_TAP ? "tap" : a->kind == K_HOLD ? "hold" : a->kind == K_KEY ? "key" :
-            a->kind == K_GLOKEY ? "glokey" : a->kind != K_TURN ? "say" :
+            a->kind == K_TAP ? "tap" : a->kind == K_HOLD ? "hold" : a->kind == K_KEY || a->kind == K_CHORD ? "key" : a->kind == K_PRESS ? "press" : a->kind == K_LETGO ? "letgo" :
+            a->kind == K_GLOKEY ? "glokey" : a->kind == K_CRANK ? "turn+" : a->kind != K_TURN ? "say" :
             a->ctl == C_OCTUP || a->ctl == C_OCTDN ? "tap" : way > 0 ? "turn+" : way < 0 ? "turn-" : "turn0", step, title,
             a->say);
 }

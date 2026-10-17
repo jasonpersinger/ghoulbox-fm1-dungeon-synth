@@ -9,7 +9,7 @@ medieval and fantasy synth music, from Old Tower and Hole Dweller to Mortiis-era
 **Latest: 2.3.1.** [Play it in your browser](https://ghoulbox.messy.quest/) ·
 [install it](https://ghoulbox.messy.quest/webapp/installer/) ·
 [hear every sound](https://ghoulbox.messy.quest/sounds/) ·
-[watch the 2.0 demo](https://youtu.be/NMSw1_wnCwQ) ·
+[watch DREAM, new in 2.3](https://youtu.be/LOAOYNm40zo) ·
 [learn it in five video lessons](https://www.youtube.com/playlist?list=PLMUs0QD7QfOw) ·
 [read the guide (PDF)](docs/guide/GHOULBOX-User-Guide-2.3.pdf)
 
@@ -27,7 +27,7 @@ GHOULBOX is free and always will be. To support it: [Ko-fi](https://ko-fi.com/gh
 
 ### 2.3
 
-- **DREAM: let the FM-1 compose.** Tap HOME on HOME until DREAM (after MIXER, CLOCK and KEYS), choose a MOOD,
+- **DREAM: let the FM-1 compose** ([watch it](https://youtu.be/LOAOYNm40zo)). Tap HOME on HOME until DREAM (after MIXER, CLOCK and KEYS), choose a MOOD,
   and press a key: the FM-1 writes a slow piece in that key for your four tracks and plays it. Each track gets a
   part that suits its sound: a drone holds the key note, a pad or choir holds the chords, a harp or lute breaks
   them, a melodic sound sings a phrase and answers it, drums play a slow ritual. Turn **EVOL** on and the piece
