@@ -1,0 +1,11 @@
+/* The printer-friendly guide (make_guide.py --print): the same pages, dark ink on white paper. Loaded after guide.html's
+ * own styles; only colours change, so the pages break where the dark guide's do. */
+:root { --ink: #1c1a17; --soft: #5a5348; --rule: #cfc8bb; --ember: #9a4f12; --blood: #8e2318; --stone: #fff; --bone: #1c1a17;
+        --card: #f4f1ea; --moss: #46632a; }
+.k { background: #f1ede4; border-color: #9c9384; }
+.try { background: #eff3e9; }
+.shots img { border-color: #9c9384; }
+.cover, .part { background: #fff; color: var(--ink); }
+.cover .t, .part h1 { color: var(--ember); }
+.cover .s, .cover .f, .part .n, .part ol { color: var(--soft); }
+.part p { color: #3a352d; }
