@@ -82,9 +82,9 @@
   {
     "name": "GHOULBOX",
     "author": "Jason Persinger",
-    "description": "Dungeon synth: a cathedral hall reverb, tape and crush, a hurdy-gurdy engine, choirs, organs and recorded psaltery and harp, an old-RPG screen with wall torches.",
+    "description": "Dungeon synth: DREAM composes and evolves ambient pieces from your sounds, a cathedral hall reverb, tape and crush, a hurdy-gurdy engine, choirs, organs and recorded psaltery and harp, an old-RPG screen with wall torches.",
     "repo": "https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth",
-    "release": "https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/releases/tag/ghoulbox-v2.0",
+    "release": "https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/releases/latest",
     "emulator": "https://ghoulbox.messy.quest/webapp/emu/",
     "audio": null,
     "audio_credit": null
