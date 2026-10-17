@@ -442,6 +442,47 @@ static const lstep_t L8_STEPS[] = {
     {"Set up", SETUP}, {"A drum kit", L8_KIT}, {"The drum grid", L8_GRID}, {"More drums", L8_MORE},
     {"One beat harder", L8_ACCENT}, {"Into the hall", L8_HALL}, {"Bring them in", L8_PLAY}, {0, 0}};
 
+/* ---------------------------------------------------------------- LESSON 9: SOUND DESIGN */
+static const act_t L9_PAD[] = {
+    TURN_TO(C_ALGO, U_TRACK, 1, 0, "Turn ALGORITHM to 2: CRYPT PAD"),
+    TURN_TO(C_K1, U_PICK, DIRGE, 0, "Still on PHRASES: turn KNOB 1 to 14 DIRGE"),
+    TAP(C_OCTUP, "Press OCT+ to load it: the chords from Lesson 3"),
+    TAP(C_HOME, "Tap HOME: the sound's main controls"),
+    SAY(C_NONE, "Now we change the sound itself, not the notes", 5), END};
+static const act_t L9_FILTER[] = {
+    TURN_TO(C_K1, U_VALUE, 10, 0, "Turn KNOB 1 (CUT) down: dark, behind a wall"),
+    SAY(C_NONE, "The filter takes the bright part away", 5),
+    TURN_TO(C_K1, U_VALUE, 95, 0, "Turn KNOB 1 up: bright and close"),
+    TURN_TO(C_K2, U_VALUE, 100, 0, "Turn KNOB 2 (RES) up: the filter rings"),
+    SAY(C_NONE, "A whistle at the edge of the sound", 5),
+    TURN_TO(C_K1, U_VALUE, 50, 0, "KNOB 1 (CUT) to the middle"),
+    TURN_TO(C_K2, U_VALUE, 45, 0, "KNOB 2 (RES) down a little"), END};
+static const act_t L9_OSC[] = {
+    TAP(C_EDIT, "Tap EDIT: the engine's own controls"),
+    SAY(C_NONE, "OSC: where the sound starts", 3.5f),
+    TURN_TO(C_K1, U_VALUE, 1, 0, "Turn KNOB 1 (WAVE) to SQR: hollow, reedy"),
+    SAY(C_NONE, "Like a clarinet in a crypt", 5),
+    TURN_TO(C_K1, U_VALUE, 4, 0, "Turn KNOB 1 to PWM: it keeps moving"),
+    SAY(C_NONE, "Rich and restless", 5),
+    TURN_TO(C_K2, U_VALUE, 40, 0, "Turn KNOB 2 (DTN) up: two oscillators apart"),
+    SAY(C_NONE, "Wider, and a little uneasy", 5),
+    TURN_TO(C_K4, U_VALUE, 45, 0, "Turn KNOB 4 (NOIS) up: breath in the pipes"),
+    SAY(C_NONE, "A sound no preset had", 6), END};
+static const act_t L9_KEEP[] = {
+    TAP(C_PLAY, "Press PLAY to stop: saving needs it stopped"),
+    TAPS(C_SAVE, "USER", "Tap SAVE until USER"),
+    SAY(C_K1, "KNOB 1 is the slot: 32 of them for your sounds", 4),
+    SAY(C_K4, "An empty slot: KNOB 4 (SAVE) is already picked", 4),
+    TAP(C_OCTUP, "Press OCT+"),
+    SAY(C_NONE, "Name it with the keys, as on a phone. Or skip it", 6),
+    TAP(C_OCTUP, "Press OCT+ to save"),
+    SAY(C_NONE, "U01 is yours: KNOB 2 (LOAD) puts it on any track", 6),
+    TAP(C_PLAY, "Press PLAY: play on"),
+    SAY(C_NONE, "Next: make it change over time, by itself", 6), END};
+static const lstep_t L9_STEPS[] = {
+    {"Set up", SETUP}, {"A pad to shape", L9_PAD}, {"Bright and dark", L9_FILTER}, {"Where sound starts", L9_OSC},
+    {"Keep your sound", L9_KEEP}, {0, 0}};
+
 /* ---------------------------------------------------------------- 6: DREAM (GHOULBOX 2.3: what's new, not a lesson) */
 static const act_t L6_FIND[] = {
     SAY(C_NONE, "GHOULBOX 2.3 can compose. This is DREAM", 4.5f),
@@ -483,7 +524,8 @@ static const lesson_t LESSONS[] = {{L1_STEPS, 9, 0} /* (a new FM-1: DUNGEON) */,
                                    {L6_STEPS, 8, 0} /* (index 6: 2.3's DREAM video, on DUNGEON) */,
                                    {L6T_STEPS, 8, 4} /* (index 7: LESSON 6, Your Own Tune) */,
                                    {L7_STEPS, 8, 4} /* (index 8: LESSON 7, The Harp Arpeggio) */,
-                                   {L8_STEPS, 8, 4} /* (index 9: LESSON 8, Ritual Drums) */};
+                                   {L8_STEPS, 8, 4} /* (index 9: LESSON 8, Ritual Drums) */,
+                                   {L9_STEPS, 8, 4} /* (index 10: LESSON 9, Sound Design) */};
 
 /* ---------------------------------------------------------------- the player */
 static FILE *wav, *vid;
@@ -549,6 +591,10 @@ static int16_t *knob_value(uint32_t slot)
 {
     int16_t *v = 0;
     const page_t *pg = &PAGES[ui.page];
+    if (ui.home && !ui.menu) {                         /* (lesson 9) HOME: the engine's four main controls */
+        home_param(slot, &v);
+        return v;
+    }
     if (ui.home || ui.menu)
         return 0;
     if (pg->scope == SC_TRK) {                         /* the MIXER: LEVEL PAN REV MUTE of the track */
