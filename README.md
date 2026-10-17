@@ -6,16 +6,40 @@
 [Felucca](https://github.com/hugelton/Felucca) by Hügelton Instruments (1.4.1), tuned for dark ambient,
 medieval and fantasy synth music, from Old Tower and Hole Dweller to Mortiis-era dungeon synth.
 
-**Latest: 2.1.** [Play it in your browser](https://ghoulbox.messy.quest/) ·
+**Latest: 2.3.** [Play it in your browser](https://ghoulbox.messy.quest/) ·
 [install it](https://ghoulbox.messy.quest/webapp/installer/) ·
 [hear every sound](https://ghoulbox.messy.quest/sounds/) ·
 [watch the 2.0 demo](https://youtu.be/NMSw1_wnCwQ) ·
 [learn it in five video lessons](https://www.youtube.com/playlist?list=PLMUs0QD7QfOw) ·
-[read the guide (PDF)](docs/guide/GHOULBOX-User-Guide-2.1.pdf)
+[read the guide (PDF)](docs/guide/GHOULBOX-User-Guide-2.3.pdf)
 
 GHOULBOX is free and always will be. To support it: [Ko-fi](https://ko-fi.com/ghoulbox) · [merch](https://ghoulbox-shop.fourthwall.com/).
 
 ## What's new
+
+### 2.3
+
+- **DREAM: let the FM-1 compose.** Tap HOME on HOME until DREAM (after MIXER, CLOCK and KEYS), choose a MOOD,
+  and press a key: the FM-1 writes a slow piece in that key for your four tracks and plays it. Each track gets a
+  part that suits its sound: a drone holds the key note, a pad or choir holds the chords, a harp or lute breaks
+  them, a melodic sound sings a phrase and answers it, drums play a slow ritual. Turn **EVOL** on and the piece
+  keeps changing by itself: a new chord, a new phrase, a part resting or coming back. **DENS** sets how busy it
+  is, **DRFT** how often it changes. What it writes is ordinary patterns: play along in key, edit, save.
+  It replaces all four tracks' patterns (it asks first).
+- **RING: drones through the rests.** On a real hurdy-gurdy the drones sound as long as the wheel turns. A new
+  RING page (EDIT, after DRONE and WHEEL) on GURDY tracks keeps the drones sounding when the sequencer reaches a
+  rest; they stop when you stop. On for HURDY GURDY, DRONE WHEEL and BAGPIPE. From an owner's request.
+
+Projects saved with 2.3 show as EMPTY on older firmware. Your saved projects, user presets and settings load as
+before (RING off, so they sound as they did).
+
+### 2.2
+
+- **Room to grow.** The firmware's free space went from 4.5 KB to 23.8 KB: the artwork and button labels are
+  stored compressed (they look exactly the same) and the FM6 engine uses a smaller, more precise table (it
+  sounds the same).
+- **USB audio is 44.1 kHz only.** Computers convert on their own; a DAW using the FM-1 directly as its audio
+  interface needs a 44.1 kHz project.
 
 ### 2.1
 
@@ -140,11 +164,11 @@ Felucca's sequencer, song mode, effects, editor and backups all work as they do 
 - **An old-RPG screen**: VT323 pixel type, stone windows, a sword cursor, flickering wall torches, and the
   CRYPT palette (stone, bone, torch amber, blood red), a blackletter wordmark and a skull at boot.
 
-Version 2.1 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
+Version 2.3 (HOME held > ABOUT). A hobby project, tested on one FM-1: **install at your own risk.**
 
-**[User guide (PDF)](docs/guide/GHOULBOX-User-Guide-2.1.pdf):** a 52-page manual: the FM-1's hardware and
+**[User guide (PDF)](docs/guide/GHOULBOX-User-Guide-2.3.pdf):** a 53-page manual: the FM-1's hardware and
 installing; synth basics in plain words (oscillators, filters, envelopes, LFOs, effects, sequencing), each
-with a hands-on exercise; a full reference to every page and all 59 sounds; a first piece built step by
+with a hands-on exercise; a full reference to every page and all 59 sounds, DREAM and RING; a first piece built step by
 step, a minor-key chord cheat sheet and dungeon recipes; recording, troubleshooting and a glossary.
 
 ## Install
