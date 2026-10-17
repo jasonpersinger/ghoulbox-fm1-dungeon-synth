@@ -15,7 +15,7 @@ enum { C_FX, C_SCL, C_ENV, C_LFO, C_EDIT, C_GLO, C_HOME, C_SAVE, C_ARP, C_SEQ, C
 static const char *const CNAME[] = {"FX", "SCL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ", "PLAY",
                                     "REC", "OCT-", "OCT+", "SELECT", "ALGORITHM", "PRESETS", "KNOB1", "KNOB2",
                                     "KNOB3", "KNOB4", "POWER", "KEY", "-"};
-enum { K_TAP, K_HOLD, K_TURN, K_SAY, K_KEY, K_GLOKEY, K_CHORD, K_PRESS, K_LETGO, K_CRANK };   /* K_CHORD (lesson 7): three keys, arg a | b << 5 | c << 10;
+enum { K_TAP, K_HOLD, K_TURN, K_SAY, K_KEY, K_GLOKEY, K_CHORD, K_PRESS, K_LETGO, K_CRANK, K_MIDI };   /* K_CHORD (lesson 7): three keys, arg a | b << 5 | c << 10;
    * (lesson 11) K_PRESS: the same three put down and kept down (the left hand), K_LETGO: they come up */   /* K_KEY: key arg held dur - 0.6 s; K_GLOKEY: GLO held,
                                                              * key arg tapped (a mute, track until-1 toggles) */
 /* what an action turns or taps until: */
@@ -48,6 +48,8 @@ typedef struct { const lstep_t *steps; float tail; uint8_t scene; } lesson_t;   
 #define PRESS(...) PRESS_(__VA_ARGS__)
 #define LETGO(s) {C_NONE, K_LETGO, U_CLICKS, 0, 0, s, 1.2f}
 #define CRANK(rate, s, d) {C_SELECT, K_CRANK, U_CLICKS, rate, 0, s, d}   /* (lesson 12) SELECT turned rate clicks a second */
+#define MIDI(script, s, d) {C_NONE, K_MIDI, U_CLICKS, script, 0, s, d}   /* (lesson 13) a computer's MIDI over USB */
+enum { MS_CONNECT, MS_CHORDS, MS_BOTH, MS_CC, MS_CLOCK, MS_STOP };   /* its scripts (midi_script) */
 #define LATCH(k, trk, s) {C_KEY, K_GLOKEY, 0x10 | ((trk) + 1), k, 0, s, 0}   /* (lesson 11) GLO + a black key: the latch */
 
 /* ---------------------------------------------------------------- LESSON 1: THE DRONE */
@@ -627,6 +629,44 @@ static const lstep_t L12_STEPS[] = {
     {"Set up", SETUP}, {"Old scales", L12_SCALES}, {"Old tunings", L12_TEMP}, {"Drones that ring", L12_RING},
     {"Turn the crank", L12_CRANK}, {0, 0}};
 
+/* ---------------------------------------------------------------- LESSON 13: WITH A MIDI KEYBOARD OR DAW */
+static const act_t L13_PLUG[] = {
+    MIDI(MS_CONNECT, "Connect a USB data cable to a computer", 4),
+    SAY(C_NONE, "No driver: the FM-1 is a MIDI instrument for any DAW", 5),
+    SAY(C_NONE, "A MIDI keyboard works the same way, or by the MIDI IN socket", 5), END};
+static const act_t L13_CHANNELS[] = {
+    HOLD(C_HOME, "Hold HOME: the menu"),
+    TURN_TO(C_ALGO, U_TAB, MTAB_MIDI, 0, "Turn ALGORITHM to the MIDI tab"),
+    TURN_TO(C_PRESETS, U_ROW, MI_MIDIIN, 0, "MIDI IN: the tab's one row"),
+    SAY(C_NONE, "CH1-4: MIDI channel 1 plays track 1, 2 track 2...", 5),
+    SAY(C_NONE, "SEL: every channel plays the track you select", 4.5f),
+    TAP(C_HOME, "Tap HOME to close the menu"), END};
+static const act_t L13_DAW[] = {
+    TURN_TO(C_ALGO, U_TRACK, 1, 0, "Turn ALGORITHM to 2: CRYPT PAD"),
+    MIDI(MS_CHORDS, "The DAW plays chords on channel 2: the crypt pad", 7.5f),
+    MIDI(MS_BOTH, "And a tune on channel 1: the hurdy-gurdy", 14.5f),
+    SAY(C_NONE, "Write the parts in the computer, hear the FM-1's sounds", 5), END};
+static const act_t L13_CC[] = {
+    SAY(C_K1, "On HOME, KNOB 1 is the pad's CUT", 3.5f),
+    MIDI(MS_CC, "A controller's knob sends CC 21: it turns CUT", 14.5f),
+    SAY(C_NONE, "CC 21 to 24 are the four knobs here. The guide lists the rest", 5), END};
+static const act_t L13_CLOCK[] = {
+    TAPS(C_HOME, "CLOCK", "Tap HOME until CLOCK"),
+    TURN_TO(C_K3, U_VALUE, 1, 0, "Turn KNOB 3 (CLK) to USB"),
+    SAY(C_NONE, "Now the computer's clock leads. None yet: it waits", 4.5f),
+    MIDI(MS_CLOCK, "The DAW presses play at 90 BPM: the FM-1 follows", 10),
+    MIDI(MS_STOP, "The DAW stops: so does the FM-1", 3.5f),
+    TURN_TO(C_K3, U_VALUE, 0, 0, "KNOB 3 (CLK) back to INT"),
+    TURN_TO(C_K1, U_VALUE, 72, 0, "KNOB 1 (BPM) back to 72"),
+    TAP(C_PLAY, "Press PLAY"), END};
+static const act_t L13_REC[] = {
+    SAY(C_NONE, "The same cable carries the sound: a USB audio input", 5),
+    SAY(C_NONE, "Record it in the DAW, next to your other parts", 5),
+    SAY(C_NONE, "Next: keep your music, and share it", 5), END};
+static const lstep_t L13_STEPS[] = {
+    {"Set up", SETUP}, {"Plug in", L13_PLUG}, {"Channels", L13_CHANNELS}, {"The computer plays", L13_DAW},
+    {"Knobs from afar", L13_CC}, {"Follow its clock", L13_CLOCK}, {"Record it", L13_REC}, {0, 0}};
+
 /* ---------------------------------------------------------------- 6: DREAM (GHOULBOX 2.3: what's new, not a lesson) */
 static const act_t L6_FIND[] = {
     SAY(C_NONE, "GHOULBOX 2.3 can compose. This is DREAM", 4.5f),
@@ -672,7 +712,55 @@ static const lesson_t LESSONS[] = {{L1_STEPS, 9, 0} /* (a new FM-1: DUNGEON) */,
                                    {L9_STEPS, 8, 4} /* (index 10: LESSON 9, Sound Design) */,
                                    {L10_STEPS, 8, 4} /* (index 11: LESSON 10, The Living Pattern) */,
                                    {L11_STEPS, 8, 4} /* (index 12: LESSON 11, Two Hands) */,
-                                   {L12_STEPS, 8, 4} /* (index 13: LESSON 12, The Old Ways) */};
+                                   {L12_STEPS, 8, 4} /* (index 13: LESSON 12, The Old Ways) */,
+                                   {L13_STEPS, 8, 4} /* (index 14: LESSON 13, With a MIDI Keyboard or DAW) */};
+
+/* ---------------------------------------------------------------- (lesson 13) what a computer sends over USB-MIDI */
+static uint32_t mpk(uint32_t st, uint32_t d1, uint32_t d2) { return (st >> 4) | st << 8 | d1 << 16 | d2 << 24; }
+static void mnote(uint32_t ch, uint32_t n, float on, float off, float t0, float t1, uint32_t vel)
+{
+    if (on >= t0 && on < t1)
+        midi_in_event(mpk(0x90u | ch, n, vel));
+    if (off >= t0 && off < t1)
+        midi_in_event(mpk(0x80u | ch, n, 0));
+}
+/* the events of script id with times in [t0, t1) (seconds into it) */
+static void midi_script(uint32_t id, float t0, float t1)
+{
+    static const uint8_t CH[4][3] = {{50, 53, 57}, {46, 50, 53}, {48, 52, 55}, {50, 53, 57}};   /* Dm Bb C Dm */
+    static const uint8_t TUNE[8] = {69, 67, 65, 64, 62, 65, 64, 62};
+    static const float TT[9] = {0, 1.4f, 2.4f, 3.4f, 4.4f, 6.8f, 8.2f, 9.6f, 13.2f};
+    uint32_t i, k;
+    if (id == MS_CONNECT) {
+        usb.config = 1;
+        usb.suspended = 0;
+    } else if (id == MS_CHORDS || id == MS_BOTH || id == MS_CC) {   /* channel 2: four chords, 3.4 s each */
+        for (i = 0; i < 4u; i++)
+            for (k = 0; k < 3u; k++)
+                mnote(1, CH[i][k], i * 3.4f, i * 3.4f + 3.3f, t0, t1, 90);
+        if (id == MS_BOTH)                              /* channel 1: a tune over them */
+            for (i = 0; i < 8u; i++)
+                mnote(0, TUNE[i], TT[i], TT[i + 1] - 0.1f, t0, t1, 100);
+        if (id == MS_CC)                                /* a controller's knob, CC 21 on channel 2: down, then up */
+            for (i = 0; i < 120u; i++) {
+                float t = 0.5f + i * 0.1f;
+                uint32_t v = i < 40u ? 60u - i * 3u / 2u : i < 100u ? (i - 40u) * 2u : 120u;
+                if (t >= t0 && t < t1)
+                    midi_in_event(mpk(0xB1u, 21, v > 127u ? 127u : v));
+            }
+    } else if (id == MS_CLOCK) {                        /* Start, then the clock at 90 BPM (24 a beat: 36 a second) */
+        if (t0 <= 0.0f)
+            midi_in_event(0x0Fu | 0xFAu << 8);
+        for (i = 0; i < 1000u; i++) {
+            float t = 0.05f + i / 36.0f;
+            if (t >= t0 && t < t1)
+                midi_in_event(0x0Fu | 0xF8u << 8);
+        }
+    } else if (id == MS_STOP) {
+        if (t0 <= 0.0f)
+            midi_in_event(0x0Fu | 0xFCu << 8);
+    }
+}
 
 /* ---------------------------------------------------------------- the player */
 static FILE *wav, *vid;
@@ -842,6 +930,13 @@ static void act(FILE *log, uint32_t step, const char *title, const act_t *a)
         run(held);
         fm1_in.notes &= ~m;
         spent += held;
+    } else if (a->kind == K_MIDI) {                    /* (lesson 13) the computer plays: its events as time passes */
+        float t = 0, slice = 1.0f / 240.0f, left_s = dur - 0.6f - 0.05f;
+        for (; t < left_s; t += slice) {
+            midi_script((uint32_t)a->arg, t, t + slice);
+            run(slice);
+        }
+        spent += left_s;
     } else if (a->kind == K_CRANK) {                   /* (lesson 12) the crank: SELECT's clicks, steady */
         float gap = 1.0f / a->arg, left_s = dur - 0.6f - 0.05f;
         way = 1;
