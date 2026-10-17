@@ -37,9 +37,13 @@ def key_box(k):
     x = 240 + WHITES.index(k - 1) * KW + KW / 2
     return (x + 10, 560, x + KW - 10, 636)
 
+def keys(c):
+    """the keys a control names: KEY7, GLO+KEY1, or a chord KEY7+11+14"""
+    return [int(k) for k in c.split("KEY")[1].split("+")]
+
 def centre(c):
-    if "KEY" in c:
-        x0, y0, x1, y1 = key_box(int(c.split("KEY")[1]))
+    if "KEY" in c:                                     # (a chord, KEYa+b+c: its middle key)
+        x0, y0, x1, y1 = key_box(keys(c)[len(keys(c)) // 2])
         return (x0 + x1) / 2, (y0 + y1) / 2
     if c in KNOBS: return KNOBS[c]
     if c in BUTTONS: x, y = BUTTONS[c]; return x + BW / 2, y + BH / 2
@@ -81,7 +85,8 @@ def aim(c):
     if c not in KNOBS and c not in BUTTONS and "KEY" not in c:   # the screen: from the right, between the knobs and buttons
         return (SX + 492, SY + 200), math.radians(180)
     if "KEY" in c:                                     # a key: the point at its top
-        x0, y0, x1, y1 = key_box(int(c.split("KEY")[1]))
+        ks = keys(c)
+        x0, y0, x1, y1 = key_box(ks[len(ks) // 2])
         return ((x0 + x1) / 2 + 8, y0 + 10), math.radians(115)
     off = KR + 6 if c in KNOBS else 30
     if y < 250:                                        # the top row: from below right, so the hilt stays in frame
@@ -127,12 +132,13 @@ while True:
         d.line([(x + math.cos(g) * 14, y + math.sin(g) * 14), (x + math.cos(g) * (KR - 8), y + math.sin(g) * (KR - 8))],
                fill=BONE, width=6)
     if a and "KEY" in a[2]:                            # a key pressed (with GLO held for a mute)
-        box = key_box(int(a[2].split("KEY")[1]))
         down = busy and (a[3] == "key" or a[0] + 1.5 <= t < a[0] + 1.75)
-        d.rounded_rectangle((box[0] - 5, box[1] - 5, box[2] + 5, box[3] + 5), 16, outline=EMBER if busy else BLOOD,
-                            width=6)
-        if down:
-            d.rounded_rectangle(box, 14, fill=EMBER)
+        for kk in keys(a[2]):
+            box = key_box(kk)
+            d.rounded_rectangle((box[0] - 5, box[1] - 5, box[2] + 5, box[3] + 5), 16, outline=EMBER if busy else BLOOD,
+                                width=6)
+            if down:
+                d.rounded_rectangle(box, 14, fill=EMBER)
         if a[2].startswith("GLO+"):
             bx, by = BUTTONS["GLO"]
             d.rounded_rectangle((bx, by, bx + BW, by + BH), 12, fill=EMBER if busy else "#1b1814")
@@ -164,7 +170,7 @@ while True:
         sword(d, tip, ang)
         d.text((180, 830), f"{KICK}  ·  {TITLE.upper()}", font=f_small, fill=DIM)
         d.text((180, 862), f"{a[4]} / {nsteps}   {a[5]}", font=f_step, fill=EMBER)
-        d.text((180, 950), "Press the key: " + a[6] if a[3] == "key" else a[6], font=f_say, fill=INK)
+        d.text((180, 950), ("Press the keys: " if "+" in a[2] else "Press the key: ") + a[6] if a[3] == "key" else a[6], font=f_say, fill=INK)
     else:
         d.text((180, 830), KICK, font=f_small, fill=DIM)
         d.text((180, 862), TITLE, font=f_step, fill=BLOOD)

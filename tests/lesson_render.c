@@ -15,7 +15,7 @@ enum { C_FX, C_SCL, C_ENV, C_LFO, C_EDIT, C_GLO, C_HOME, C_SAVE, C_ARP, C_SEQ, C
 static const char *const CNAME[] = {"FX", "SCL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ", "PLAY",
                                     "REC", "OCT-", "OCT+", "SELECT", "ALGORITHM", "PRESETS", "KNOB1", "KNOB2",
                                     "KNOB3", "KNOB4", "POWER", "KEY", "-"};
-enum { K_TAP, K_HOLD, K_TURN, K_SAY, K_KEY, K_GLOKEY };   /* K_KEY: key arg held dur - 0.6 s; K_GLOKEY: GLO held,
+enum { K_TAP, K_HOLD, K_TURN, K_SAY, K_KEY, K_GLOKEY, K_CHORD };   /* K_CHORD (lesson 7): three keys, arg a | b << 5 | c << 10 */   /* K_KEY: key arg held dur - 0.6 s; K_GLOKEY: GLO held,
                                                              * key arg tapped (a mute, track until-1 toggles) */
 /* what an action turns or taps until: */
 enum { U_CLICKS, U_TRACK, U_SOUND, U_PICK, U_PAGE, U_ROW, U_TAB, U_VALUE, U_SCENE, U_RESTORE,   /* U_RESTORE: arg 1 OFF */
@@ -41,6 +41,8 @@ typedef struct { const lstep_t *steps; float tail; uint8_t scene; } lesson_t;   
 #define MUTE(k, trk, s) {C_KEY, K_GLOKEY, (trk) + 1, k, 0, s, 0}
 #define END {C_NONE, 0, 0, 0, 0, 0, 0}
 #define TURN(c, n, s) {c, K_TURN, U_CLICKS, n, 0, s, 0}
+#define CHORD_(a, b, c, s, d) {C_KEY, K_CHORD, U_CLICKS, (a) | (b) << 5 | (c) << 10, 0, s, d}
+#define CHORD(...) CHORD_(__VA_ARGS__)                   /* (so a chord #define spreads into its three keys) */
 
 /* ---------------------------------------------------------------- LESSON 1: THE DRONE */
 #define PEDAL 16                                       /* PATTERNS[16]: one low D, held (engines.c) */
@@ -342,6 +344,57 @@ static const lstep_t L6T_STEPS[] = {
     {"Set up", SETUP}, {"The key", L6T_KEY}, {"Record it", L6T_REC}, {"Listen back", L6T_LISTEN},
     {"Hold a note longer", L6T_FIX}, {"Let it breathe", L6T_CHANCE}, {"Keep it", L6T_KEEP}, {0, 0}};
 
+/* ---------------------------------------------------------------- LESSON 7: THE HARP ARPEGGIO */
+#define DMIN 7, 11, 14                                 /* (WHITE in D minor: C E G play D F A) */
+#define BFLAT 4, 7, 11                                 /* A C E: B-flat D F */
+#define CMAJ 6, 9, 12                                  /* B D F: C E G */
+static const act_t L7_HARP[] = {
+    TURN_TO(C_ALGO, U_TRACK, 0, 0, "Turn ALGORITHM to 1"),
+    TAP(C_SCL, "Tap SCL: as in Lesson 2"),
+    TURN_TO(C_PRESETS, U_SOUND, 0, "FOLK HARP", "Turn PRESETS to FOLK HARP"),
+    TURN_TO(C_K1, U_VALUE, 2, 0, "KNOB 1 (ROOT) to D"),
+    TURN_TO(C_K2, U_VALUE, 2, 0, "KNOB 2 (SCL) to MIN"),
+    TURN_TO(C_K3, U_VALUE, 2, 0, "KNOB 3 (QNT) to WHITE: no wrong notes"),
+    CHORD(DMIN, "Hold C, E and G together: D minor", 3.5f),
+    SAY(C_NONE, "A chord, all at once. A harpist rolls it", 4), END};
+static const act_t L7_ARP[] = {
+    TAP(C_ARP, "Tap ARP"),
+    TURN_TO(C_K1, U_VALUE, 3, 0, "Turn KNOB 1 (MODE) to UPDN: up, then down"),
+    TURN_TO(C_K2, U_VALUE, 1, 0, "Turn KNOB 2 (RATE) to 1/8"),
+    TURN_TO(C_K3, U_VALUE, 2, 0, "Turn KNOB 3 (OCT) to 2: two octaves"),
+    CHORD(DMIN, "Hold C, E and G again: the harp rolls", 9),
+    SAY(C_NONE, "One note at a time, in time with the drone", 4), END};
+static const act_t L7_CHORDS[] = {
+    CHORD(DMIN, "Hold C, E, G: D minor", 5.5f),
+    CHORD(BFLAT, "The same shape on A, C, E: B-flat", 5.5f),
+    CHORD(CMAJ, "On B, D, F: C major", 5.5f),
+    CHORD(DMIN, "Back to C, E, G: home", 6),
+    SAY(C_NONE, "Three shapes, one hand: a whole dungeon ballad", 4.5f), END};
+static const act_t L7_HOLD[] = {
+    TAPS(C_ARP, "ARP 2", "Tap ARP again: ARP 2"),
+    TURN_TO(C_K3, U_VALUE, 1, 0, "Turn KNOB 3 (HOLD) to ON"),
+    CHORD(DMIN, "Play C, E, G, then let go", 1.5f),
+    SAY(C_NONE, "It keeps playing: hands free", 6),
+    CHORD(BFLAT, "Play A, C, E: the new chord takes over", 1.5f),
+    SAY(C_NONE, "Change the chord whenever you like", 6),
+    CHORD(DMIN, "C, E, G: back home", 1.5f), END};
+static const act_t L7_SHAPE[] = {
+    TURN_TO(C_K2, U_VALUE, 70, 0, "Turn KNOB 2 (PROB) down: some notes rest"),
+    SAY(C_NONE, "Like a player, not a machine", 7),
+    TAPS(C_ARP, "ARP", "Tap ARP: back to the first page"),
+    TURN_TO(C_K4, U_VALUE, 20, 0, "Turn KNOB 4 (GATE) down: short, plucked"),
+    SAY(C_NONE, "Each string just touched", 6),
+    TURN_TO(C_K1, U_VALUE, 4, 0, "Turn KNOB 1 (MODE) to RND: random order"),
+    SAY(C_NONE, "Wind through the strings", 8), END};
+static const act_t L7_END[] = {
+    TURN_TO(C_K1, U_VALUE, 3, 0, "KNOB 1 (MODE) back to UPDN"),
+    TURN_TO(C_K4, U_VALUE, 64, 0, "KNOB 4 (GATE) back to the middle"),
+    SAY(C_NONE, "The arpeggiator works on any sound: try the LUTE", 5),
+    SAY(C_NONE, "Next: drums for a ritual", 5), END};
+static const lstep_t L7_STEPS[] = {
+    {"Set up", SETUP}, {"A harp", L7_HARP}, {"Roll the chord", L7_ARP}, {"Change chords", L7_CHORDS},
+    {"Hands free", L7_HOLD}, {"Shape it", L7_SHAPE}, {"Leave it playing", L7_END}, {0, 0}};
+
 /* ---------------------------------------------------------------- 6: DREAM (GHOULBOX 2.3: what's new, not a lesson) */
 static const act_t L6_FIND[] = {
     SAY(C_NONE, "GHOULBOX 2.3 can compose. This is DREAM", 4.5f),
@@ -381,7 +434,8 @@ static const lstep_t L6_STEPS[] = {
 
 static const lesson_t LESSONS[] = {{L1_STEPS, 9, 0} /* (a new FM-1: DUNGEON) */, {L2_STEPS, 8, 4}, {L3_STEPS, 8, 4}, {L4_STEPS, 8, 4}, {L5_STEPS, 8, 4},
                                    {L6_STEPS, 8, 0} /* (index 6: 2.3's DREAM video, on DUNGEON) */,
-                                   {L6T_STEPS, 8, 4} /* (index 7: LESSON 6, Your Own Tune) */};
+                                   {L6T_STEPS, 8, 4} /* (index 7: LESSON 6, Your Own Tune) */,
+                                   {L7_STEPS, 8, 4} /* (index 8: LESSON 7, The Harp Arpeggio) */};
 
 /* ---------------------------------------------------------------- the player */
 static FILE *wav, *vid;
@@ -537,6 +591,14 @@ static void act(FILE *log, uint32_t step, const char *title, const act_t *a)
         run(held);
         fm1_in.notes &= ~(1u << a->arg);
         spent += held;
+    } else if (a->kind == K_CHORD) {                   /* (lesson 7) three keys held together */
+        uint32_t m = 1u << (a->arg & 31) | 1u << (a->arg >> 5 & 31) | 1u << (a->arg >> 10 & 31);
+        float held = dur - 0.6f - 0.05f;
+        fm1_in.notes |= m;
+        host_notes |= m;
+        run(held);
+        fm1_in.notes &= ~m;
+        spent += held;
     } else if (a->kind == K_GLOKEY) {                  /* GLO held for its layer, a black key: a track's mute */
         int16_t was = trk[a->until - 1].p[P_MUTE];
         btn(C_GLO, 1); run(0.9f);
@@ -587,12 +649,14 @@ static void act(FILE *log, uint32_t step, const char *title, const act_t *a)
     if (spent < dur)
         run(dur - spent);
     lit_slot = -1;
-    if (a->ctl == C_KEY)
+    if (a->kind == K_CHORD)
+        snprintf(cname, sizeof cname, "KEY%d+%d+%d", a->arg & 31, a->arg >> 5 & 31, a->arg >> 10 & 31);
+    else if (a->ctl == C_KEY)
         snprintf(cname, sizeof cname, "%sKEY%d", a->kind == K_GLOKEY ? "GLO+" : "", a->arg);
     else
         snprintf(cname, sizeof cname, "%s", CNAME[used]);
     fprintf(log, "%.3f\t%.3f\t%s\t%s\t%u\t%s\t%s\n", t0, now / (float)FS, cname,
-            a->kind == K_TAP ? "tap" : a->kind == K_HOLD ? "hold" : a->kind == K_KEY ? "key" :
+            a->kind == K_TAP ? "tap" : a->kind == K_HOLD ? "hold" : a->kind == K_KEY || a->kind == K_CHORD ? "key" :
             a->kind == K_GLOKEY ? "glokey" : a->kind != K_TURN ? "say" :
             a->ctl == C_OCTUP || a->ctl == C_OCTDN ? "tap" : way > 0 ? "turn+" : way < 0 ? "turn-" : "turn0", step, title,
             a->say);
