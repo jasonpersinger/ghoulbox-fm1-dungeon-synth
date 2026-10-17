@@ -395,6 +395,53 @@ static const lstep_t L7_STEPS[] = {
     {"Set up", SETUP}, {"A harp", L7_HARP}, {"Roll the chord", L7_ARP}, {"Change chords", L7_CHORDS},
     {"Hands free", L7_HOLD}, {"Shape it", L7_SHAPE}, {"Leave it playing", L7_END}, {0, 0}};
 
+/* ---------------------------------------------------------------- LESSON 8: RITUAL DRUMS */
+/* the DRUM grid (seq.c key_place): white keys from F are steps 1..16; black keys 1..8 the lanes, 9 ACC */
+#define LN_FRAME 1
+#define LN_TIMP 13
+#define LN_SHAKR 8
+static const act_t L8_KIT[] = {
+    TURN_TO(C_ALGO, U_TRACK, 2, 0, "Turn ALGORITHM to 3"),
+    TAPS(C_HOME, "MIXER", "Tap HOME until the MIXER"),
+    TURN_TO(C_PRESETS, U_SOUND, 0, "TOMB DRUMS", "Turn PRESETS to TOMB DRUMS"),
+    SAY(C_NONE, "Low, slow drums, far back in the hall", 4), END};
+static const act_t L8_GRID[] = {
+    TAP(C_SEQ, "Tap SEQ: on a drum track, a drum grid"),
+    SAY(C_NONE, "The white keys are the steps: 16 of them, left to right", 5),
+    SAY(C_NONE, "The black keys pick the drum", 4),
+    KEY(LN_FRAME, "1st black key, FRAME, the frame drum", 1.6f),
+    KEY(0, "1st white key, step 1: a hit", 1.6f),
+    KEY(6, "4th white key, step 4", 1.6f),
+    KEY(14, "9th white key, step 9", 1.6f),
+    SAY(C_NONE, "BOOM . . boom . . . . BOOM: a slow heartbeat", 8), END};
+static const act_t L8_MORE[] = {
+    KEY(LN_TIMP, "6th black key, TIMP, the timpani", 1.6f),
+    KEY(21, "13th white key, step 13", 1.6f),
+    KEY(24, "15th white key, step 15", 1.6f),
+    SAY(C_NONE, "The timpani rolls into the next round", 7),
+    KEY(LN_SHAKR, "4th black key, SHAKR, a shaker", 1.6f),
+    KEY(7, "5th white key, step 5", 1.6f),
+    KEY(16, "10th white key, step 10", 1.6f),
+    SAY(C_NONE, "Few hits, far apart: that is a ritual", 8), END};
+static const act_t L8_ACCENT[] = {
+    KEY(LN_FRAME, "1st black key, back to the frame drum", 1.6f),
+    TURN(C_K1, -1, "Turn KNOB 1 (STEP) left: the cursor back to step 9"),
+    TURN(C_K4, 1, "Turn KNOB 4 (ACC) right: step 9 hits harder"),
+    SAY(C_NONE, "The big beat of the procession", 7), END};
+static const act_t L8_HALL[] = {
+    TAPS(C_FX, "FX", "Tap FX: the track's sends"),
+    TURN_TO(C_K4, U_VALUE, 120, 0, "Turn KNOB 4 (REV) up: deep in the hall"),
+    SAY(C_NONE, "Drums from somewhere under the castle", 8), END};
+static const act_t L8_PLAY[] = {
+    MUTE(5, 2, "Hold GLO, tap the 3rd black key, the drums stop"),
+    SAY(C_NONE, "Just the drone again", 6),
+    MUTE(5, 2, "Again: the procession returns"),
+    SAY(C_NONE, "As in Lesson 5: bring them in when the piece needs them", 7),
+    SAY(C_NONE, "Next: shape a sound of your own", 5), END};
+static const lstep_t L8_STEPS[] = {
+    {"Set up", SETUP}, {"A drum kit", L8_KIT}, {"The drum grid", L8_GRID}, {"More drums", L8_MORE},
+    {"One beat harder", L8_ACCENT}, {"Into the hall", L8_HALL}, {"Bring them in", L8_PLAY}, {0, 0}};
+
 /* ---------------------------------------------------------------- 6: DREAM (GHOULBOX 2.3: what's new, not a lesson) */
 static const act_t L6_FIND[] = {
     SAY(C_NONE, "GHOULBOX 2.3 can compose. This is DREAM", 4.5f),
@@ -435,7 +482,8 @@ static const lstep_t L6_STEPS[] = {
 static const lesson_t LESSONS[] = {{L1_STEPS, 9, 0} /* (a new FM-1: DUNGEON) */, {L2_STEPS, 8, 4}, {L3_STEPS, 8, 4}, {L4_STEPS, 8, 4}, {L5_STEPS, 8, 4},
                                    {L6_STEPS, 8, 0} /* (index 6: 2.3's DREAM video, on DUNGEON) */,
                                    {L6T_STEPS, 8, 4} /* (index 7: LESSON 6, Your Own Tune) */,
-                                   {L7_STEPS, 8, 4} /* (index 8: LESSON 7, The Harp Arpeggio) */};
+                                   {L7_STEPS, 8, 4} /* (index 8: LESSON 7, The Harp Arpeggio) */,
+                                   {L8_STEPS, 8, 4} /* (index 9: LESSON 8, Ritual Drums) */};
 
 /* ---------------------------------------------------------------- the player */
 static FILE *wav, *vid;
