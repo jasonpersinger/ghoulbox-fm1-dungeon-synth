@@ -112,6 +112,7 @@ enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_f
                        stdin=subprocess.PIPE)
 spin = {k: -2.4 for k in KNOBS}                        # each knob's marker angle
 k, cur = 0, 0
+left = []                                              # keys a "press" holds down until a "letgo" (the left hand)
 while True:
     raw = screen.read(240 * 240 * 3)
     if len(raw) < 240 * 240 * 3:
@@ -124,15 +125,21 @@ while True:
     im = base.copy()
     im.paste(Image.frombytes("RGB", (240, 240), raw).resize((480, 480), Image.NEAREST), (SX, SY))
     d = ImageDraw.Draw(im)
-    busy = a and a[0] + 0.6 <= t < a[1] - (0.05 if a[3] == "key" else 0.4) and a[3] != "say"   # (a key: held to its end)
+    busy = a and a[0] + 0.6 <= t < a[1] - (0.05 if a[3] in ("key", "press") else 0.4) and a[3] not in ("say", "letgo")   # (a key: held to its end)
     if a and a[3].startswith("turn") and busy and a[2] in KNOBS:   # the way it really turned
         spin[a[2]] += 0.12 if a[3] == "turn+" else -0.12
     for n, (x, y) in KNOBS.items():                    # the markers
         g = spin[n]
         d.line([(x + math.cos(g) * 14, y + math.sin(g) * 14), (x + math.cos(g) * (KR - 8), y + math.sin(g) * (KR - 8))],
                fill=BONE, width=6)
+    if a and a[3] == "press" and t >= a[0] + 0.6:
+        left = keys(a[2])
+    if a and a[3] == "letgo":
+        left = []
+    for kk in left:                                    # the left hand, still down
+        d.rounded_rectangle(key_box(kk), 14, fill=EMBER)
     if a and "KEY" in a[2]:                            # a key pressed (with GLO held for a mute)
-        down = busy and (a[3] == "key" or a[0] + 1.5 <= t < a[0] + 1.75)
+        down = busy and (a[3] in ("key", "press") or a[0] + 1.5 <= t < a[0] + 1.75)
         for kk in keys(a[2]):
             box = key_box(kk)
             d.rounded_rectangle((box[0] - 5, box[1] - 5, box[2] + 5, box[3] + 5), 16, outline=EMBER if busy else BLOOD,
@@ -170,7 +177,7 @@ while True:
         sword(d, tip, ang)
         d.text((180, 830), f"{KICK}  ·  {TITLE.upper()}", font=f_small, fill=DIM)
         d.text((180, 862), f"{a[4]} / {nsteps}   {a[5]}", font=f_step, fill=EMBER)
-        d.text((180, 950), ("Press the keys: " if "+" in a[2] else "Press the key: ") + a[6] if a[3] == "key" else a[6], font=f_say, fill=INK)
+        d.text((180, 950), ("Press the keys: " if "+" in a[2] else "Press the key: ") + a[6] if a[3] in ("key", "press") else a[6], font=f_say, fill=INK)
     else:
         d.text((180, 830), KICK, font=f_small, fill=DIM)
         d.text((180, 862), TITLE, font=f_step, fill=BLOOD)
