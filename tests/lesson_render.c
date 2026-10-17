@@ -292,7 +292,45 @@ static const lstep_t L5_STEPS[] = {
     {"The whole dungeon", L5_DUNGEON}, {"Balance", L5_BALANCE}, {"The cassette", L5_TAPE},
     {"Play the mutes", L5_MUTES}, {"Record it", L5_RECORD}, {"Keep your music", L5_KEEP}, {0, 0}};
 
-static const lesson_t LESSONS[] = {{L1_STEPS, 9, 0} /* (a new FM-1: DUNGEON) */, {L2_STEPS, 8, 4}, {L3_STEPS, 8, 4}, {L4_STEPS, 8, 4}, {L5_STEPS, 8, 4}};
+/* ---------------------------------------------------------------- 6: DREAM (GHOULBOX 2.3: what's new, not a lesson) */
+static const act_t L6_FIND[] = {
+    SAY(C_NONE, "GHOULBOX 2.3 can compose. This is DREAM", 4.5f),
+    TAPS(C_HOME, "DREAM", "Tap HOME until DREAM: after MIXER, CLOCK, KEYS"),
+    SAY(C_NONE, "Four knobs: EVOL, DENS, DRFT and MOOD", 4.5f), END};
+static const act_t L6_FIRST[] = {
+    SAY(C_K4, "KNOB 4 is the MOOD: MIN, a minor key", 4),
+    KEY(9, "D. The piece will be in D", 2.5f),
+    SAY(C_NONE, "It asks first: it replaces all four tracks", 4),
+    TAP(C_OCTUP, "Press OCT+ for yes"),
+    SAY(C_NONE, "The FM-1 writes a piece for its four sounds", 8),
+    SAY(C_NONE, "A drone holds D, the pad and the monks the chords", 10),
+    SAY(C_NONE, "The hurdy-gurdy sings a phrase, then answers it", 10),
+    SAY(C_NONE, "Each note has a chance: no two passes are the same", 10), END};
+static const act_t L6_EVOLVE[] = {
+    TURN_TO(C_K3, U_VALUE, 8, 0, "Turn KNOB 3 (DRFT) to 8: a change every pass"),
+    TURN_TO(C_K1, U_VALUE, 1, 0, "Turn KNOB 1 (EVOL) to ON"),
+    SAY(C_NONE, "Now it changes by itself as it plays", 10),
+    SAY(C_NONE, "A new chord, a new phrase, a part resting", 14),
+    SAY(C_NONE, "The drone and the first phrase stay: the same piece", 14),
+    SAY(C_NONE, "Leave it running for as long as you like", 10), END};
+static const act_t L6_MOOD[] = {
+    TURN_TO(C_K2, U_VALUE, 6, 0, "Turn KNOB 2 (DENS) to 6: busier"),
+    TURN_TO(C_K4, U_VALUE, 2, 0, "Turn KNOB 4 (MOOD) to PHRY: darker"),
+    KEY(4, "A. A new piece in A Phrygian", 2.5f),
+    SAY(C_NONE, "At once this time: no question after the first", 8),
+    SAY(C_NONE, "Same sounds, a new key and mood: a new piece", 12),
+    SAY(C_NONE, "EVOL is still on: it keeps changing", 12), END};
+static const act_t L6_YOURS[] = {
+    SAY(C_NONE, "DREAM writes ordinary patterns: edit them, save them", 6),
+    SAY(C_NONE, "Choose other sounds first: they dream other parts", 6),
+    SAY(C_NONE, "Also new: RING keeps a gurdy's drones through rests", 6),
+    SAY(C_NONE, "Free at ghoulbox.messy.quest", 6), END};
+static const lstep_t L6_STEPS[] = {
+    {"Find DREAM", L6_FIND}, {"A piece in D", L6_FIRST}, {"Let it change", L6_EVOLVE}, {"Another mood", L6_MOOD},
+    {"Make it yours", L6_YOURS}, {0, 0}};
+
+static const lesson_t LESSONS[] = {{L1_STEPS, 9, 0} /* (a new FM-1: DUNGEON) */, {L2_STEPS, 8, 4}, {L3_STEPS, 8, 4}, {L4_STEPS, 8, 4}, {L5_STEPS, 8, 4},
+                                   {L6_STEPS, 8, 0} /* (2.3's DREAM, on DUNGEON) */};
 
 /* ---------------------------------------------------------------- the player */
 static FILE *wav, *vid;
@@ -428,6 +466,7 @@ static void act(FILE *log, uint32_t step, const char *title, const act_t *a)
     } else if (a->kind == K_KEY) {                     /* a key held, as a player would */
         float held = dur - 0.6f - 0.05f;
         fm1_in.notes |= 1u << a->arg;
+        host_notes |= 1u << a->arg;                    /* (its press, as the UI sees one: DREAM's keys) */
         run(held);
         fm1_in.notes &= ~(1u << a->arg);
         spent += held;

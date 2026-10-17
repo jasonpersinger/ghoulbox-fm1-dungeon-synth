@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """GHOULBOX lesson video: build/host/lesson_render N DIR/lesson.wav DIR/frames.rgb, then
-  python3 tools/make_lesson_video.py DIR N "Title"  -> DIR/ghoulbox-lesson-N.mp4
+  python3 tools/make_lesson_video.py DIR N "Title" ["KICKER"]  -> DIR/ghoulbox-lesson-N.mp4
+(KICKER: the small line above the step, "LESSON N" when not given: "GHOULBOX 2.3" for a what's-new video)
 1920x1080: an FM-1 panel drawn with the device's live screen in it, a sword pointing at the control each action
 uses (from lesson.wav.acts), and below it the step and the one thing to do."""
 import math, os, subprocess, sys
 from PIL import Image, ImageDraw, ImageFont
 
 D, N, TITLE = sys.argv[1], sys.argv[2], sys.argv[3]
+KICK = sys.argv[4] if len(sys.argv) > 4 else f"LESSON {N}"
 FONTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "fonts")
 def font(name, size): return ImageFont.truetype(os.path.join(FONTS, name), size)
 VT, PIR = "VT323-Regular.ttf", "PirataOne-Regular.ttf"
@@ -160,11 +162,11 @@ while True:
         bob = 10 * math.sin(t * 2 * math.pi * 1.4) if busy else 4 * math.sin(t * 2 * math.pi * 0.5)
         tip = (tip[0] - math.cos(ang) * (bob + 12), tip[1] - math.sin(ang) * (bob + 12))
         sword(d, tip, ang)
-        d.text((180, 830), f"LESSON {N}  ·  {TITLE.upper()}", font=f_small, fill=DIM)
+        d.text((180, 830), f"{KICK}  ·  {TITLE.upper()}", font=f_small, fill=DIM)
         d.text((180, 862), f"{a[4]} / {nsteps}   {a[5]}", font=f_step, fill=EMBER)
         d.text((180, 950), "Press the key: " + a[6] if a[3] == "key" else a[6], font=f_say, fill=INK)
     else:
-        d.text((180, 830), f"LESSON {N}", font=f_small, fill=DIM)
+        d.text((180, 830), KICK, font=f_small, fill=DIM)
         d.text((180, 862), TITLE, font=f_step, fill=BLOOD)
     enc.stdin.write(im.tobytes())
 enc.stdin.close()
