@@ -45,11 +45,13 @@ enum {
 };
 
 /* ---------------------------------------------------------------- math --- */
-/* 2^(x / 2^24), Q24 (msfa Exp2::lookup): the Q30 mantissa from FM6_EXP2, shifted by the integer part */
+/* 2^(x / 2^24), Q24 (msfa Exp2::lookup): the Q30 mantissa from FM6_EXP2 (257 points, quadratic between them:
+ * u (1 - u) / 2 of the second difference off the line; msfa: 1025, linear), shifted by the integer part */
 static inline uint32_t fm6_mant(int32_t x)
 {
-    uint32_t f = (uint32_t)x & 0xFFFFFFu, k = f >> 14, a = FM6_EXP2[k];
-    return (1u << 30) + a + (uint32_t)(((uint64_t)(FM6_EXP2[k + 1u] - a) * (f & 0x3FFFu)) >> 14);
+    uint32_t f = (uint32_t)x & 0xFFFFFFu, k = f >> 16, u = f & 0xFFFFu, a = FM6_EXP2[k], b = FM6_EXP2[k + 1u];
+    uint32_t d2 = FM6_EXP2[k + 2u] - 2u * b + a;                 /* 7894 .. 15744 */
+    return (1u << 30) + a + (uint32_t)(((uint64_t)(b - a) * u) >> 16) - ((d2 * ((u * (65536u - u)) >> 16)) >> 17);
 }
 static inline int32_t fm6_exp2(int32_t x)
 {
