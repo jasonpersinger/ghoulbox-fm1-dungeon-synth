@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 M. Geisler (genkigenki/makkuro) <mcgeisler@gmail.com> */
+ * Copyright (C) 2026 M. Geisler (genkigenki/makkuro) */
 /* SMK-37 Pro store owner tag (storage.c st_owner_check, build with -DBOARD_SMK37=1): a simulated flash with
  * another firmware's store (SLOOP's, Felucca's), an untagged one and our own (FELUCCA_DATA_FAMILY, storage.c: GHOULBX);
  * only FL_DATA objects, the voice bank and the tag sector are ever erased, and ours is kept. The tag is 16 bytes, with

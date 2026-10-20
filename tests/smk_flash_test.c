@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 M. Geisler (genkigenki/makkuro) <mcgeisler@gmail.com> */
+ * Copyright (C) 2026 M. Geisler (genkigenki/makkuro) */
 /* SMK-37 Pro flash map (build with -DBOARD_SMK37=1; see the fm1-to-smk37 guide):
  * every 4 KiB sector of the 1 MiB part through the app's allow-list (FL_RANGE_OK / FL_GUARD, fm1_flash.h),
  * the update loader's (loader.c) and ldr_core.c's record window: none of them may ever reach
