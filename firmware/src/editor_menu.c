@@ -34,6 +34,7 @@ static const uint8_t ED_MENU[][2] = {
     {MI_HOME, 24},                                     /* 1.3 (Discussions #112, #134): HOME SCOPE / TRACKS, DISPLAY */
     {MI_NAMES, 25},                                    /* GHOULBOX 2.1: NOTE NAMES ON / OFF, CONTROL */
     {MI_SLEEP, 26},                                    /* GHOULBOX 2.4: SLEEP OFF / 30 / 60 / 90 MIN, SYSTEM */
+    {MI_SEQOUT, 27},                                   /* GHOULBOX 2.4: SEQ OUT OFF / ON, MIDI */
 };
 #define ED_MENU_N NELEM(ED_MENU)
 

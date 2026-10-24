@@ -73,6 +73,7 @@ static uint32_t up_gen;                      /* bumped on every user bank change
 #define PREF_PREVIEW (0x02u << 16)
 #define PREF_CHORD_ADD (0x04u << 16)
 #define PREF_NAMES_OFF (0x08u << 16)           /* GHOULBOX 2.1: MENU > CONTROL > NOTE NAMES OFF (ui_input.c names_notice) */
+#define PREF_SEQ_OUT (0x10u << 16)             /* GHOULBOX 2.4: MENU > MIDI > SEQ OUT ON (seq.c seq_out_on) */
 /* 1.3 (Discussions #112, #134): MENU > DISPLAY > HOME, what the HOME page shows under its four cards: 0 SCOPE (the
  * oscilloscope, as before), 1 TRACKS (the four tracks as rows: ui_graph.c draw_home_tracks). A byte of its own no engine
  * uses, saved with the settings; 0 in older settings = SCOPE; an unknown value (a later firmware's view) reads as SCOPE

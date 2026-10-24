@@ -844,11 +844,27 @@ static void seq_start(void)
     perf_start();                                  /* perform.c: its 1/16 grid too */
 }
 
+/* GHOULBOX 2.4: MENU > MIDI > SEQ OUT ON: the sequencer's notes (DREAM's parts too: steps) also go out over USB MIDI,
+ * each track on its MIDI OUT channel (trk_midi_ch), as the keys' do; ui_input copies the setting here every pass */
+static volatile uint8_t seq_out;
+static void seq_note_on(track_t *t, uint32_t n, uint32_t v)
+{
+    trk_note_on(t, n, v);
+    if (seq_out)
+        midi_out_event(0x09u | (0x90u | trk_midi_ch(trk_index(t))) << 8 | n << 16 | v << 24);
+}
+static void seq_note_off(track_t *t, uint32_t n)
+{
+    trk_note_off(t, n);
+    if (seq_out)
+        midi_out_event(0x08u | (0x80u | trk_midi_ch(trk_index(t))) << 8 | n << 16);
+}
+
 static void seq_release(track_t *t)
 {
     uint32_t i;
     for (i = 0; i < t->seq_n; i++)
-        trk_note_off(t, t->seq_notes[i]);
+        seq_note_off(t, t->seq_notes[i]);
     t->seq_n = 0;
     t->seq_hold = 0;
     t->slide_glide = 0;                             /* live MONO / LEG keys must not glide after it */
@@ -951,13 +967,13 @@ static __attribute__((noinline)) void seq_step(track_t *t, const step_t *s, uint
         seq_release(t);
     for (i = 0; i < m; i++)
         if (!((sk >> i) & 1u))
-            trk_note_on(t, nn[i], vv[i]);
+            seq_note_on(t, nn[i], vv[i]);
     if (slide_in)                                   /* release what is not held over */
         for (i = 0; i < t->seq_n; i++) {
             for (j = 0; j < m && nn[j] != t->seq_notes[i]; j++)
                 ;
             if (j == m)
-                trk_note_off(t, t->seq_notes[i]);
+                seq_note_off(t, t->seq_notes[i]);
         }
     t->seq_n = 0;
     for (i = 0; i < m; i++)

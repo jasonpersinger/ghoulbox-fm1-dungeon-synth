@@ -13,7 +13,7 @@
  * nothing of theirs is in the settings record (MI_PROJECT: menu_get / menu_put read and write song.g) */
 enum { MI_COLOR, MI_STYLE, MI_LARGE, MI_ANIM, MI_LEDS, MI_SCROFF, MI_SCOPE, MI_HOME, MI_HOLD, MI_ACCEL, MI_LATCH, MI_BPMLOCK, MI_SCLLED,
        MI_PREVIEW, MI_CHADD, MI_NAMES, MI_LOWCUT, MI_USB,
-       MI_CLICK, MI_CLKLVL, MI_COUNTIN, MI_TUNE, MI_MIDIIN, MI_SCENE, MI_SLEEP,
+       MI_CLICK, MI_CLKLVL, MI_COUNTIN, MI_TUNE, MI_MIDIIN, MI_SEQOUT, MI_SCENE, MI_SLEEP,
 #if FELUCCA_CDC
        MI_SERIAL,
 #endif
@@ -31,7 +31,7 @@ enum { MI_COLOR, MI_STYLE, MI_LARGE, MI_ANIM, MI_LEDS, MI_SCROFF, MI_SCOPE, MI_H
 static const char *const MI_NAME[MI_COUNT] = {"COLOR", "STYLE", "LARGE", "ANIM", "LEDS", "SCREEN OFF", "SCOPE", "HOME", "HOLD", "KNOB ACCEL",
                                               "FX LATCH", "BPM LOCK", "SCALE LEDS", "STEP PREVIEW", "CHORD ENTRY", "NOTE NAMES",
                                               "SPEAKER EQ", "USB LEVEL", "CLICK", "CLICK LEVEL", "COUNT-IN", "TUNE",
-                                              "MIDI IN", "SCENE", "SLEEP",
+                                              "MIDI IN", "SEQ OUT", "SCENE", "SLEEP",
 #if FELUCCA_CDC
                                               "USB SERIAL",
 #endif
@@ -58,6 +58,7 @@ static const uint8_t MI_TAB[MI_COUNT] = {
                                                                              * COUNT-IN */
     MTAB_AUDIO,                                                             /* TUNE (1.2) */
     MTAB_MIDI,                                                              /* MIDI IN (1.2) */
+    MTAB_MIDI,                                                              /* SEQ OUT (GHOULBOX 2.4) */
     MTAB_SYSTEM,                                                            /* SCENE (GHOULBOX) */
     MTAB_SYSTEM,                                                            /* SLEEP (GHOULBOX 2.4) */
 #if FELUCCA_CDC
@@ -106,6 +107,7 @@ static const menu_flag_t MENU_FLAGS[] = {
     {MI_PREVIEW, PREF_PREVIEW, {"OFF", "ON"}},         /* 1.2, Discussion #169: ON, the cursor's step sounds (ui_input.c) */
     {MI_CHADD, PREF_CHORD_ADD, {"HOLD", "ADD"}},       /* 1.2, #155: ADD, keys add to the cursor step (ui_input.c) */
     {MI_NAMES, PREF_NAMES_OFF, {"ON", "OFF"}},         /* GHOULBOX 2.1: OFF, no note / chord name in the header */
+    {MI_SEQOUT, PREF_SEQ_OUT, {"OFF", "ON"}},          /* GHOULBOX 2.4: ON, the sequencer's notes out over USB MIDI (seq.c) */
 };
 /* SPEAKER EQ (settings.lowcut, fx.c fx_lowcut): an EQ on the master for the small speaker, not a speaker switch
  * (#42: "OFF" read as the speaker off). FLAT is the old OFF (0, stored as before). The built-in speaker cannot be

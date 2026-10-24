@@ -184,7 +184,7 @@ static int preferences(void)
         host_wire[n - 30] == 0 &&                        /* (no bank since 1.0.3) */
         host_wire[n - 29] == 0x53 && host_wire[n - 28] == 1 && host_wire[n - 27] == 3 &&
         host_wire[n - 26] == 0x50 && host_wire[n - 25] == 1 && host_wire[n - 24] == 3 &&   /* FM6 v2: no bank, preset patches */
-        host_wire[n - 23] == 0x4E && host_wire[n - 22] == 1 && host_wire[n - 21] == (FELUCCA_CDC ? 27 : 26) &&   /* MENU settings: 26 items (GHOULBOX's SCENE, 2.1's NOTE NAMES; 2.4 without the console: 25) */
+        host_wire[n - 23] == 0x4E && host_wire[n - 22] == 1 && host_wire[n - 21] == (FELUCCA_CDC ? 28 : 27) &&   /* MENU settings: 26 items (GHOULBOX's SCENE, 2.1's NOTE NAMES; 2.4 without the console: 25) */
         host_wire[n - 20] == 0x52 && host_wire[n - 19] == 1 && host_wire[n - 18] == 4 &&   /* RATCH */
         host_wire[n - 17] == 0x4C && host_wire[n - 16] == 1 && host_wire[n - 15] == 1 &&   /* 1.1 parameter locks */
         host_wire[n - 14] == 0x41 && host_wire[n - 13] == 1 && host_wire[n - 12] == 0 && host_wire[n - 11] == 1 &&   /* 1.2: 128 */
@@ -869,7 +869,7 @@ static uint32_t menu_set(uint32_t id, int32_t v)            /* -> rc; host_wire[
 }
 static int menu_protocol(void)
 {
-    static const char *const WANT[27][2] = {
+    static const char *const WANT[28][2] = {
         {"COLOR", 0}, {"STYLE", "FLAT,LINE"}, {"LARGE", "OFF,ON"}, {"ANIM", "ON,OFF,IDLE"}, {"LEDS", "OFF,DIM LO,DIM HI,INV"},
         {"HOLD", "0.3 s,0.4 s,0.5 s,0.6 s"}, {"KNOB ACCEL", "OFF,ON"}, {"FX LATCH", "OFF,ON"}, {"BPM LOCK", "OFF,ON"},
         {"SPEAKER EQ", "FLAT,LOWCUT,BASS+"}, {"USB LEVEL", "MASTER,FIXED"}, {"SCENE", "DUNGEON,CRYPT,TAVERN,CHAPEL,BLANK"},
@@ -881,9 +881,9 @@ static int menu_protocol(void)
         {"MIDI IN", "CH1-4,SEL,CH5-8,CH9-12,CH13-16"}, {"TUNE", 0},   /* (1.2: the project's ROUT and TUNE; TUNE a number) */
         {"HOME", "SCOPE,TRACKS"},                                                                     /* (1.3) */
         {"NOTE NAMES", "ON,OFF"},                                                                     /* (GHOULBOX 2.1) */
-        {"SLEEP", "OFF,30 MIN,60 MIN,90 MIN"}};                                                       /* (GHOULBOX 2.4) */
-    static const int32_t DEF[27] = {-1, 0, 0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};   /* (COLOR: the default palette) */
-    static const uint8_t TAB[27] = {0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 2, 2, 2, 4, 1, 0, 0, 1, 1, 3, 2, 0, 1, 4};   /* DISPLAY CONTROL AUDIO
+        {"SLEEP", "OFF,30 MIN,60 MIN,90 MIN"}, {"SEQ OUT", "OFF,ON"}};                                /* (GHOULBOX 2.4) */
+    static const int32_t DEF[28] = {-1, 0, 0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};   /* (COLOR: the default palette) */
+    static const uint8_t TAB[28] = {0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 2, 2, 2, 4, 1, 0, 0, 1, 1, 3, 2, 0, 1, 4, 3};   /* DISPLAY CONTROL AUDIO
                                                                                                          * MIDI SYSTEM (1.2) */
     static const char *const TABN[5] = {"DISPLAY", "CONTROL", "AUDIO", "MIDI", "SYSTEM"};
     /* the editor ids: the index, but GHOULBOX's SCENE (index 11) keeps its 1.3 id 12, so USB SERIAL (index 12) has 11
@@ -898,7 +898,7 @@ static int menu_protocol(void)
     reset();
     if (jf) fprintf(jf, "[");
     /* GHOULBOX 2.4 (FELUCCA_CDC 0): no USB SERIAL row; the items after it come one place earlier, their ids kept */
-    uint32_t nitems = FELUCCA_CDC ? 27u : 26u, w;   /* (2.4: + SLEEP, id 26) */
+    uint32_t nitems = FELUCCA_CDC ? 28u : 27u, w;   /* (2.4: + SLEEP id 26, SEQ OUT id 27) */
     for (i = 0; i < nitems; i++) {
         w = !FELUCCA_CDC && i >= 12u ? i + 1u : i;        /* the item WANT, DEF, TAB and MENU_ID describe */
         n = menu_desc(i, &it);
@@ -924,7 +924,7 @@ static int menu_protocol(void)
     if (jf) { fprintf(jf, "]\n"); fclose(jf); }
     if (!FELUCCA_CDC) {                                  /* .. and the reply past the last item: none */
         n = menu_desc(nitems, &it);
-        bad += check("MENU_DESC without the console (GHOULBOX 2.4): 26 items (with 2.4's SLEEP), no USB SERIAL, every id as before", ok && n <= 10u);
+        bad += check("MENU_DESC without the console (GHOULBOX 2.4): 27 items (with 2.4's SLEEP and SEQ OUT), no USB SERIAL, every id as before", ok && n <= 10u);
     }
     bad += check("MENU_DESC: 26 items (1.0.4's 12 and GHOULBOX's SCENE (id 12, before USB SERIAL 11) in the menu's order, then 1.1's CLICK, CLICK LEVEL, COUNT-IN, 1.2's RESTORE LAST, SCALE LEDS, SCREEN OFF, 1.2's SCOPE, STEP PREVIEW, CHORD ENTRY, MIDI IN, TUNE, 1.3's HOME, GHOULBOX 2.1's NOTE NAMES), ids 0..25, names, defaults; TUNE a number -50..50 ct", ok);
     bad += check("MENU_DESC (1.0.5): after the names (TUNE: the unit) each item's tab, index and name (DISPLAY CONTROL AUDIO MIDI SYSTEM)", ok);
@@ -936,12 +936,12 @@ static int menu_protocol(void)
         bad += check("MENU_DESC: the tab comes after every byte of the 1.0.4 reply (older editors ignore it)", ok);
     }
     ok = 1;
-    for (i = 0; i < (FELUCCA_CDC ? 27u : 26u); i++) {
+    for (i = 0; i < (FELUCCA_CDC ? 28u : 27u); i++) {
         menu_desc(i, &it);
         ok &= strcmp(it.name, "CALIBRATION") && strcmp(it.name, "ABOUT") && strcmp(it.name, "INFO");
     }
-    n = menu_desc(FELUCCA_CDC ? 27u : 26u, &it);           /* (past the list: 2.4's SLEEP is the last) */
-    ok &= n == 2u && it.index == (FELUCCA_CDC ? 27 : 26) && it.id == 127;
+    n = menu_desc(FELUCCA_CDC ? 28u : 27u, &it);           /* (past the list: 2.4's SEQ OUT is the last) */
+    ok &= n == 2u && it.index == (FELUCCA_CDC ? 28 : 27) && it.id == 127;
     n = menu_desc(127, &it);
     bad += check("MENU_DESC: no CALIBRATION / INFO / ABOUT; an index past the list answers index, 127 (no item)",
                  ok && n == 2u && it.index == 127 && it.id == 127);
@@ -981,6 +981,8 @@ static int menu_protocol(void)
                                                          * project's, rc 0: in the music, no settings record) */
     ok &= menu_set(24, 1) == 3 && ui_home_view == HV_TRACKS && ui_prefs2 == 7u && ui_scr == 1u;   /* (1.3: its own byte) */
     ok &= menu_set(26, 2) == 3 && ui_sleep == 2u && menu_set(26, 9) == 3 && ui_sleep == 3u;   /* (2.4: SLEEP, clamped) */
+    ok &= menu_set(27, 1) == 3 && (ui_prefs2 & (PREF_SEQ_OUT >> 16)) && menu_set(27, 0) == 3 &&
+          !(ui_prefs2 & (PREF_SEQ_OUT >> 16));                                                     /* (2.4: SEQ OUT) */
     ui_sleep = 0;
     for (i = 0; i < (FELUCCA_CDC ? 25u : 24u); i++) {   /* MENU_DESC reads them back (2.4 without the console: no USB SERIAL) */
         static const int32_t SET[25] = {2, 1, 1, 1, 1, 3, 1, 1, 1, 2, 1, 2, 0, 2, 0, 2, 1, 1, 2, 1, 1, 1, 2, -13, 1};

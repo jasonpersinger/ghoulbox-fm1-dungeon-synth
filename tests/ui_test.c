@@ -1693,7 +1693,7 @@ static int test_menu_tabs(void)
                  "constant (S, LARGE)",
                  ok && MTAB_COUNT == 5u && str_eq(MTAB_NAME[0], "DISPLAY") && str_eq(MTAB_NAME[MTAB_MIDI], "MIDI") &&
                  mtab_rows(MTAB_DISPLAY) == 8u && MI_TAB[MI_HOME] == MTAB_DISPLAY && mtab_rows(MTAB_CONTROL) == 8u && MI_TAB[MI_NAMES] == MTAB_CONTROL && mtab_rows(MTAB_AUDIO) == 6u &&
-                 mtab_rows(MTAB_MIDI) == 1u && mtab_rows(MTAB_SYSTEM) == (FELUCCA_CDC ? 7u : 6u) && MI_TAB[MI_SCENE] == MTAB_SYSTEM && MI_TAB[MI_TUNE] == MTAB_AUDIO &&
+                 mtab_rows(MTAB_MIDI) == 2u &&   /* (2.4: + SEQ OUT) */ mtab_rows(MTAB_SYSTEM) == (FELUCCA_CDC ? 7u : 6u) && MI_TAB[MI_SCENE] == MTAB_SYSTEM && MI_TAB[MI_TUNE] == MTAB_AUDIO &&
                  MI_TAB[MI_MIDIIN] == MTAB_MIDI && MI_TAB[MI_INFO] == MTAB_SYSTEM && MI_INFO >= MI_VALUES);
 
     ui_power_on();
@@ -1709,7 +1709,8 @@ static int test_menu_tabs(void)
     turn(EN_PRESET, 1); turn(EN_PRESET, 1); ok &= ui.menu_sel == MI_LATCH;
     turn(EN_ALGO, 1); ok &= ui.menu_sel == MI_LOWCUT && menu_tab() == MTAB_AUDIO;
     turn(EN_ALGO, 1); ok &= ui.menu_sel == MI_MIDIIN && menu_tab() == MTAB_MIDI;   /* (1.2) */
-    turn(EN_PRESET, 1); ok &= ui.menu_sel == MI_MIDIIN;  /* (its only row) */
+    turn(EN_PRESET, 1); ok &= ui.menu_sel == MI_SEQOUT;  /* (2.4: SEQ OUT its second row) */
+    turn(EN_PRESET, 1); ok &= ui.menu_sel == MI_MIDIIN;  /* (wraps) */
     turn(EN_ALGO, 1); ok &= ui.menu_sel == MI_SCENE && menu_tab() == MTAB_SYSTEM;   /* (GHOULBOX: SCENE its first row) */
     turn(EN_ALGO, -1); turn(EN_ALGO, -1); ok &= ui.menu_sel == MI_LOWCUT;
     turn(EN_ALGO, -1); ok &= ui.menu_sel == MI_LATCH;   /* (back at the row left there) */

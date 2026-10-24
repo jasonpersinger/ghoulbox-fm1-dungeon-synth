@@ -1422,6 +1422,7 @@ static void ui_input(void)
     fx_map_sync();                                      /* (the FX layer's key map: ui_layer.c, a settings load too) */
     fx_usb_fixed = (ui_prefs & PREF_USB_FIXED) != 0u;   /* (MENU > USB LEVEL: fx.c, audio.c) */
     scope_mix = (ui_prefs2 & (PREF_SCOPE_MIX >> 16)) != 0u;   /* (MENU > SCOPE: fx.c, audio.c) */
+    seq_out = (ui_prefs2 & (PREF_SEQ_OUT >> 16)) != 0u;   /* (GHOULBOX 2.4: MENU > SEQ OUT, seq.c) */
     rp_apply();                                         /* (MENU > CLICK, CLICK LEVEL, COUNT-IN: click.c, seq.c) */
     if (!ui.menu)
         usb_serial_apply();                             /* (MENU > USB SERIAL: when the menu has closed) */
