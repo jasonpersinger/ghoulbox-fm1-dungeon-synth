@@ -174,6 +174,21 @@ static inline int32_t spk_bass(int32_t m)
     return sb_hl + (sb_hl >> 1);      /* x1.5 (#180: x3 peaked at 1.5 .. 3.5 x a full-scale kick, the limiter */
 }                                     /* pulled the mix down up to 16 dB on each hit and the buzz took over) */
 
+/* GHOULBOX 2.4: the master fade (sleep.c SLEEP, the SCENES page): a gain after everything, Q30, ramped a step a
+ * sample from where it is to fade_tgt. At full it is never applied: the output bit for bit as before */
+#define FADE_FULL 32768u                                /* fade_level's full: Q15 */
+#define FADE_Q30 (1 << 30)
+static volatile int32_t fade_tgt = FADE_Q30, fade_inc = 1;   /* main: where to, and the step a sample */
+static int32_t fade_cur = FADE_Q30;                     /* ISR: the gain now */
+static void fade_to(uint32_t q15, uint32_t ms)          /* main loop: to q15 (FADE_FULL: full) in ms */
+{
+    int32_t t = (int32_t)(q15 >= FADE_FULL ? FADE_FULL : q15) << 15, d = t - fade_cur;
+    uint32_t n = ms * (FS / 1000u) + 1u;
+    fade_inc = (int32_t)((uint32_t)(d < 0 ? -d : d) / n) + 1;
+    fade_tgt = t;                                       /* (after its step: the ISR never takes an old one with it) */
+}
+static uint32_t fade_level(void) { return (uint32_t)fade_cur >> 15; }
+
 static inline void master_out(int32_t *l, int32_t *r)
 {
     int32_t al, ar, a;
@@ -201,6 +216,14 @@ static inline void master_out(int32_t *l, int32_t *r)
     }
     *l = softclip(*l);
     *r = softclip(*r);
+    if (fade_cur != fade_tgt || fade_cur != FADE_Q30) {  /* (GHOULBOX 2.4: the fade; at full nothing at all) */
+        int32_t t = fade_tgt, g;
+        fade_cur = fade_cur < t ? (t - fade_cur > fade_inc ? fade_cur + fade_inc : t)
+                                : (fade_cur - t > fade_inc ? fade_cur - fade_inc : t);
+        g = fade_cur >> 15;
+        *l = (*l * g) >> 15;
+        *r = (*r * g) >> 15;
+    }
 }
 
 /* length of one division (N_DIV order) in samples at the song tempo */

@@ -1553,6 +1553,7 @@ static void track_select(uint32_t i)
 #include "ui_slice.c"                             /* EDIT > SLICES: SLICE's slices by hand (an action page too) */
 #include "ui_events.c"                            /* SEQ > AUTOMATION: locks, events, CHANCE, RATCH as a list (an action page) */
 #include "dream.c"                                 /* GHOULBOX 2.3: HOME > DREAM, generative ambient */
+#include "sleep.c"                                 /* GHOULBOX 2.4: MENU > SYSTEM > SLEEP */
 
 /* ---------------------------------------------------- action pages --- */
 /* Pages whose purpose is an action (SAVE > USER, PHRASES, PROJECT, TOOLS, EDIT > SLICES, SEQ > AUTOMATION): the knobs pick,

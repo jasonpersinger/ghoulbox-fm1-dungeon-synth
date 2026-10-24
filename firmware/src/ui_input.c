@@ -1425,8 +1425,12 @@ static void ui_input(void)
     rp_apply();                                         /* (MENU > CLICK, CLICK LEVEL, COUNT-IN: click.c, seq.c) */
     if (!ui.menu)
         usb_serial_apply();                             /* (MENU > USB SERIAL: when the menu has closed) */
-    if (scr_input(pressed, notes))                      /* MENU > SCREEN OFF: dark, or the wake gesture: swallowed */
-        return;                                         /* (before the buttons' timers: no tap or hold after it) */
+    {
+        int eaten = scr_input(pressed, notes);          /* MENU > SCREEN OFF: dark, or the wake gesture: swallowed */
+        sleep_tick();                                   /* (GHOULBOX 2.4: SLEEP, the panel's idle time just updated) */
+        if (eaten)
+            return;                                     /* (before the buttons' timers: no tap or hold after it) */
+    }
     if (mom.n && !mom_down()) {                         /* MOMENTARY: LFO let go (or the menu, a layer ..): back */
         mom_restore();
         ui_message("BACK");
