@@ -28,7 +28,7 @@ static struct {
 
 /* the piece's key, chords and parts are no longer what the tracks hold (GHOULBOX 2.3.1): a project load (project.c
  * project_restore_runtime), a sound or pattern load (ui.c load_end). EVOL's next change finds them back (dr_rebuild) */
-static void dream_forget(void) { dream.valid = 0; }
+static void dream_forget(void) { dream.valid = 0; seq_heard_forget(); }   /* (2.4: FREEZE too: new steps) */
 
 static uint32_t dr_rnd(uint32_t n) { return n ? rng() % n : 0u; }
 
@@ -287,6 +287,7 @@ static void dr_roles(void)
 static void dream_compose(uint32_t root)
 {
     uint32_t i, s;
+    seq_heard_forget();                                     /* (2.4: new steps, FREEZE waits for them to play) */
     const uint8_t *pg = DR_PROG[dr_rnd(sizeof DR_PROG / sizeof DR_PROG[0])];
     dream.root = (uint8_t)(root % 12u);
     dream.scl = DR_MOOD_SCL[clamp(song.g[G_DMOOD], 0, 5)];

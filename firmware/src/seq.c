@@ -62,6 +62,10 @@ static int32_t midi_base(void)
 }
 /* MIDI channel 0..15 of track i (keys -> MIDI out): its channel in ROUT's block (SEL, CH1-4: 1..4) */
 static uint32_t trk_midi_ch(uint32_t i) { return (midi_base() > 0 ? (uint32_t)midi_base() : 0u) + i % NTRK; }
+/* GHOULBOX 2.4: per track, the steps rolled since the run started or the steps came (seen) and those whose CHANCE
+ * let them play the last time (heard), a bit a step: SEQ TOOLS > FREEZE (ui_tools.c). The audio ISR writes them */
+static uint64_t seq_seen[NTRK], seq_heard[NTRK];
+static void seq_heard_forget(void) { memset(seq_seen, 0, sizeof seq_seen); memset(seq_heard, 0, sizeof seq_heard); }
 
 static int drum_track(const track_t *t) { return ENGINES[eng_idx(t->eng_req)] == &ENG_DRUM; }
 
@@ -759,7 +763,7 @@ static void keyboard_block(void)
     }
     lay = (fm1_in.buttons & kb_mask) || kb_lock;  /* (#83: kb_lock, a layer locked open with no button held) */
     fx = (fm1_in.buttons & perf_mask) || (kb_lock & 2u);
-    mute = song.grid == 2u || song.grid == 4u ? ~0u : song.grid == 3u ? SONG_KEYS : 0u;   /* the keys that never sound
+    mute = song.grid == 2u || song.grid == 4u || song.grid == 5u ? ~0u : song.grid == 3u ? SONG_KEYS : 0u;   /* the keys that never sound
                                                  * here (4: GHOULBOX's DREAM, a key composes) */
     for (k = 0; k < 27u; k++) {
         if (!((ch >> k) & 1u))
@@ -822,6 +826,7 @@ static void keyboard_block(void)
 static void seq_start(void)
 {
     uint32_t i;
+    seq_heard_forget();                            /* (GHOULBOX 2.4: FREEZE knows this run's passes only) */
     motion_begin();
     chain_start();
     for (i = 0; i < NTRK; i++) {                   /* every track from its step 0, together */
@@ -844,11 +849,27 @@ static void seq_start(void)
     perf_start();                                  /* perform.c: its 1/16 grid too */
 }
 
+/* GHOULBOX 2.4: MENU > MIDI > SEQ OUT ON: the sequencer's notes (DREAM's parts too: steps) also go out over USB MIDI,
+ * each track on its MIDI OUT channel (trk_midi_ch), as the keys' do; ui_input copies the setting here every pass */
+static volatile uint8_t seq_out;
+static void seq_note_on(track_t *t, uint32_t n, uint32_t v)
+{
+    trk_note_on(t, n, v);
+    if (seq_out)
+        midi_out_event(0x09u | (0x90u | trk_midi_ch(trk_index(t))) << 8 | n << 16 | v << 24);
+}
+static void seq_note_off(track_t *t, uint32_t n)
+{
+    trk_note_off(t, n);
+    if (seq_out)
+        midi_out_event(0x08u | (0x80u | trk_midi_ch(trk_index(t))) << 8 | n << 16);
+}
+
 static void seq_release(track_t *t)
 {
     uint32_t i;
     for (i = 0; i < t->seq_n; i++)
-        trk_note_off(t, t->seq_notes[i]);
+        seq_note_off(t, t->seq_notes[i]);
     t->seq_n = 0;
     t->seq_hold = 0;
     t->slide_glide = 0;                             /* live MONO / LEG keys must not glide after it */
@@ -951,13 +972,13 @@ static __attribute__((noinline)) void seq_step(track_t *t, const step_t *s, uint
         seq_release(t);
     for (i = 0; i < m; i++)
         if (!((sk >> i) & 1u))
-            trk_note_on(t, nn[i], vv[i]);
+            seq_note_on(t, nn[i], vv[i]);
     if (slide_in)                                   /* release what is not held over */
         for (i = 0; i < t->seq_n; i++) {
             for (j = 0; j < m && nn[j] != t->seq_notes[i]; j++)
                 ;
             if (j == m)
-                trk_note_off(t, t->seq_notes[i]);
+                seq_note_off(t, t->seq_notes[i]);
         }
     t->seq_n = 0;
     for (i = 0; i < m; i++)
@@ -1032,6 +1053,12 @@ static __attribute__((noinline)) void seq_play(track_t *t, uint32_t idx, uint32_
     uint32_t skip = SEQ_ROLLED, i, k;
     if (step_chance(s) < 100u && rng() % 100u >= step_chance(s))
         skip = SEQ_MISS;
+    {                                               /* (GHOULBOX 2.4: what FREEZE keeps) */
+        uint32_t ti = trk_index(t);
+        uint64_t b = (uint64_t)1 << (idx & (NSTEP - 1u));
+        seq_seen[ti] |= b;
+        seq_heard[ti] = skip == SEQ_MISS ? seq_heard[ti] & ~b : seq_heard[ti] | b;
+    }
     if (m)
         motion_step(t, idx, m, skip == SEQ_ROLLED);
     if (t->rskip_n && t->rskip_idx == idx) {

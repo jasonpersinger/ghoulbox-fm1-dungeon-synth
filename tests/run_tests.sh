@@ -223,6 +223,14 @@ if [ -f build/gen/felucca_tables.h ]; then
     run "1.2 (FUN10): LFO 2 SYNC / TRIG / POL, NUDGE (record, QUANTIZE, play, controls), 128 motion records, FUN10 / FUN9 / FUN8 / FUN7, user presets" "$OUT/fun10_test"
     $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/midi_control_test" tests/midi_control_test.c -lm
     run "USB/TRS clock, bend, sustain, ownership and panic recovery" "$OUT/midi_control_test"
+    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/sleep_test" tests/sleep_test.c -lm
+    run "GHOULBOX 2.4: the master fade, MENU > SYSTEM > SLEEP (fade, stop, silence, wake)" "$OUT/sleep_test"
+    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/seq_out_test" tests/seq_out_test.c -lm
+    run "GHOULBOX 2.4: MENU > MIDI > SEQ OUT (the sequencer's notes to USB MIDI, channels, STOP's note-offs)" "$OUT/seq_out_test"
+    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/freeze_test" tests/freeze_test.c -lm
+    run "GHOULBOX 2.4: SEQ TOOLS > FREEZE (the steps as they last played, LEN, one undo, EVOL off)" "$OUT/freeze_test"
+    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/scene_test" tests/scene_test.c -lm
+    run "GHOULBOX 2.4: HOME > SCENES (a live switch: fade, load, fade in; silent keys; 20 switches while playing)" "$OUT/scene_test"
     $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/latch_test" tests/latch_test.c -lm
     run "the drone latch (GHOULBOX, GLO + F#4..C#5): new chord, stop press, what ends it, MIDI OUT, recording, voices kept" "$OUT/latch_test"
     $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/keys_test" tests/keys_test.c -lm
@@ -279,8 +287,11 @@ if [ -f build/gen/felucca_tables.h ]; then
     $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/fm6bank_test" tests/fm6bank_test.c -lm
     run "FM6 voice bank (1.4.1): write / read, power cuts, CRC, SLOT B1..B32, stored SLOT values as before" "$OUT/fm6bank_test"
     $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/editor_test" tests/editor_test.c -lm
-    run "editor: real C protocol, malformed transfers, queue recovery, MENU settings (writes build/host/menu.json)" \
-        env MENU_JSON="$OUT/menu.json" "$OUT/editor_test"
+    run "editor: real C protocol, malformed transfers, queue recovery, MENU settings (with the serial console)" \
+        "$OUT/editor_test"
+    $CC -w -Ibuild/gen -Ifirmware/src -DFELUCCA_CDC=0 -o "$OUT/editor_test_nocdc" tests/editor_test.c -lm
+    run "editor, as GHOULBOX 2.4 builds it (no serial console, no USB SERIAL row; writes build/host/menu.json)" \
+        env MENU_JSON="$OUT/menu.json" "$OUT/editor_test_nocdc"
     $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/robust_test" tests/robust_test.c -lm
     run "robustness: crafted sample slots, engine numbers, retained old projects, preset patterns, malformed requests" \
         "$OUT/robust_test"

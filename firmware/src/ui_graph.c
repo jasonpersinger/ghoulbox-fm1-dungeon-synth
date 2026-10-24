@@ -1319,6 +1319,14 @@ static void graph_user(void)
     }
 }
 /* SAVE > PHRASES: the pattern list around the one picked ("03  MELODY", "U07  MY BASS") */
+/* GHOULBOX 2.4: HOME > SCENES, the five keys and their scenes; the one playing (or coming) lit */
+static void graph_scenes(void)
+{
+    static const char *const KEY[GB_NSCENE] = {"F3", "G3", "A3", "B3", "C4"};
+    uint32_t i, on = scene_req < GB_NSCENE ? scene_req : scene_cur;
+    for (i = 0; i < GB_NSCENE; i++)
+        list_row(LIST_Y((int32_t)i), i == on, KEY[i], T_MID, GB_SCENES[i].name, T_TEXT, 232);
+}
 static void graph_pats(void)
 {
     uint32_t n = pat_count(), cur = pat_pick();
@@ -2265,6 +2273,10 @@ static void draw_graph(void)
         case GR_SLOTS:
             cv_oy = 0;
             graph_slots();
+            break;
+        case GR_SCENES:                                 /* GHOULBOX 2.4 (scenes.c) */
+            cv_oy = 0;
+            graph_scenes();
             break;
         case GR_USER:
             cv_oy = 0;

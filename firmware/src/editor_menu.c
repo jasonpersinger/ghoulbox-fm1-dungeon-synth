@@ -18,7 +18,10 @@ enum { ED_MENU_DESC = 72, ED_MENU_SET };
 enum { EDM_ENUM, EDM_INT };                            /* kind: names follow; or a unit (none yet) */
 static const uint8_t ED_MENU[][2] = {
     {MI_COLOR, 0}, {MI_STYLE, 1}, {MI_LARGE, 2}, {MI_ANIM, 3}, {MI_LEDS, 4}, {MI_HOLD, 5}, {MI_ACCEL, 6},
-    {MI_LATCH, 7}, {MI_BPMLOCK, 8}, {MI_LOWCUT, 9}, {MI_USB, 10}, {MI_SCENE, 12}, {MI_SERIAL, 11},   /* SCENE: GHOULBOX 1.3's id */
+    {MI_LATCH, 7}, {MI_BPMLOCK, 8}, {MI_LOWCUT, 9}, {MI_USB, 10}, {MI_SCENE, 12},                    /* SCENE: GHOULBOX 1.3's id */
+#if FELUCCA_CDC
+    {MI_SERIAL, 11},                                   /* (GHOULBOX 2.4 builds without the console: no USB SERIAL, id 11 kept free) */
+#endif
     {MI_CLICK, 13}, {MI_CLKLVL, 14}, {MI_COUNTIN, 15},
     {MI_RESTORE, 16},                                  /* 1.2 (Discussion #130), a row of SYSTEM */
     {MI_SCLLED, 17},                                   /* 1.2 (Discussion #127), a row of CONTROL */
@@ -30,6 +33,8 @@ static const uint8_t ED_MENU[][2] = {
     {MI_TUNE, 23},                                     /* 1.2: the project's G_TUNE (was GLO > GLOBAL), AUDIO */
     {MI_HOME, 24},                                     /* 1.3 (Discussions #112, #134): HOME SCOPE / TRACKS, DISPLAY */
     {MI_NAMES, 25},                                    /* GHOULBOX 2.1: NOTE NAMES ON / OFF, CONTROL */
+    {MI_SLEEP, 26},                                    /* GHOULBOX 2.4: SLEEP OFF / 30 / 60 / 90 MIN, SYSTEM */
+    {MI_SEQOUT, 27},                                   /* GHOULBOX 2.4: SEQ OUT OFF / ON, MIDI */
 };
 #define ED_MENU_N NELEM(ED_MENU)
 

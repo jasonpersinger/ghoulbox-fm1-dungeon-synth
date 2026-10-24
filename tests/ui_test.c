@@ -229,6 +229,7 @@ static void ui_power_on(void)
     perf_solo = 0;
     memset(&lys, 0, sizeof lys);
     perf_k[0] = perf_k[1] = perf_k[2] = perf_k[3] = 0;
+    perf_cc74 = 0;                                      /* (2.4: no CC74 since power-on) */
     settings_hold = HOLD_DEF;
     fm1_in.buttons = fm1_in.notes = 0;
     memset(&motion, 0, sizeof motion);                  /* (main.c: no motion at power-on) */
@@ -1688,11 +1689,11 @@ static int test_menu_tabs(void)
             }
     }
     ui_prefs = 0;
-    bad += check("MENU tabs: DISPLAY CONTROL AUDIO MIDI SYSTEM (8 8 6 1 6 rows: GHOULBOX's SCENE, NOTE NAMES), 1..8 each in a run, fit the page; tab gaps "
+    bad += check("MENU tabs: DISPLAY CONTROL AUDIO MIDI SYSTEM (8 8 6 1 6 rows: GHOULBOX's SCENE, NOTE NAMES; 2.4: SYSTEM + SLEEP, - USB SERIAL without the console), 1..8 each in a run, fit the page; tab gaps "
                  "constant (S, LARGE)",
                  ok && MTAB_COUNT == 5u && str_eq(MTAB_NAME[0], "DISPLAY") && str_eq(MTAB_NAME[MTAB_MIDI], "MIDI") &&
                  mtab_rows(MTAB_DISPLAY) == 8u && MI_TAB[MI_HOME] == MTAB_DISPLAY && mtab_rows(MTAB_CONTROL) == 8u && MI_TAB[MI_NAMES] == MTAB_CONTROL && mtab_rows(MTAB_AUDIO) == 6u &&
-                 mtab_rows(MTAB_MIDI) == 1u && mtab_rows(MTAB_SYSTEM) == 6u && MI_TAB[MI_SCENE] == MTAB_SYSTEM && MI_TAB[MI_TUNE] == MTAB_AUDIO &&
+                 mtab_rows(MTAB_MIDI) == 2u &&   /* (2.4: + SEQ OUT) */ mtab_rows(MTAB_SYSTEM) == (FELUCCA_CDC ? 7u : 6u) && MI_TAB[MI_SCENE] == MTAB_SYSTEM && MI_TAB[MI_TUNE] == MTAB_AUDIO &&
                  MI_TAB[MI_MIDIIN] == MTAB_MIDI && MI_TAB[MI_INFO] == MTAB_SYSTEM && MI_INFO >= MI_VALUES);
 
     ui_power_on();
@@ -1708,7 +1709,8 @@ static int test_menu_tabs(void)
     turn(EN_PRESET, 1); turn(EN_PRESET, 1); ok &= ui.menu_sel == MI_LATCH;
     turn(EN_ALGO, 1); ok &= ui.menu_sel == MI_LOWCUT && menu_tab() == MTAB_AUDIO;
     turn(EN_ALGO, 1); ok &= ui.menu_sel == MI_MIDIIN && menu_tab() == MTAB_MIDI;   /* (1.2) */
-    turn(EN_PRESET, 1); ok &= ui.menu_sel == MI_MIDIIN;  /* (its only row) */
+    turn(EN_PRESET, 1); ok &= ui.menu_sel == MI_SEQOUT;  /* (2.4: SEQ OUT its second row) */
+    turn(EN_PRESET, 1); ok &= ui.menu_sel == MI_MIDIIN;  /* (wraps) */
     turn(EN_ALGO, 1); ok &= ui.menu_sel == MI_SCENE && menu_tab() == MTAB_SYSTEM;   /* (GHOULBOX: SCENE its first row) */
     turn(EN_ALGO, -1); turn(EN_ALGO, -1); ok &= ui.menu_sel == MI_LOWCUT;
     turn(EN_ALGO, -1); ok &= ui.menu_sel == MI_LATCH;   /* (back at the row left there) */
@@ -2742,8 +2744,8 @@ static int test_page_cycles(void)
         ok &= f != FAM_SEQ || PAGES[i].graph == GR_ROLL || PAGES[i].graph == GR_EVENTS;
         ok &= f != FAM_GLO || PAGES[i].graph == GR_SONG;   /* (1.2: GLO's only page) */
         ok &= f != FAM_TRK || PAGES[i].graph == GR_TRK || str_eq(PAGES[i].title, "CLOCK") ||
-              str_eq(PAGES[i].title, "KEYS") || str_eq(PAGES[i].title, "DREAM");   /* HOME's: MIXER CLOCK KEYS (2.1)
-                                                                                     * DREAM (2.3) */
+              str_eq(PAGES[i].title, "KEYS") || str_eq(PAGES[i].title, "DREAM") ||
+              str_eq(PAGES[i].title, "SCENES");   /* HOME's: MIXER CLOCK KEYS (2.1) DREAM (2.3) SCENES (2.4) */
         ok &= PAGES[i].graph != GR_TRK || f == FAM_TRK;
         ui_power_on(); ui.home = 0; ui.page = (uint8_t)i; page_entered();
         ok &= FAM_BTN[cur_fam()] == (f == FAM_TRK ? B_HOME : f == FAM_GLO ? B_GLO : f == FAM_SEQ ? B_SEQ :
@@ -2752,7 +2754,7 @@ static int test_page_cycles(void)
     for (i = 0; i < NPAGES; i++)
         ok &= !str_eq(PAGES[i].title, "PATTERN") && !str_eq(PAGES[i].title, "CHANCE") && !str_eq(PAGES[i].title, "AUTO LIST");
     bad += check("1.2: SEQ has STEP and AUTOMATION only; SONG is GLO's only page, PHRASES SAVE's, MIXER CLOCK KEYS DREAM "
-                 "HOME's (their LED HOME)", ok);
+                 "SCENES HOME's (their LED HOME)", ok);
     {   /* 1.2: GLOBAL and SYSTEM are gone; their knobs: BPM SWG CLK on HOME > CLOCK, TUNE and ROUT on no page (the MENU's),
          * MIDI SYNC CPU on none (INFO shows the USB state and the CPU) */
         uint32_t k, clock = 0;
@@ -2925,6 +2927,8 @@ static int test_product_ux(void)
     press(B_HOME);
     ok &= !ui.home && str_eq(cur_page()->title, "DREAM");
     press(B_HOME);
+    ok &= !ui.home && str_eq(cur_page()->title, "SCENES");   /* (2.4: > SCENES > HOME) */
+    press(B_HOME);
     ok &= ui.home && !ui.menu;
     press(B_HOME);
     ok &= cur_page()->graph == GR_TRK;
@@ -2951,8 +2955,10 @@ static int test_product_ux(void)
         memcpy(song.g, g0, sizeof g0);
     }
     press(B_HOME);
+    ok &= !ui.home && str_eq(cur_page()->title, "SCENES");   /* (2.4: SCENES after DREAM) */
+    press(B_HOME);
     ok &= ui.home;
-    bad += check("HOME cycles HOME > MIXER > CLOCK > KEYS > DREAM > HOME (CLOCK: BPM SWG CLK; KEYS: MODE TRK SPLT OCT; "
+    bad += check("HOME cycles HOME > MIXER > CLOCK > KEYS > DREAM > SCENES > HOME (CLOCK: BPM SWG CLK; KEYS: MODE TRK SPLT OCT; "
                  "DREAM: EVOL DENS DRFT MOOD); elsewhere HOME", ok);
     hold(B_HOME);
     bad += check("1.2: HOME held still opens the menu", ui.menu == 1);
@@ -6829,7 +6835,7 @@ static int test_seq_tools(void)
     ok &= tl_count(TSEL, DV_TOM) >= 1u && tl_lanes_of(TSEL, DV_KICK) == 0x1111u;
     bad += check("  A4 / G4 / C5: the lane reversed (its accents with it), cleared, at random; the others stay", ok);
     a = leds_at(0); b2 = leds_at(250);
-    ok = ((a ^ b2) >> white(0)) & 1u && ((a ^ b2) >> white(11)) & 1u && !(((a | b2) >> white(7)) & 1u) &&
+    ok = ((a ^ b2) >> white(0)) & 1u && ((a ^ b2) >> white(11)) & 1u && ((a ^ b2) >> white(7)) & 1u &&   /* (2.4: F4 FREEZE) */
          ((a & b2) >> black(DV_TOM)) & 1u && ((a ^ b2) >> black(0)) & 1u && !(((a | b2) >> black(8)) & 1u);
     btn_up(B_SEQ); frame();
     ui_power_on();
@@ -6838,12 +6844,13 @@ static int test_seq_tools(void)
     btn_down(B_SEQ); frames(500);                       /* (the map: a peek) */
     memcpy(ref, TSEL->step, sizeof ref);
     a = leds_at(0); b2 = leds_at(250);
-    ok &= ((a ^ b2) >> white(5)) & 1u && !(((a | b2) >> white(6)) & 1u) && !(((a | b2) >> black(0)) & 1u);
+    ok &= ((a ^ b2) >> white(5)) & 1u && !(((a | b2) >> white(6)) & 1u) && ((a ^ b2) >> white(7)) & 1u &&   /* (FREEZE: any track) */
+          !(((a | b2) >> black(0)) & 1u);
     tl_key(6); tl_key(10);
     key_down(black(2)); frame(); key_up(black(2)); frame();
     ok &= !memcmp(TSEL->step, ref, sizeof ref) && ui.lane == 0u && !gates();
     btn_up(B_SEQ); frame();
-    bad += check("  LEDs: the tools breathe, the lane lit (DRUM); a melodic track: no BEAT, no lane keys", ok);
+    bad += check("  LEDs: the tools breathe, the lane lit (DRUM); a melodic track: no BEAT, no lane keys (2.4: F4 FREEZE on both)", ok);
 
     /* the lock (a double tap), a song playing */
     ui_power_on();
@@ -9201,10 +9208,11 @@ static int test_home_tracks(void)
     press(B_HOME); ok &= !ui.home && str_eq(cur_page()->title, "CLOCK");
     press(B_HOME); ok &= !ui.home && str_eq(cur_page()->title, "KEYS");
     press(B_HOME); ok &= !ui.home && str_eq(cur_page()->title, "DREAM");
+    press(B_HOME); ok &= !ui.home && str_eq(cur_page()->title, "SCENES");   /* (2.4) */
     press(B_HOME); ok &= ui.home;
     frame();
     ok &= tr_px(3 + 22, tr_y(3) + 1) == T_THEME;
-    bad += check("1.3 HOME > TRACKS: HOME tapped still goes HOME > MIXER > CLOCK > KEYS > DREAM > HOME (the rows back)", ok);
+    bad += check("1.3 HOME > TRACKS: HOME tapped still goes HOME > MIXER > CLOCK > KEYS > DREAM > SCENES > HOME (the rows back)", ok);
 
     ui_prefs |= PREF_LARGE;                             /* MENU > LARGE: the cards as on a list page, the rows */
     ui.force = 1; frame();
@@ -9653,7 +9661,7 @@ static int test_scenes(void)
     }
     bad += check("1.3 SCENE: DUNGEON CRYPT TAVERN CHAPEL BLANK load their sounds, patterns (BLANK: none), tempo, HALL", ok);
     ui_power_on();
-    ok = MI_TAB[row] == MTAB_SYSTEM && MI_TAB[row + 1u] == MTAB_SYSTEM && row + 1u == MI_SERIAL &&
+    ok = MI_TAB[row] == MTAB_SYSTEM && MI_TAB[row + 1u] == MTAB_SYSTEM && row + 1u == MI_SLEEP &&   /* (2.4: SLEEP after it) */
          menu_n(row) == GB_NSCENE && str_eq(MI_NAME[row], "SCENE") && menu_get(row) == 0 &&
          str_eq(menu_vname(row, 0), "DUNGEON") && str_eq(menu_vname(row, 4), "BLANK");
     menu_put(row, 2);

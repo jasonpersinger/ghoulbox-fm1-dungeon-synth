@@ -13,7 +13,15 @@
  * nothing of theirs is in the settings record (MI_PROJECT: menu_get / menu_put read and write song.g) */
 enum { MI_COLOR, MI_STYLE, MI_LARGE, MI_ANIM, MI_LEDS, MI_SCROFF, MI_SCOPE, MI_HOME, MI_HOLD, MI_ACCEL, MI_LATCH, MI_BPMLOCK, MI_SCLLED,
        MI_PREVIEW, MI_CHADD, MI_NAMES, MI_LOWCUT, MI_USB,
-       MI_CLICK, MI_CLKLVL, MI_COUNTIN, MI_TUNE, MI_MIDIIN, MI_SCENE, MI_SERIAL, MI_RESTORE, MI_PANEL, MI_INFO, MI_ABOUT, MI_COUNT };
+       MI_CLICK, MI_CLKLVL, MI_COUNTIN, MI_TUNE, MI_MIDIIN, MI_SEQOUT, MI_SCENE, MI_SLEEP,
+#if FELUCCA_CDC
+       MI_SERIAL,
+#endif
+       MI_RESTORE, MI_PANEL, MI_INFO, MI_ABOUT, MI_COUNT
+#if !FELUCCA_CDC
+       , MI_SERIAL                                     /* GHOULBOX 2.4: no serial console, so no row (past MI_COUNT) */
+#endif
+};
                                                        /* (1.1: the metronome's rows in AUDIO; 1.2: RESTORE LAST in
                                                         * SYSTEM, SCALE LEDS STEP PREVIEW CHORD ENTRY in CONTROL, SCOPE in
                                                         * DISPLAY, TUNE in AUDIO, MIDI IN in MIDI, INFO in SYSTEM;
@@ -23,7 +31,11 @@ enum { MI_COLOR, MI_STYLE, MI_LARGE, MI_ANIM, MI_LEDS, MI_SCROFF, MI_SCOPE, MI_H
 static const char *const MI_NAME[MI_COUNT] = {"COLOR", "STYLE", "LARGE", "ANIM", "LEDS", "SCREEN OFF", "SCOPE", "HOME", "HOLD", "KNOB ACCEL",
                                               "FX LATCH", "BPM LOCK", "SCALE LEDS", "STEP PREVIEW", "CHORD ENTRY", "NOTE NAMES",
                                               "SPEAKER EQ", "USB LEVEL", "CLICK", "CLICK LEVEL", "COUNT-IN", "TUNE",
-                                              "MIDI IN", "SCENE", "USB SERIAL", "RESTORE LAST", "CALIBRATION", "INFO", "ABOUT"};
+                                              "MIDI IN", "SEQ OUT", "SCENE", "SLEEP",
+#if FELUCCA_CDC
+                                              "USB SERIAL",
+#endif
+                                              "RESTORE LAST", "CALIBRATION", "INFO", "ABOUT"};
 /* 1.0.5: the MENU's tabs (ui_menu.c: ALGORITHM steps between them, PRESETS among one tab's rows; the editor gets a
  * row's tab after its MENU_DESC reply). A tab's rows follow each other in MI order (tests/ui_test.c checks it); at
  * most MTAB_ROWS each (the page does not scroll: ui_menu.c fits them; 1.2: 7, the rows of such a tab 21 px; 1.3: 8,
@@ -46,9 +58,14 @@ static const uint8_t MI_TAB[MI_COUNT] = {
                                                                              * COUNT-IN */
     MTAB_AUDIO,                                                             /* TUNE (1.2) */
     MTAB_MIDI,                                                              /* MIDI IN (1.2) */
+    MTAB_MIDI,                                                              /* SEQ OUT (GHOULBOX 2.4) */
     MTAB_SYSTEM,                                                            /* SCENE (GHOULBOX) */
-    MTAB_SYSTEM, MTAB_SYSTEM, MTAB_SYSTEM, MTAB_SYSTEM, MTAB_SYSTEM,        /* USB SERIAL, RESTORE LAST, CALIBRATION,
-                                                                             * INFO (1.2), ABOUT */
+    MTAB_SYSTEM,                                                            /* SLEEP (GHOULBOX 2.4) */
+#if FELUCCA_CDC
+    MTAB_SYSTEM,                                                            /* USB SERIAL */
+#endif
+    MTAB_SYSTEM, MTAB_SYSTEM, MTAB_SYSTEM, MTAB_SYSTEM,                     /* RESTORE LAST, CALIBRATION, INFO (1.2),
+                                                                             * ABOUT */
 };
 /* TUNE: the project's tuning in cents (G_TUNE, -50..+50); as a row its values 0..TUNE_N - 1 (value - TUNE_MIN). The
  * editor gets it as a number (EDM_INT: the cents, min..max, its unit) */
@@ -90,6 +107,7 @@ static const menu_flag_t MENU_FLAGS[] = {
     {MI_PREVIEW, PREF_PREVIEW, {"OFF", "ON"}},         /* 1.2, Discussion #169: ON, the cursor's step sounds (ui_input.c) */
     {MI_CHADD, PREF_CHORD_ADD, {"HOLD", "ADD"}},       /* 1.2, #155: ADD, keys add to the cursor step (ui_input.c) */
     {MI_NAMES, PREF_NAMES_OFF, {"ON", "OFF"}},         /* GHOULBOX 2.1: OFF, no note / chord name in the header */
+    {MI_SEQOUT, PREF_SEQ_OUT, {"OFF", "ON"}},          /* GHOULBOX 2.4: ON, the sequencer's notes out over USB MIDI (seq.c) */
 };
 /* SPEAKER EQ (settings.lowcut, fx.c fx_lowcut): an EQ on the master for the small speaker, not a speaker switch
  * (#42: "OFF" read as the speaker off). FLAT is the old OFF (0, stored as before). The built-in speaker cannot be
@@ -144,7 +162,7 @@ static uint32_t menu_n(uint32_t row)
     return row == MI_COLOR ? NPALETTES : row == MI_LOWCUT || (row >= MI_CLICK && row <= MI_COUNTIN) ? 3u :
            row == MI_HOLD ? 4u : row == MI_LEDS ? LEDS_COUNT : row == MI_SCROFF ? NELEM(SCROFF_N) :
            row == MI_TUNE ? TUNE_N : row == MI_MIDIIN ? NELEM(N_ROUTE) : row == MI_ANIM ? 3u :
-           row == MI_SCENE ? GB_NSCENE : 2u;
+           row == MI_SCENE ? GB_NSCENE : row == MI_SLEEP ? SLEEP_N : 2u;
 }
 static uint32_t menu_get(uint32_t row)
 {
@@ -158,6 +176,7 @@ static uint32_t menu_get(uint32_t row)
     case MI_LOWCUT: return settings.lowcut % 3u;
     case MI_HOLD: return settings_hold % 4u;
     case MI_SCENE: return ui_scene < GB_NSCENE ? ui_scene : 0u;   /* (a later version's: DUNGEON, as played) */
+    case MI_SLEEP: return sleep_get();                 /* (GHOULBOX 2.4; another value: OFF) */
     case MI_SCROFF: return scr_get();
     case MI_ANIM: return ui_prefs & PREF_ANIM_OFF ? 1u : (ui_idle & 1u) ? 2u : 0u;
     case MI_HOME: return (uint32_t)home_tracks();
@@ -182,6 +201,7 @@ static const char *menu_vname(uint32_t row, uint32_t v)
     case MI_LOWCUT: return SPK_EQ[v % 3u];
     case MI_HOLD: return HOLD_N[v & 3u];
     case MI_SCENE: return GB_SCENES[v % GB_NSCENE].name;
+    case MI_SLEEP: return SLEEP_NAME[v % SLEEP_N];
     case MI_CLICK: return CLICK_N[v % 3u];
     case MI_CLKLVL: return CLKLVL_N[v % 3u];
     case MI_COUNTIN: return COUNTIN_N[v % 3u];
@@ -229,6 +249,7 @@ static void menu_put(uint32_t row, uint32_t v)
     case MI_LOWCUT: settings.lowcut = v; fx_lowcut = (uint8_t)v; break;
     case MI_HOLD: settings_hold = (uint8_t)v; break;
     case MI_SCENE: ui_scene = (uint8_t)v; break;      /* (played at the next power-on: main.c felucca_init) */
+    case MI_SLEEP: ui_sleep = (uint8_t)v; scrn.idle = fm1_ms; break;   /* (the time counts from the change: the editor's too) */
     case MI_SCROFF: scr_put(v); break;                 /* (read every frame: ui.c scr_frame) */
     case MI_ANIM:                                      /* (read where they are used, every frame) */
         ui_prefs = (uint8_t)(v == 1u ? ui_prefs | PREF_ANIM_OFF : ui_prefs & ~PREF_ANIM_OFF);

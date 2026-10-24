@@ -17,7 +17,8 @@
 #define FELUCCA_OTA_DRYRUN 0     /* 1 = stage, ask "success", then undo: no record, no reset */
 #endif
 #ifndef FELUCCA_CDC
-#define FELUCCA_CDC 1            /* USB CDC-ACM serial console */
+#define FELUCCA_CDC 0            /* USB CDC-ACM serial console. GHOULBOX 2.4: left out (6 KB of flash for 2.4's
+                                  * features; off by default since 1.2, and macOS's USB audio wants it gone) */
 #endif
 #ifndef FELUCCA_UAC
 #define FELUCCA_UAC 1            /* USB audio input: the master output, 16-bit stereo 44.1 kHz (usb.c) */

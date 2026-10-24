@@ -239,7 +239,8 @@ static void drum_note_on(track_t *t, voice_t *v)
                                                           * a key-off before the first block (zero-length MIDI
                                                           * notes) would end a fresh voice at env 0 in env_tick */
     dv_trigger(&L->v);
-    if (lane == DV_HATC && K[DV_HATO].v.live)            /* a closed hat chokes the open one */
+    if (lane == DV_HATC && K[DV_HATO].v.live &&          /* a closed hat chokes the open one; GHOULBOX 2.4: not on */
+        drum_kit_plays(t->p[P_E0]) != DK_CRYPT)          /* CRYPT, whose lanes there are a shaker and jingles */
         dv_choke(&K[DV_HATO].v);
 }
 

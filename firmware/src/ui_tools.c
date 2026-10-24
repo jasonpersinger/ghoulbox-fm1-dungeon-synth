@@ -11,7 +11,7 @@
  * A step that held something and is empty after loses its locks (as EDIT's step clear); REVERSE and SHIFT move the
  * steps' automation and locks with them. RANDOM and COOK draw from libc.c rng(): no seed is kept, each press
  * differs. A sequence of ties reversed keeps its note first: N T T -> N T T at the mirrored place */
-enum { TL_CLEAR, TL_REV, TL_LEFT, TL_RIGHT, TL_RANDOM, TL_COOK, TL_BEAT, TL_GAP, TL_LCLR, TL_LREV, TL_LFILL, TL_LRND,
+enum { TL_CLEAR, TL_REV, TL_LEFT, TL_RIGHT, TL_RANDOM, TL_COOK, TL_BEAT, TL_FREEZE, TL_LCLR, TL_LREV, TL_LFILL, TL_LRND,
        TL_N };
 
 /* the track as the layer opened (OCT-): in the pool (RAM's .bss is tight), taken by layer_opened */
@@ -22,7 +22,7 @@ static uint32_t tl_rnd(uint32_t n) { return n ? rng() % n : 0u; }
 static int tl_gate(const step_t *s) { return s->time == ST_NOTE && s->n; }
 static uint32_t tl_lane(const step_t *s, uint32_t l) { return (step_lanes(s) >> l) & 1u; }
 /* place p's action is there for this track (the lane row and BEAT: DRUM only) */
-static int tl_cell(const track_t *t, uint32_t p) { return p < TL_N && p != TL_GAP && (p < TL_BEAT || drum_track(t)); }
+static int tl_cell(const track_t *t, uint32_t p) { return p < TL_N && (p < TL_BEAT || p == TL_FREEZE || drum_track(t)); }
 
 /* the undo copy of t as it is now (ui.c load_begin, but the automation is copied and stays): one action */
 static void tl_undo_take(track_t *t)
@@ -347,6 +347,14 @@ static const char *tl_do(track_t *t, uint32_t p, uint32_t l)
             return 0;
         }
     }
+    if (p == TL_FREEZE) {                               /* (GHOULBOX 2.4: every CHANCE step heard once, else nothing) */
+        uint32_t ti = trk_index(t);
+        for (i = 0; i < len; i++)
+            if (((was >> i) & 1u) && step_chance(&t->step[i]) < 100u && !((seq_seen[ti] >> i) & 1u)) {
+                ui_message("PLAY IT FIRST");
+                return 0;
+            }
+    }
     tl_undo_take(t);
     switch (p) {
     case TL_CLEAR:
@@ -375,6 +383,17 @@ static const char *tl_do(track_t *t, uint32_t p, uint32_t l)
         else
             tl_cook_notes(t, len, n);
         msg = "COOKED";
+        break;
+    case TL_FREEZE:                                     /* GHOULBOX 2.4: the steps as they last played */
+        for (i = 0; i < len; i++)
+            if (((was >> i) & 1u) && step_chance(&t->step[i]) < 100u) {
+                if ((seq_heard[trk_index(t)] >> i) & 1u)
+                    step_set_chance(&t->step[i], 100u);
+                else
+                    step_clear(&t->step[i]);
+            }
+        song.g[G_DREAM] = 0;                            /* (EVOL would change them again) */
+        msg = "FROZEN";
         break;
     case TL_BEAT:                                       /* four on the floor, the backbeat, 8th hats */
         for (i = 0; i < len; i++) {

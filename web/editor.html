@@ -431,12 +431,16 @@ const drumLane = (n) => +LANE_OF[(n >= 35 && n <= 81 ? n : 36 + ((n + 120 - 36) 
 /* the lanes a step strikes (its hits, its notes on their lanes) and which are accented (step_lanes / step_accents) */
 const stepLanes = (s) => (s.time !== 0 ? 0 : s.notes.slice(0, s.n).reduce((m, n) => m | (1 << drumLane(n)), s.hit | 0));
 const stepAccents = (s) => (s.flags & 1 ? stepLanes(s) : (s.acc | 0) & stepLanes(s));
-/* hits as text, an accent marked ">" ("KICK >SNARE HATCL"), and back: null when a word is not a lane */
-const hitsText = (hit, acc) => LANES.map((nm, l) => (hit >> l & 1 ? (acc >> l & 1 ? ">" : "") + nm : "")).filter(Boolean).join(" ");
-function parseHits(text) {
+/* GHOULBOX: the CRYPT kit's own pieces on the same lanes (eng_drum.c drum_lane_name); crypt: the track plays it */
+const CRYPT_LANES = ["FRAME", "ROPE", "SLAP", "SHAKR", "JINGL", "TIMP", "STICK", "GONG"];
+/* hits as text, an accent marked ">" ("KICK >SNARE HATCL"), and back: null when a word is not a lane (a CRYPT kit's
+   names, or the standard ones, read on a CRYPT track) */
+const hitsText = (hit, acc, crypt) => (crypt ? CRYPT_LANES : LANES).map((nm, l) => (hit >> l & 1 ? (acc >> l & 1 ? ">" : "") + nm : "")).filter(Boolean).join(" ");
+function parseHits(text, crypt) {
   let hit = 0, acc = 0;
   for (const w of String(text).toUpperCase().split(/[\s,]+/).filter(Boolean)) {
-    const a = w.startsWith(">"), nm = a ? w.slice(1) : w, l = LANES.includes(nm) ? LANES.indexOf(nm) : LANE_ALIAS[nm];
+    const a = w.startsWith(">"), nm = a ? w.slice(1) : w,
+      l = crypt && CRYPT_LANES.includes(nm) ? CRYPT_LANES.indexOf(nm) : LANES.includes(nm) ? LANES.indexOf(nm) : LANE_ALIAS[nm];
     if (l == null) return null;
     hit |= 1 << l;
     if (a) acc |= 1 << l;
@@ -2956,6 +2960,8 @@ const LAYOUT = (pe0, gc = 27) => [
 const G_SKIP = new Set(["SLOT", "NAME", "LOAD", "SAVE", "ENG", "SET", "CLRSQ", "INIT", "MIDI", "SYNC", "CPU", "CLK"]);
 const key = (s, id) => s + ":" + id;
 const engName = () => (dev && dev.info && dev.dump ? dev.info.engines[dev.dump.engine] : "");
+/* GHOULBOX: the selected track a DRUM on KIT CRYPT (stored value 9, eng_drum.c DK_CRYPT): its lanes have the dungeon names */
+const cryptKit = () => engName() === "DRUM" && dev.dump.p[dev.info.pe0] === 9;
 const gEng = () => { const i = dev.gdesc.findIndex((d) => d && d.label === "ENG"); return i >= 0 ? i : 20; };
 const pSlen = () => { const i = dev.pdesc.findIndex((d) => d && d.fmt === F.STEPS); return i >= 0 ? i : P.SLEN; };
 /* mixer ids by DESC label (core.h: P_PAN 39, P_MUTE 40) */
@@ -3593,7 +3599,7 @@ function fillStep(tr, s) {
   if (!s) return;
   c.notes.value = stepNotes(s);
   c.notes.classList.remove("bad");
-  c.hits.value = hitsText(s.hit | 0, s.acc | 0);
+  c.hits.value = hitsText(s.hit | 0, s.acc | 0, cryptKit());
   c.hits.classList.remove("bad");
   c.time.value = String(s.time);
   c.acc.checked = !!(s.flags & 1);
@@ -3621,7 +3627,7 @@ function renderGrid() {
   for (const b of box.children) {
     const i = +b.dataset.i, s = dev.steps[i];
     const on = stepOn(s), tie = !!s && s.time === 1;
-    const txt = on ? [stepNotes(s), hitsText(s.hit | 0, s.acc | 0)].filter(Boolean).join(" ") : tie ? "—" : "";
+    const txt = on ? [stepNotes(s), hitsText(s.hit | 0, s.acc | 0, cryptKit())].filter(Boolean).join(" ") : tie ? "—" : "";
     const marks = s && on ? (s.flags & 1 ? " >" : "") + (s.flags & 2 ? " ~" : "") + (s.ratchet > 1 ? " x" + s.ratchet : "") : "";
     b.className = [on && "on", tie && "tie", on && s.flags & 1 && "acc", i % 4 === 0 && "beat"].filter(Boolean).join(" ");
     b.title = `${i + 1}: ${on ? txt : tie ? "TIE" : "REST"}${marks}`;
@@ -3638,7 +3644,7 @@ function focusStep(i) {
 }
 async function writeStep(i, tr) {
   const c = tr._c;
-  const notes = parseNotes(c.notes.value), hits = parseHits(c.hits.value);
+  const notes = parseNotes(c.notes.value), hits = parseHits(c.hits.value, cryptKit());
   c.notes.classList.toggle("bad", !notes);
   c.hits.classList.toggle("bad", !hits);
   if (!notes || !hits) return;

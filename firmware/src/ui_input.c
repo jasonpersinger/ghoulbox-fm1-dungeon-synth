@@ -1352,7 +1352,7 @@ static void midi_cc_apply(void)
                 continue;
             q -= 1u;
             if (kind == MC_F) {
-                perf_k[0] = (int8_t)(q == 64u ? 0 : clamp(((int32_t)q - 64) * 100 / 63, -100, 100));
+                perf_k[0] = perf_cc74 = (int8_t)(q == 64u ? 0 : clamp(((int32_t)q - 64) * 100 / 63, -100, 100));
                 continue;
             }
             if (kind == MC_K)
@@ -1422,11 +1422,17 @@ static void ui_input(void)
     fx_map_sync();                                      /* (the FX layer's key map: ui_layer.c, a settings load too) */
     fx_usb_fixed = (ui_prefs & PREF_USB_FIXED) != 0u;   /* (MENU > USB LEVEL: fx.c, audio.c) */
     scope_mix = (ui_prefs2 & (PREF_SCOPE_MIX >> 16)) != 0u;   /* (MENU > SCOPE: fx.c, audio.c) */
+    seq_out = (ui_prefs2 & (PREF_SEQ_OUT >> 16)) != 0u;   /* (GHOULBOX 2.4: MENU > SEQ OUT, seq.c) */
     rp_apply();                                         /* (MENU > CLICK, CLICK LEVEL, COUNT-IN: click.c, seq.c) */
     if (!ui.menu)
         usb_serial_apply();                             /* (MENU > USB SERIAL: when the menu has closed) */
-    if (scr_input(pressed, notes))                      /* MENU > SCREEN OFF: dark, or the wake gesture: swallowed */
-        return;                                         /* (before the buttons' timers: no tap or hold after it) */
+    {
+        int eaten = scr_input(pressed, notes);          /* MENU > SCREEN OFF: dark, or the wake gesture: swallowed */
+        sleep_tick();                                   /* (GHOULBOX 2.4: SLEEP, the panel's idle time just updated) */
+        scene_tick();                                   /* (GHOULBOX 2.4: a SCENES switch, once faded out) */
+        if (eaten)
+            return;                                     /* (before the buttons' timers: no tap or hold after it) */
+    }
     if (mom.n && !mom_down()) {                         /* MOMENTARY: LFO let go (or the menu, a layer ..): back */
         mom_restore();
         ui_message("BACK");
@@ -1664,6 +1670,8 @@ static void ui_input(void)
         song_keys(notes);
     } else if (song.grid == 4u) {                       /* GHOULBOX 2.3: DREAM, a key composes */
         dream_keys(notes);
+    } else if (song.grid == 5u) {                       /* GHOULBOX 2.4: SCENES, a key switches */
+        scene_keys(notes);
     } else if (song.grid) {
         grid_keys(notes);
     } else if (song.seq_mode && cur_page()->graph == GR_ROLL) {   /* STEP */

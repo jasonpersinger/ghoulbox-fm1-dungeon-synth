@@ -17,6 +17,25 @@ GHOULBOX is free and always will be. To support it: [Ko-fi](https://ko-fi.com/gh
 
 ## What's new
 
+### 2.4
+
+- **SCENES: change the music live.** A new HOME page after DREAM: its first five white keys switch to DUNGEON,
+  CRYPT, TAVERN, CHAPEL or BLANK while the music plays, with a short fade out and in. Made for game masters: the
+  party walks into the tavern, one key.
+- **SLEEP.** MENU › SYSTEM › SLEEP OFF, 30, 60 or 90 minutes: after that long without touching the FM-1, the music
+  fades out over two minutes and stops. Touch anything to bring the sound back.
+- **FREEZE: keep the pass you liked.** DREAM's notes each have a chance, so every pass differs. SEQ held, F4: the
+  selected track's steps become exactly what the last pass played, and EVOL turns off. SAVE held undoes it.
+- **SEQ OUT.** MENU › MIDI › SEQ OUT ON sends what the sequencer plays (DREAM's parts too) out over USB MIDI, each
+  track on its own channel: the FM-1 can drive your DAW's instruments. OFF by default.
+- **Fixes:** the CRYPT kit's shaker no longer cuts off its jingles; letting go of the FX layer puts a MIDI CC74
+  filter back where the controller left it instead of opening it; the web editor names a CRYPT kit's lanes
+  (FRAME, ROPE, SLAP, SHAKR, JINGL, TIMP, STICK, GONG).
+- **No more developer console.** MENU › SYSTEM › USB SERIAL is gone (it was off by default since 1.2). That made
+  room for the above, and a Mac now always finds the FM-1's USB audio.
+
+Your saved projects, user presets and settings load and sound as before.
+
 ### 2.3.2
 
 - **A RING fix.** Muting a GURDY track with RING on (GLO's mute keys, the MIXER's MUTE, DREAM's) now silences its
