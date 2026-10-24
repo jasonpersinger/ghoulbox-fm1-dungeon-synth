@@ -790,6 +790,12 @@ async function editorGrid() {
   const h = E.parseHits("kick >snare HATCL cym");
   ok(h && h.hit === (1 | 2 | 8 | 128) && h.acc === 2 && E.hitsText(h.hit, h.acc) === "KICK >SNARE HATCL BELL" &&
      E.parseHits("KICK FOO") === null && E.parseHits(" ").hit === 0, "grid: hits as text (lanes, > accent, CYM / CONGA aliases)");
+  {   /* GHOULBOX 2.4: a CRYPT kit's lanes by their own names (firmware eng_drum.c drum_lane_name), standard names still read */
+    const c = E.parseHits("frame >rope shakr gong", true), k = E.parseHits("KICK >SNARE", true);
+    ok(c && c.hit === (1 | 2 | 8 | 128) && c.acc === 2 && E.hitsText(c.hit, c.acc, true) === "FRAME >ROPE SHAKR GONG" &&
+       k && k.hit === 3 && E.hitsText(c.hit, c.acc) === "KICK >SNARE HATCL BELL" && E.parseHits("FRAME") === null,
+       "grid: a CRYPT kit's hits as text (FRAME ROPE SLAP SHAKR JINGL TIMP STICK GONG), the standard names still read");
+  }
   let s = E.parse[C.STEP_SET](await rq(E.req.stepSet(3, { n: 1, notes: [41, 0, 0, 0], time: 0, flags: 0, vel: 100, hit: 0x81, acc: 0x80 })));
   ok(s.hit === 0x81 && s.acc === 0x80 && s.notes[0] === 41, "grid: STEP_SET / STEP_GET carry the hits (lane 8 too)");
   s = E.parse[C.STEP_SET](await rq(E.req.stepSet(3, { n: 1, notes: [42, 0, 0, 0], time: 0, flags: 0, vel: 100 })));
