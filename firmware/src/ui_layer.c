@@ -159,8 +159,10 @@ static void layer_arm(uint32_t pressed, uint32_t now)
  * opened, or a combo: KNOB 1..4 quiet for a while (#39: the knob still turning is not the page's) */
 static void layer_let_go(uint32_t quiet)
 {
-    if (ui.ly == LAYER_FX && !perf_latch_on)
-        perf_k[0] = perf_k[1] = perf_k[2] = perf_k[3] = 0;
+    if (ui.ly == LAYER_FX && !perf_latch_on) {
+        perf_k[1] = perf_k[2] = perf_k[3] = 0;
+        perf_k[0] = perf_cc74;                          /* (GHOULBOX 2.4: the filter back where CC74 left it, 0 without) */
+    }
     if (lys.rp_dirty) {                                 /* REC: its settings kept, as MENU does when it closes (FX: the map) */
         lys.rp_dirty = 0;
         settings_save();                                /* (deferred while playing) */
@@ -757,6 +759,7 @@ static uint32_t layer_oct(uint32_t pressed, uint32_t oct)
         if (lys.l == LAYER_FX) {                        /* (FX LATCH) every effect and macro off */
             perf_latched = 0;
             perf_k[0] = perf_k[1] = perf_k[2] = perf_k[3] = 0;
+            perf_cc74 = 0;                              /* (all off: CC74's filter too, until its next message) */
             ui_message("FX ALL OFF");
         } else if (lys.l == LAYER_EDIT) {
             uint32_t ld = lys.loaded;

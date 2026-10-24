@@ -229,6 +229,7 @@ static void ui_power_on(void)
     perf_solo = 0;
     memset(&lys, 0, sizeof lys);
     perf_k[0] = perf_k[1] = perf_k[2] = perf_k[3] = 0;
+    perf_cc74 = 0;                                      /* (2.4: no CC74 since power-on) */
     settings_hold = HOLD_DEF;
     fm1_in.buttons = fm1_in.notes = 0;
     memset(&motion, 0, sizeof motion);                  /* (main.c: no motion at power-on) */

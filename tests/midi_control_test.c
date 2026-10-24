@@ -383,6 +383,16 @@ static int cc_map_test(void)
     ok = !memcmp(before, trk[0].p, sizeof before) && perf_k[0] == 100;
     queued(0xB0, 74, 64, 1);
     bad += check("CC74 (GHOULBOX): the master filter, no track parameter", ok && perf_k[0] == 0);
+    /* GHOULBOX 2.4: the FX layer let go (FX LATCH OFF) puts the filter back where CC74 left it, not open */
+    queued(0xB0, 74, 20, 1);
+    ok = perf_k[0] == (20 - 64) * 100 / 63;
+    btn_down(B_FX); frame();
+    turn(EN_K2, 30);
+    ok &= perf_k[1] == 30;
+    btn_up(B_FX); frame();
+    bad += check("CC74 then the FX layer let go: KNOB 2's macro back to 0, the filter back to CC74's place",
+                 ok && perf_k[1] == 0 && perf_k[0] == (20 - 64) * 100 / 63);
+    queued(0xB0, 74, 64, 1);
     queued(0xB0, 71, 0, 1);
     bad += check("CC71 on ANALOG: RES", trk[0].p[P_E5] == 0);
     memcpy(before, trk[1].p, sizeof before); queued(0xB1, 71, 99, 1);

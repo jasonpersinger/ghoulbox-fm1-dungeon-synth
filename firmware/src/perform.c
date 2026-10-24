@@ -84,6 +84,8 @@ static volatile uint8_t perf_solo;    /* main: tracks soloed in the GLO layer (t
 static volatile uint8_t perf_kill;    /* main: every effect off (the menu, a dialog, UBOOT) */
 static volatile int8_t perf_k[4];     /* main: the knob macros, 0 = untouched: FILTER -100..100 (- LPF, + HPF),
                                        * CRUSH 0..100, THROW 0..100, DEPTH cut 0..100 (the buffer effects' level) */
+static int8_t perf_cc74;               /* GHOULBOX 2.4: the FILTER macro as MIDI CC74 last set it (ui_input.c midi_cc_apply):
+                                       * where the FX layer let go puts it back (ui_layer.c layer_let_go) */
 static volatile uint32_t kb_layer;    /* ISR: the keys held that are the layer's, a bit per key */
 static volatile uint32_t perf_held;   /* ISR: the effects held (PF_*) */
 static volatile uint8_t perf_latch_on;   /* main: MENU > FX LATCH ON (#40): a key with FX toggles its effect */

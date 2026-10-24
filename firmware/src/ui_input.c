@@ -1352,7 +1352,7 @@ static void midi_cc_apply(void)
                 continue;
             q -= 1u;
             if (kind == MC_F) {
-                perf_k[0] = (int8_t)(q == 64u ? 0 : clamp(((int32_t)q - 64) * 100 / 63, -100, 100));
+                perf_k[0] = perf_cc74 = (int8_t)(q == 64u ? 0 : clamp(((int32_t)q - 64) * 100 / 63, -100, 100));
                 continue;
             }
             if (kind == MC_K)
