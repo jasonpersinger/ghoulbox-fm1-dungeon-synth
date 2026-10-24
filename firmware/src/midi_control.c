@@ -334,10 +334,13 @@ static void __attribute__((noinline)) midi_route_block(void)
  * (realtime and clock are handled in events_block, SysEx never reaches here). With ROUT CH1-4 channels
  * 5..16 are ignored entirely (with CH5-8 .. CH13-16 every channel outside the block): notes, bend, CCs (CC1/11/64, RPN, and the CC120/121/123 panic and reset),
  * channel aftertouch, so they stay free for other instruments. */
+static volatile uint32_t midi_note_ms;                  /* GHOULBOX 2.4: fm1_ms | 1 of the last note-on in (0 none): sleep.c */
 static void __attribute__((noinline)) midi_event(uint32_t st, uint32_t ch, uint32_t d1, uint32_t d2)
 {
     if (song.g[G_ROUTE] != 1 && !midi_in_block(ch))
         return;
+    if (st == 0x90u && d2)
+        midi_note_ms = fm1_ms | 1u;                     /* (someone playing from a keyboard or a DAW: SLEEP waits) */
     if (st == 0x90u || st == 0x80u)
         midi_note_event(ch, d1, st == 0x90u ? d2 : 0);
     else if (st == 0xE0u) {

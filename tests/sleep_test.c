@@ -69,6 +69,24 @@ int main(void)
     run_ms(200);
     bad += check("sleep: a knob turned wakes it: full level again", fade_level() == FADE_FULL);
 
+    /* someone playing from a MIDI keyboard or a DAW is not idle: no fade while notes come in, then sleep after them */
+    ui_power_on();
+    ui_sleep = 1;
+    scrn.idle = fm1_ms;
+    seq_start();
+    for (i = 0; i < 6u; i++) {
+        midi_event(0x90u, 0, 60, 100);
+        run_ms(500);
+        midi_event(0x80u, 0, 60, 0);
+        run_ms(500);
+    }
+    bad += check("sleep: MIDI notes coming in count as playing: no fade for as long as they come", fade_level() == FADE_FULL &&
+                 song.playing);
+    run_ms(3000 + SLEEP_FADE_MS + 400);
+    bad += check("sleep: once the MIDI notes stop, it sleeps after its time", fade_level() == 0u && !song.playing);
+    sleep_wake();
+    ui_sleep = 0;
+
     /* a value from another firmware in its byte: OFF */
     ui_power_on();
     ui_sleep = 7;
