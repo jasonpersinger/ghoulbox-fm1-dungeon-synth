@@ -7,7 +7,10 @@ static unsigned char host_samples[3][0x14000];
 #define FELUCCA_OTA 1
 #define FELUCCA_FLASH 0
 #define FELUCCA_VERSION "TEST"
-#define FELUCCA_CDC 1                                    /* (as the firmware: MENU > USB SERIAL switches the console) */
+#ifndef FELUCCA_CDC
+#define FELUCCA_CDC 1                                    /* (MENU > USB SERIAL switches the console; GHOULBOX 2.4
+                                                         * builds without it: run_tests.sh builds this test both ways) */
+#endif
 #define main hostsim_main
 #include "hostsim.c"
 #undef main
@@ -181,7 +184,7 @@ static int preferences(void)
         host_wire[n - 30] == 0 &&                        /* (no bank since 1.0.3) */
         host_wire[n - 29] == 0x53 && host_wire[n - 28] == 1 && host_wire[n - 27] == 3 &&
         host_wire[n - 26] == 0x50 && host_wire[n - 25] == 1 && host_wire[n - 24] == 3 &&   /* FM6 v2: no bank, preset patches */
-        host_wire[n - 23] == 0x4E && host_wire[n - 22] == 1 && host_wire[n - 21] == 26 &&   /* MENU settings: 26 items (GHOULBOX's SCENE, 2.1's NOTE NAMES) */
+        host_wire[n - 23] == 0x4E && host_wire[n - 22] == 1 && host_wire[n - 21] == (FELUCCA_CDC ? 26 : 25) &&   /* MENU settings: 26 items (GHOULBOX's SCENE, 2.1's NOTE NAMES; 2.4 without the console: 25) */
         host_wire[n - 20] == 0x52 && host_wire[n - 19] == 1 && host_wire[n - 18] == 4 &&   /* RATCH */
         host_wire[n - 17] == 0x4C && host_wire[n - 16] == 1 && host_wire[n - 15] == 1 &&   /* 1.1 parameter locks */
         host_wire[n - 14] == 0x41 && host_wire[n - 13] == 1 && host_wire[n - 12] == 0 && host_wire[n - 11] == 1 &&   /* 1.2: 128 */
@@ -893,17 +896,20 @@ static int menu_protocol(void)
     FILE *jf = json ? fopen(json, "w") : 0;
     reset();
     if (jf) fprintf(jf, "[");
-    for (i = 0; i < 26u; i++) {
+    /* GHOULBOX 2.4 (FELUCCA_CDC 0): no USB SERIAL row; the items after it come one place earlier, their ids kept */
+    uint32_t nitems = FELUCCA_CDC ? 26u : 25u, w;
+    for (i = 0; i < nitems; i++) {
+        w = !FELUCCA_CDC && i >= 12u ? i + 1u : i;        /* the item WANT, DEF, TAB and MENU_ID describe */
         n = menu_desc(i, &it);
         joined[0] = 0;
         for (k = 0; k < it.nnames; k++) { if (k) strcat(joined, ","); strcat(joined, it.names[k]); }
-        ok &= i == 23u ? n > 10u && it.index == i && it.id == MENU_ID(i) && it.kind == 1 && it.min == -50 && it.max == 50 &&
+        ok &= w == 23u ? n > 10u && it.index == i && it.id == MENU_ID(w) && it.kind == 1 && it.min == -50 && it.max == 50 &&
                          !it.nnames && !strcmp(it.unit, "ct") && !strcmp(it.name, "TUNE")     /* (a number: cents) */
-                       : n > 10u && it.index == i && it.id == MENU_ID(i) && it.kind == 0 && it.min == 0 && !it.unit[0] &&
-                         it.max + 1 == (int32_t)it.nnames && !strcmp(it.name, WANT[i][0]) &&
-                         (WANT[i][1] ? !strcmp(joined, WANT[i][1]) : it.nnames == NPALETTES);
-        ok &= it.value == (DEF[i] < 0 ? (int32_t)settings.palette : DEF[i]) &&
-              it.tab == TAB[i] && !strcmp(it.tabname, TABN[TAB[i]]) && !it.rest;
+                       : n > 10u && it.index == i && it.id == MENU_ID(w) && it.kind == 0 && it.min == 0 && !it.unit[0] &&
+                         it.max + 1 == (int32_t)it.nnames && !strcmp(it.name, WANT[w][0]) &&
+                         (WANT[w][1] ? !strcmp(joined, WANT[w][1]) : it.nnames == NPALETTES);
+        ok &= it.value == (DEF[w] < 0 ? (int32_t)settings.palette : DEF[w]) &&
+              it.tab == TAB[w] && !strcmp(it.tabname, TABN[TAB[w]]) && !it.rest;
         if (i == 0)
             for (k = 0; k < NPALETTES; k++) ok &= !strcmp(it.names[k], UI_PALETTES[k].name);
         if (!ok) { printf("  MENU_DESC %u: %s [%s] value %d max %d tab %u %s\n", i, it.name, joined, it.value, it.max, it.tab, it.tabname); break; }
@@ -915,6 +921,10 @@ static int menu_protocol(void)
         }
     }
     if (jf) { fprintf(jf, "]\n"); fclose(jf); }
+    if (!FELUCCA_CDC) {                                  /* .. and the reply past the last item: none */
+        n = menu_desc(nitems, &it);
+        bad += check("MENU_DESC without the console (GHOULBOX 2.4): 25 items, no USB SERIAL, every id as before", ok && n <= 10u);
+    }
     bad += check("MENU_DESC: 26 items (1.0.4's 12 and GHOULBOX's SCENE (id 12, before USB SERIAL 11) in the menu's order, then 1.1's CLICK, CLICK LEVEL, COUNT-IN, 1.2's RESTORE LAST, SCALE LEDS, SCREEN OFF, 1.2's SCOPE, STEP PREVIEW, CHORD ENTRY, MIDI IN, TUNE, 1.3's HOME, GHOULBOX 2.1's NOTE NAMES), ids 0..25, names, defaults; TUNE a number -50..50 ct", ok);
     bad += check("MENU_DESC (1.0.5): after the names (TUNE: the unit) each item's tab, index and name (DISPLAY CONTROL AUDIO MIDI SYSTEM)", ok);
     {   /* an older editor reads the names and stops: the tab is past them, nothing it reads moved */
@@ -969,10 +979,10 @@ static int menu_protocol(void)
     ok &= menu_set(22, 2) == 0 && song.g[G_ROUTE] == 2 && menu_set(23, -13) == 0 && song.g[G_TUNE] == -13;   /* (1.2: the
                                                          * project's, rc 0: in the music, no settings record) */
     ok &= menu_set(24, 1) == 3 && ui_home_view == HV_TRACKS && ui_prefs2 == 7u && ui_scr == 1u;   /* (1.3: its own byte) */
-    for (i = 0; i < 25u; i++) {                         /* MENU_DESC reads them back */
+    for (i = 0; i < (FELUCCA_CDC ? 25u : 24u); i++) {   /* MENU_DESC reads them back (2.4 without the console: no USB SERIAL) */
         static const int32_t SET[25] = {2, 1, 1, 1, 1, 3, 1, 1, 1, 2, 1, 2, 0, 2, 0, 2, 1, 1, 2, 1, 1, 1, 2, -13, 1};
         menu_desc(i, &it);
-        ok &= it.value == SET[i];
+        ok &= it.value == SET[!FELUCCA_CDC && i >= 12u ? i + 1u : i];
     }
     bad += check("MENU_SET: every setting applied as the menu does (palette, EQ, USB LEVEL, CLICK, COUNT-IN at once, RESTORE LAST, SCALE LEDS, SCREEN OFF, SCOPE, STEP PREVIEW, CHORD ENTRY, HOME), read back", ok);
     ok = menu_set(3, 0) == 3 && !(ui_prefs & PREF_ANIM_OFF) && (ui_prefs & PREF_LARGE) && menu_set(10, 0) == 3 &&
@@ -1011,6 +1021,7 @@ static int menu_protocol(void)
     bad += check("MENU_SET while the MENU page is shown: the page redraws (ui.force)", ui.force && ui.menu == 1);
     ui.menu = 0;
 
+#if FELUCCA_CDC                                          /* (GHOULBOX 2.4: no console, no USB SERIAL row) */
     /* USB SERIAL: the reply first, the re-enumeration 200 ms later (usb_serial_apply, called every frame). (usb.up
      * stays 0 here: the host has no USB registers; usb.config 0 = the device off the bus, enumerated afresh) */
     {
@@ -1042,6 +1053,7 @@ static int menu_protocol(void)
         ok &= usb_cdc_on && usb.config;
         bad += check("MENU_SET USB SERIAL ON: applied later (with the MENU open: when it closes); unchanged: no drop", ok);
     }
+#endif
     reset();
     return bad;
 }

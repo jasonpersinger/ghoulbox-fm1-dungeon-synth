@@ -279,8 +279,11 @@ if [ -f build/gen/felucca_tables.h ]; then
     $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/fm6bank_test" tests/fm6bank_test.c -lm
     run "FM6 voice bank (1.4.1): write / read, power cuts, CRC, SLOT B1..B32, stored SLOT values as before" "$OUT/fm6bank_test"
     $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/editor_test" tests/editor_test.c -lm
-    run "editor: real C protocol, malformed transfers, queue recovery, MENU settings (writes build/host/menu.json)" \
-        env MENU_JSON="$OUT/menu.json" "$OUT/editor_test"
+    run "editor: real C protocol, malformed transfers, queue recovery, MENU settings (with the serial console)" \
+        "$OUT/editor_test"
+    $CC -w -Ibuild/gen -Ifirmware/src -DFELUCCA_CDC=0 -o "$OUT/editor_test_nocdc" tests/editor_test.c -lm
+    run "editor, as GHOULBOX 2.4 builds it (no serial console, no USB SERIAL row; writes build/host/menu.json)" \
+        env MENU_JSON="$OUT/menu.json" "$OUT/editor_test_nocdc"
     $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/robust_test" tests/robust_test.c -lm
     run "robustness: crafted sample slots, engine numbers, retained old projects, preset patterns, malformed requests" \
         "$OUT/robust_test"

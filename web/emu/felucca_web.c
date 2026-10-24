@@ -22,7 +22,7 @@
 
 #define FELUCCA_WEB 1
 #ifndef FELUCCA_CDC
-#define FELUCCA_CDC 1                    /* as src/felucca.c: MENU > USB SERIAL is there (nothing behind it) */
+#define FELUCCA_CDC 0                    /* as src/felucca.c (GHOULBOX 2.4): no MENU > USB SERIAL */
 #endif
 #define FELUCCA_FLASH 1
 #define FELUCCA_OTA 0
