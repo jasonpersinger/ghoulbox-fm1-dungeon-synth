@@ -62,6 +62,10 @@ static int32_t midi_base(void)
 }
 /* MIDI channel 0..15 of track i (keys -> MIDI out): its channel in ROUT's block (SEL, CH1-4: 1..4) */
 static uint32_t trk_midi_ch(uint32_t i) { return (midi_base() > 0 ? (uint32_t)midi_base() : 0u) + i % NTRK; }
+/* GHOULBOX 2.4: per track, the steps rolled since the run started or the steps came (seen) and those whose CHANCE
+ * let them play the last time (heard), a bit a step: SEQ TOOLS > FREEZE (ui_tools.c). The audio ISR writes them */
+static uint64_t seq_seen[NTRK], seq_heard[NTRK];
+static void seq_heard_forget(void) { memset(seq_seen, 0, sizeof seq_seen); memset(seq_heard, 0, sizeof seq_heard); }
 
 static int drum_track(const track_t *t) { return ENGINES[eng_idx(t->eng_req)] == &ENG_DRUM; }
 
@@ -822,6 +826,7 @@ static void keyboard_block(void)
 static void seq_start(void)
 {
     uint32_t i;
+    seq_heard_forget();                            /* (GHOULBOX 2.4: FREEZE knows this run's passes only) */
     motion_begin();
     chain_start();
     for (i = 0; i < NTRK; i++) {                   /* every track from its step 0, together */
@@ -1048,6 +1053,12 @@ static __attribute__((noinline)) void seq_play(track_t *t, uint32_t idx, uint32_
     uint32_t skip = SEQ_ROLLED, i, k;
     if (step_chance(s) < 100u && rng() % 100u >= step_chance(s))
         skip = SEQ_MISS;
+    {                                               /* (GHOULBOX 2.4: what FREEZE keeps) */
+        uint32_t ti = trk_index(t);
+        uint64_t b = (uint64_t)1 << (idx & (NSTEP - 1u));
+        seq_seen[ti] |= b;
+        seq_heard[ti] = skip == SEQ_MISS ? seq_heard[ti] & ~b : seq_heard[ti] | b;
+    }
     if (m)
         motion_step(t, idx, m, skip == SEQ_ROLLED);
     if (t->rskip_n && t->rskip_idx == idx) {

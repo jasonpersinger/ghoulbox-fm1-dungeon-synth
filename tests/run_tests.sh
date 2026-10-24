@@ -227,6 +227,8 @@ if [ -f build/gen/felucca_tables.h ]; then
     run "GHOULBOX 2.4: the master fade, MENU > SYSTEM > SLEEP (fade, stop, silence, wake)" "$OUT/sleep_test"
     $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/seq_out_test" tests/seq_out_test.c -lm
     run "GHOULBOX 2.4: MENU > MIDI > SEQ OUT (the sequencer's notes to USB MIDI, channels, STOP's note-offs)" "$OUT/seq_out_test"
+    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/freeze_test" tests/freeze_test.c -lm
+    run "GHOULBOX 2.4: SEQ TOOLS > FREEZE (the steps as they last played, LEN, one undo, EVOL off)" "$OUT/freeze_test"
     $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/latch_test" tests/latch_test.c -lm
     run "the drone latch (GHOULBOX, GLO + F#4..C#5): new chord, stop press, what ends it, MIDI OUT, recording, voices kept" "$OUT/latch_test"
     $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/keys_test" tests/keys_test.c -lm
