@@ -1429,6 +1429,7 @@ static void ui_input(void)
     {
         int eaten = scr_input(pressed, notes);          /* MENU > SCREEN OFF: dark, or the wake gesture: swallowed */
         sleep_tick();                                   /* (GHOULBOX 2.4: SLEEP, the panel's idle time just updated) */
+        scene_tick();                                   /* (GHOULBOX 2.4: a SCENES switch, once faded out) */
         if (eaten)
             return;                                     /* (before the buttons' timers: no tap or hold after it) */
     }
@@ -1669,6 +1670,8 @@ static void ui_input(void)
         song_keys(notes);
     } else if (song.grid == 4u) {                       /* GHOULBOX 2.3: DREAM, a key composes */
         dream_keys(notes);
+    } else if (song.grid == 5u) {                       /* GHOULBOX 2.4: SCENES, a key switches */
+        scene_keys(notes);
     } else if (song.grid) {
         grid_keys(notes);
     } else if (song.seq_mode && cur_page()->graph == GR_ROLL) {   /* STEP */

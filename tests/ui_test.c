@@ -2744,8 +2744,8 @@ static int test_page_cycles(void)
         ok &= f != FAM_SEQ || PAGES[i].graph == GR_ROLL || PAGES[i].graph == GR_EVENTS;
         ok &= f != FAM_GLO || PAGES[i].graph == GR_SONG;   /* (1.2: GLO's only page) */
         ok &= f != FAM_TRK || PAGES[i].graph == GR_TRK || str_eq(PAGES[i].title, "CLOCK") ||
-              str_eq(PAGES[i].title, "KEYS") || str_eq(PAGES[i].title, "DREAM");   /* HOME's: MIXER CLOCK KEYS (2.1)
-                                                                                     * DREAM (2.3) */
+              str_eq(PAGES[i].title, "KEYS") || str_eq(PAGES[i].title, "DREAM") ||
+              str_eq(PAGES[i].title, "SCENES");   /* HOME's: MIXER CLOCK KEYS (2.1) DREAM (2.3) SCENES (2.4) */
         ok &= PAGES[i].graph != GR_TRK || f == FAM_TRK;
         ui_power_on(); ui.home = 0; ui.page = (uint8_t)i; page_entered();
         ok &= FAM_BTN[cur_fam()] == (f == FAM_TRK ? B_HOME : f == FAM_GLO ? B_GLO : f == FAM_SEQ ? B_SEQ :
@@ -2754,7 +2754,7 @@ static int test_page_cycles(void)
     for (i = 0; i < NPAGES; i++)
         ok &= !str_eq(PAGES[i].title, "PATTERN") && !str_eq(PAGES[i].title, "CHANCE") && !str_eq(PAGES[i].title, "AUTO LIST");
     bad += check("1.2: SEQ has STEP and AUTOMATION only; SONG is GLO's only page, PHRASES SAVE's, MIXER CLOCK KEYS DREAM "
-                 "HOME's (their LED HOME)", ok);
+                 "SCENES HOME's (their LED HOME)", ok);
     {   /* 1.2: GLOBAL and SYSTEM are gone; their knobs: BPM SWG CLK on HOME > CLOCK, TUNE and ROUT on no page (the MENU's),
          * MIDI SYNC CPU on none (INFO shows the USB state and the CPU) */
         uint32_t k, clock = 0;
@@ -2927,6 +2927,8 @@ static int test_product_ux(void)
     press(B_HOME);
     ok &= !ui.home && str_eq(cur_page()->title, "DREAM");
     press(B_HOME);
+    ok &= !ui.home && str_eq(cur_page()->title, "SCENES");   /* (2.4: > SCENES > HOME) */
+    press(B_HOME);
     ok &= ui.home && !ui.menu;
     press(B_HOME);
     ok &= cur_page()->graph == GR_TRK;
@@ -2953,8 +2955,10 @@ static int test_product_ux(void)
         memcpy(song.g, g0, sizeof g0);
     }
     press(B_HOME);
+    ok &= !ui.home && str_eq(cur_page()->title, "SCENES");   /* (2.4: SCENES after DREAM) */
+    press(B_HOME);
     ok &= ui.home;
-    bad += check("HOME cycles HOME > MIXER > CLOCK > KEYS > DREAM > HOME (CLOCK: BPM SWG CLK; KEYS: MODE TRK SPLT OCT; "
+    bad += check("HOME cycles HOME > MIXER > CLOCK > KEYS > DREAM > SCENES > HOME (CLOCK: BPM SWG CLK; KEYS: MODE TRK SPLT OCT; "
                  "DREAM: EVOL DENS DRFT MOOD); elsewhere HOME", ok);
     hold(B_HOME);
     bad += check("1.2: HOME held still opens the menu", ui.menu == 1);
@@ -9204,10 +9208,11 @@ static int test_home_tracks(void)
     press(B_HOME); ok &= !ui.home && str_eq(cur_page()->title, "CLOCK");
     press(B_HOME); ok &= !ui.home && str_eq(cur_page()->title, "KEYS");
     press(B_HOME); ok &= !ui.home && str_eq(cur_page()->title, "DREAM");
+    press(B_HOME); ok &= !ui.home && str_eq(cur_page()->title, "SCENES");   /* (2.4) */
     press(B_HOME); ok &= ui.home;
     frame();
     ok &= tr_px(3 + 22, tr_y(3) + 1) == T_THEME;
-    bad += check("1.3 HOME > TRACKS: HOME tapped still goes HOME > MIXER > CLOCK > KEYS > DREAM > HOME (the rows back)", ok);
+    bad += check("1.3 HOME > TRACKS: HOME tapped still goes HOME > MIXER > CLOCK > KEYS > DREAM > SCENES > HOME (the rows back)", ok);
 
     ui_prefs |= PREF_LARGE;                             /* MENU > LARGE: the cards as on a list page, the rows */
     ui.force = 1; frame();

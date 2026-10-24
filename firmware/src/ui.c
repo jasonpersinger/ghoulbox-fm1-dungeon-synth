@@ -1269,7 +1269,7 @@ static void track_defaults(track_t *t)
 
 /* GHOULBOX: power-on scene s (engines.c GB_SCENES; one out of range, from a later version, plays DUNGEON): the globals'
  * defaults, each part's sound and pattern at 1/8, the scene's tempo, HALL and TAPE (main.c felucca_init) */
-static void gb_scene_load(uint32_t s)
+static void gb_scene_apply(uint32_t s, int live)       /* live (GHOULBOX 2.4, HOME > SCENES): while the audio runs */
 {
     uint32_t i;
     if (s >= GB_NSCENE)
@@ -1283,8 +1283,10 @@ static void gb_scene_load(uint32_t s)
         track_defaults(t);
         set_engine_of(t, p[0]);
         apply_preset_to(t, p[1]);             /* with its sends */
-        t->engine = t->eng_req;
-        eng_mem_claim(t);                     /* (Felucca 1.5's engine memory; zeros already: no note can come before) */
+        if (!live) {                          /* (live: voice.c engine_block switches it, its own crossfade) */
+            t->engine = t->eng_req;
+            eng_mem_claim(t);                 /* (Felucca 1.5's engine memory; zeros already: no note can come before) */
+        }
         track_defaults_steps(t);              /* (a sound load never touches them) */
         if (p[2])
             load_pat16(t, PATTERNS[p[2] - 1u].note, PATTERNS[p[2] - 1u].flags);
@@ -1293,13 +1295,16 @@ static void gb_scene_load(uint32_t s)
         t->p[P_SDIV] = 1;                     /* 1/8, a slow scene */
     }
     undo_depth--;
-    song.sel = 0;
     song.g[G_BPM] = GB_SCENES[s].bpm;
     song.g[G_RTYPE] = 2;                      /* HALL */
     song.g[G_TAPE] = GB_SCENES[s].tape;
-    ui.home = 1;
     ui.force = 1;
+    if (live)
+        return;                               /* (the page and the selected track stay) */
+    song.sel = 0;
+    ui.home = 1;
 }
+static void gb_scene_load(uint32_t s) { gb_scene_apply(s, 0); }
 
 /* switch engine (its defaults + first preset) and say so */
 static void select_engine(uint32_t e)
@@ -1555,6 +1560,7 @@ static void track_select(uint32_t i)
 #include "ui_events.c"                            /* SEQ > AUTOMATION: locks, events, CHANCE, RATCH as a list (an action page) */
 #include "dream.c"                                 /* GHOULBOX 2.3: HOME > DREAM, generative ambient */
 #include "sleep.c"                                 /* GHOULBOX 2.4: MENU > SYSTEM > SLEEP */
+#include "scenes.c"                                /* GHOULBOX 2.4: HOME > SCENES, a live scene switch */
 
 /* ---------------------------------------------------- action pages --- */
 /* Pages whose purpose is an action (SAVE > USER, PHRASES, PROJECT, TOOLS, EDIT > SLICES, SEQ > AUTOMATION): the knobs pick,
