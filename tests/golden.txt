@@ -121,7 +121,7 @@ drums/kit_10 0cd4e95937dc519c
 drums/kit_66 04e60dfd865541b0
 drums/kit_55 b86935ebf007cdbc
 drums/kit_77 1e3617b89fd7e2fc
-drums/kit_CRYPT c9cabda9f729cd0c
+drums/kit_CRYPT 228a3c87e07cae2c
 mode/ANALOG/POLY 37fb068bc75b2f5c
 mode/ANALOG/MONO 4904e99e3020a8b0
 mode/ANALOG/LEGATO 8fff1c8dc8b7ded8

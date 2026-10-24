@@ -546,6 +546,26 @@ static void choke(void)
     printf("drum_test: choke in the DRUM engine (note 42 after 46): the open hat's lane choked and silent: %s\n",
            ok ? "ok" : "FAIL");
     fails += !ok;
+    /* GHOULBOX 2.4: the CRYPT kit's SHAKR (the closed hat's lane) does not choke its JINGL (the open hat's): they are
+     * a shaker and jingles, not one hi-hat */
+    host_tracks_init();
+    host_preset(&trk[0], ENGI_DRUM, 0);
+    trk[0].p[P_E0] = 9;                                /* KIT CRYPT (eng_drum.c DK_CRYPT) */
+    trk[0].p[P_SUS] = 127;
+    trk_note_on(&trk[0], 46, 100);
+    for (i = 0; i < 20u; i++) {
+        int32_t o[2 * CTL];
+        mix_block(o, CTL);
+    }
+    trk_note_on(&trk[0], 42, 100);
+    for (i = 0; i < 20u; i++) {
+        int32_t o[2 * CTL];
+        mix_block(o, CTL);
+    }
+    ok = drum_kit_plays(trk[0].p[P_E0]) == DK_CRYPT && !drum_kit_of(&trk[0])[DV_HATO].v.choke &&
+         drum_kit_of(&trk[0])[DV_HATO].v.live && drum_kit_of(&trk[0])[DV_HATC].v.live;
+    printf("drum_test: CRYPT kit: SHAKR (note 42) leaves JINGL (46) ringing, no choke: %s\n", ok ? "ok" : "FAIL");
+    fails += !ok;
 }
 
 static void kick_speaker(void)
