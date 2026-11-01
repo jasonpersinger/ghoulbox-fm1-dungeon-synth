@@ -33,7 +33,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 20px 16px 32px; }
 .tagline { margin: -8px 0 18px; text-align: center; font: 700 19px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
            "Helvetica Neue", Arial, sans-serif; color: var(--bone); letter-spacing: .02em; text-shadow: 0 0 3px #000, 0 0 6px #000, 0 2px 0 #000; }
 /* the calls under the tagline: Install as the installer's own button (a pixel slab in torch amber) */
-.calls { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px 24px; margin: 0 0 24px; }
+.calls { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px 24px; margin: 24px 0; }
 .slab { display: inline-block; font: 600 18px/1 monospace; letter-spacing: .08em; text-decoration: none; color: var(--night);
         background: var(--amber); padding: 14px 32px; box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .35),
         inset 0 4px 0 rgba(255, 255, 255, .3), 0 0 0 2px #000; }
@@ -41,6 +41,24 @@ main { max-width: 1240px; margin: 0 auto; padding: 20px 16px 32px; }
 .slab.bone { background: var(--bone); font-size: 15px; padding: 12px 22px; }
 .calls .plain { font: 700 17px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
                text-shadow: 0 0 3px #000, 0 0 6px #000, 0 2px 0 #000; }
+/* GHOULBOX DAW plugin top section */
+.plugin-hero { max-width: 1040px; margin: 0 auto 36px; padding: 24px 20px 22px; background: var(--plaque);
+               box-shadow: 0 0 0 2px #6b4513, 0 0 0 4px #000, 0 0 0 6px #3a3a3e; text-align: center; box-sizing: border-box; }
+.plugin-headline { margin: 0 0 8px; font: 700 36px/1.1 DotGothic16, monospace; letter-spacing: .08em;
+                   color: var(--amber); text-shadow: 0 0 10px rgba(239, 154, 41, .35), 0 2px 0 #000; text-transform: uppercase; }
+.plugin-subhead { margin: 0 0 8px; font: 700 18px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                  color: var(--bone); text-shadow: 0 0 3px #000, 0 0 6px #000, 0 2px 0 #000; }
+.plugin-release { margin: 0 0 20px; font: 700 15px/1.4 DotGothic16, monospace; letter-spacing: .03em; color: var(--amber); }
+.plugin-calls { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 14px 20px; margin: 0 0 14px; }
+.plugin-calls .slab { font-size: 16px; padding: 12px 26px; }
+.plugin-note { margin: 0 0 22px; font-size: 12px; color: var(--bone); opacity: .88; }
+.plugin-preview { display: flex; justify-content: center; align-items: center; margin: 0 auto; max-width: 100%; }
+.plugin-preview img { width: 100%; max-width: 1036px; height: auto; display: block;
+                      box-shadow: 0 0 0 2px #6b4513, 0 0 0 4px #000; }
+.firmware-heading { max-width: 1040px; margin: 40px auto 16px; text-align: center; }
+.firmware-heading h2 { display: inline-block; margin: 0; padding: 8px 24px; font: 700 18px/1.2 DotGothic16, monospace;
+                       letter-spacing: .06em; color: var(--bone); background: var(--plaque);
+                       box-shadow: 0 0 0 2px #6b4513, 0 0 0 4px #000, 0 0 0 6px #3a3a3e; text-transform: uppercase; }
 /* the instrument between two torches (the firmware's own, x4: its 4 frames each 120 ms, the right one 2 frames on) */
 .stage { display: grid; grid-template-columns: 48px minmax(0, 1040px) 48px; gap: 40px; align-items: center;
          justify-content: center; isolation: isolate; }   /* (the glow: over the wall, under the torch) */
@@ -57,7 +75,12 @@ main { max-width: 1240px; margin: 0 auto; padding: 20px 16px 32px; }
 @media (max-width: 1100px) { .stage { grid-template-columns: minmax(0, 1040px); } .stage .torch { display: none; } }
 @media (max-width: 600px) { .crest .skull { width: 48px; height: 56px; } .crest .logo { height: 52px; width: auto; }
                             .crest { gap: 12px; } .tagline { font-size: 15px; }
-                            p.keys span, p.keys label { display: block; white-space: normal; margin: 4px 0; } }
+                            p.keys span, p.keys label { display: block; white-space: normal; margin: 4px 0; }
+                            .plugin-hero { padding: 16px 12px 14px; margin-bottom: 24px; }
+                            .plugin-headline { font-size: 26px; }
+                            .plugin-subhead { font-size: 15px; }
+                            .plugin-release { font-size: 13px; }
+                            .plugin-calls .slab { width: 100%; box-sizing: border-box; text-align: center; } }
 /* the text on stone plaques (a window's frame: EDGE outside, STONE inside, as gfx.c cv_window) */
 .keys, .utility, footer { max-width: 1040px; margin-left: auto; margin-right: auto; background: var(--plaque); padding: 12px 16px;
                 box-shadow: 0 0 0 2px #6b4513, 0 0 0 4px #000, 0 0 0 6px #3a3a3e; }
@@ -175,16 +198,29 @@ body.focus-mode .audio-recovery { position: fixed; top: max(16px, env(safe-area-
 </head>
 <body>
 <main>
-<header class="crest">
-  <img class="skull" src="art/skull.png" alt="">
-  <img class="logo" src="art/logo.png" alt="GHOULBOX">
-</header>
-<p class="tagline">Dungeon synth for the FM-1 · play it here, in your browser</p>
-<nav class="calls"><a class="slab" href="../installer/">Install on your FM-1</a>
-  <a class="slab bone" href="https://ko-fi.com/ghoulbox" target="_blank" rel="noopener">Support on Ko-fi</a>
-  <a class="slab bone" href="https://ghoulbox-shop.fourthwall.com/" target="_blank" rel="noopener">Merch</a>
-  <a class="plain" href="https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/releases/latest">User guide (PDF)</a>
-  <a class="plain" href="https://www.youtube.com/playlist?list=PLMUs0QD7QfOw" target="_blank" rel="noopener">Video lessons</a></nav>
+<section class="plugin-hero" aria-label="GHOULBOX DAW plugin">
+  <h1 class="plugin-headline">GHOULBOX</h1>
+  <p class="plugin-subhead">A CLAP, VST3 and LV2 instrument for dungeon and fantasy synth.</p>
+  <p class="plugin-release">0.2.0-rc4 is out. Pre-release for Linux x86_64.</p>
+  <div class="plugin-calls">
+    <a class="slab" href="https://github.com/jasonpersinger/ghoulbox-plugin/releases/tag/v0.2.0-rc4" target="_blank" rel="noopener">Download 0.2.0-rc4</a>
+    <a class="slab bone" href="https://github.com/jasonpersinger/ghoulbox-plugin" target="_blank" rel="noopener">GitHub</a>
+  </div>
+  <p class="plugin-note">Four layered sound slots, a live firmware screen, and a sound browser. GPL-3.0-only.</p>
+  <div class="plugin-preview">
+    <img src="art/ghoulbox-plugin.png" alt="GHOULBOX DAW plugin interface showing sound slot browser, live firmware screen, and control dials" width="1036" height="857">
+  </div>
+</section>
+
+<section class="firmware-section" aria-label="FM-1 firmware">
+  <div class="firmware-heading">
+    <h2>FM-1 firmware</h2>
+  </div>
+  <header class="crest">
+    <img class="skull" src="art/skull.png" alt="" width="96" height="112">
+    <img class="logo" src="art/logo.png" alt="GHOULBOX" width="416" height="104">
+  </header>
+  <p class="tagline">Dungeon synth for the FM-1 · play it here, in your browser</p>
 <div class="stage">
 <div class="torch" aria-hidden="true"></div>
 <div class="device" id="device">
@@ -197,6 +233,12 @@ body.focus-mode .audio-recovery { position: fixed; top: max(16px, env(safe-area-
 </div>
 <div class="torch r" aria-hidden="true"></div>
 </div>
+
+<nav class="calls"><a class="slab" href="../installer/">Install on your FM-1</a>
+  <a class="slab bone" href="https://ko-fi.com/ghoulbox" target="_blank" rel="noopener">Support on Ko-fi</a>
+  <a class="slab bone" href="https://ghoulbox-shop.fourthwall.com/" target="_blank" rel="noopener">Merch</a>
+  <a class="plain" href="https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth/releases/latest" target="_blank" rel="noopener">User guide (PDF)</a>
+  <a class="plain" href="https://www.youtube.com/playlist?list=PLMUs0QD7QfOw" target="_blank" rel="noopener">Video lessons</a></nav>
 
 <p class="keys">
   <span>Play with the mouse, or with the computer keys printed on the panel.</span>
@@ -234,12 +276,14 @@ body.focus-mode .audio-recovery { position: fixed; top: max(16px, env(safe-area-
   </details>
   <p class="tools-manual-link"><a href="tools.html" target="_blank" rel="noopener">Open the Web Synth Tools manual ↗</a></p>
 </details>
+</section>
 
 <footer>
   <small class="version">GHOULBOX 2.4 · on Felucca v1.4.1</small><br>
   GHOULBOX by Jason Persinger · on <a href="https://github.com/hugelton/Felucca">Felucca</a> by Leo Kuroshita, Hügelton Instruments · <a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0</a> · browser build after charlesvestal's <a href="https://github.com/charlesvestal/fm1-x0x">X0X</a> · DotGothic16 font, <a href="fonts/OFL.txt">SIL OFL 1.1</a> · the name in Pirata One (SIL OFL 1.1)<br>
   <nav><a href="../installer/">Install</a><a href="../editor/">Editor</a><a href="https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth">Source</a><a href="../../firmwares/">All FM-1 firmwares</a></nav>
-  <small>M-VAVE and FM-1 are trademarks of their respective owners. GHOULBOX and Felucca are not affiliated with or endorsed by them.</small>
+  <small>Copyright (C) 2026 MESSYQUEST.<br>
+  GHOULBOX is an independent project. It is not affiliated with, endorsed by or sponsored by M-Vave. The names M-Vave and FM-1 are used only to identify the hardware the GHOULBOX firmware was written for.</small>
 </footer>
 </main>
 
