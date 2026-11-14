@@ -12,6 +12,10 @@
  * Flash access goes through three hooks (also used by the host test):
  *   st_read(off, dst, n)   st_erase(off)   st_prog(off, src, n)
  */
+/* the 1 MiB SPI NOR parts the FM-1 ships with (JEDEC 0x9F id): Puya P25Q80, and UC25HQ80 on units sold
+ * since autumn 2026; same size, same plain commands. Anything else: saves stay in RAM (project.c, rescue.c) */
+#define FL_JEDEC_OK(id) ((id) == 0x856014u || (id) == 0xB36014u)
+
 #define ST_MAGIC 0x554C4546u                   /* "FELU" */
 #define ST_SECTOR 4096u
 #define ST_PAYLOAD_OFF 256u
