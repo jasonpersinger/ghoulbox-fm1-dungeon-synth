@@ -707,6 +707,11 @@ int main(void)
                   irq_races == 3u && song.playing && !transport_req && persist_pending && erases == before);
     bad += mig_test();
     bad += autosave_test();
+    /* GHOULBOX 2.4.1 (Felucca #320): the newer FM-1s' flash (UC25HQ80) saves and updates like the first ones' (Puya);
+     * any other id stays RAM-only (no save, no update session) */
+    bad += check("flash: the Puya (0x856014) and the UC25HQ80 (0xB36014) are known, anything else is not",
+                 FL_JEDEC_OK(0x856014u) && FL_JEDEC_OK(0xB36014u) && !FL_JEDEC_OK(0u) && !FL_JEDEC_OK(0xFFFFFFu) &&
+                 !FL_JEDEC_OK(0x856015u) && !FL_JEDEC_OK(0xEF4014u));
     printf("%s\n", bad ? "PERSISTENCE TEST FAILED" : "persistence test passed");
     return bad != 0;
 }
