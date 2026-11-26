@@ -17,6 +17,19 @@ GHOULBOX is free and always will be. To support it: [Ko-fi](https://ko-fi.com/gh
 
 ## What's new
 
+### 2.4.1
+
+- **Works on the newer FM-1s.** FM-1s sold since about autumn 2026 have a different flash chip (UC25HQ80, ID
+  0xB36014). GHOULBOX up to 2.4 knew only the first one, so on those units nothing saved after a power-off and
+  the installer could not update them. 2.4.1 knows both chips, and so does the USB rescue. Thanks to Leszek
+  Kicior for the fix (#27) and to brangor for testing it on a newer FM-1: saves work and survive a power-off.
+- **A newer FM-1 on M-VAVE's firmware, or on one that knows the newer chip** (Felucca 1.8.2 or later, SLOOP 2.8.5
+  or later), installs 2.4.1 directly.
+- **A newer FM-1 already on GHOULBOX 2.4 or older** can't take an update from the web installer: that GHOULBOX
+  refuses it. Put the FM-1 back on M-VAVE's firmware through the chip's boot mode first (a flasher that writes in
+  WL80UBOOT mode, such as The Firmware Hub's FM-1 rescue; back up the flash first), then install 2.4.1 as usual.
+- Nothing else changes.
+
 ### 2.4
 
 - **SCENES: change the music live.** A new HOME page after DREAM: its first five white keys switch to DUNGEON,
